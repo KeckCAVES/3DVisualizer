@@ -1,0 +1,32 @@
+3D Visualizer Change History
+============================
+
+3D Visualizer 1.0:
+- Beginning of history file
+
+3D Visualizer 1.1:
+- Redesigned Algorithm API to concentrate information needed to create
+  and algorithm object into a new VariableManager class.
+- Added preliminary support for multi-data set visualization into new
+  VariableManager class.
+- Created new Element and Algorithm classes to create isosurfaces of one
+  variable that are color-mapped by another variable.
+- Added original spherical coordinates as scalar variable fields to many
+  modules dealing with spherical coordinates. Together with colored
+  seeded isosurfaces, this allows to extract color-mapped radial slices,
+  for example.
+- Made SeismicTomographyGrid module class more flexible by adding more
+  command line options.
+- Added version number variable to makefile to simplify moving to a
+  simpler installation directory structure in the future.
+
+3D Visualizer 1.2:
+- Added ability to load palette files dynamically using Vrui's new file
+  selection dialog.
+- Lots of cosmetic changes to dialogs.
+- Changed order of main menu entries: color submenu is now right after
+  algorithm submenu.
+- New default appearance of menus inherited from Vrui build 053.
+- Fixed makefile to be in line with Visualizer development sources.
+- Evaluation dialogs can now measure coordinates in the same system as
+  the source data, for example in spherical lat/long/radius coordinates.
