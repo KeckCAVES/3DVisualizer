@@ -3,7 +3,7 @@ Algorithm - Abstract base class for visualization algorithms that
 extract visualization elements from data sets.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,13 +25,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_ABSTRACT_ALGORITHM_INCLUDED
 #define VISUALIZATION_ABSTRACT_ALGORITHM_INCLUDED
 
-#include <Comm/MulticastPipe.h>
-
 #include <Abstract/DataSet.h>
 
 /* Forward declarations: */
 namespace Realtime {
 class AlarmTimer;
+}
+namespace Comm {
+class MulticastPipe;
 }
 namespace GLMotif {
 class WidgetManager;
@@ -40,6 +41,7 @@ class Widget;
 namespace Visualization {
 namespace Abstract {
 class VariableManager;
+class Parameters;
 class Element;
 }
 }
@@ -54,21 +56,16 @@ class Algorithm
 	private:
 	VariableManager* variableManager; // Pointer to the variable manager containing the source data set and variables for this algorithm
 	Comm::MulticastPipe* pipe; // Multicast pipe to synchronize element extraction in a cluster-based environment; created externally but owned by Algorithm object
+	bool master; // Flag if this instance of the algorithm runs on the master node of a visualization cluster
 	
 	/* Constructors and destructors: */
 	public:
-	Algorithm(VariableManager* sVariableManager,Comm::MulticastPipe* sPipe) // Creates algorithm to own the given pipe
-		:variableManager(sVariableManager),pipe(sPipe)
-		{
-		}
+	Algorithm(VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates algorithm to own the given pipe
 	private:
 	Algorithm(const Algorithm& source); // Prohibit copy constructor
 	Algorithm& operator=(const Algorithm& source); // Prohibit assignment operator
 	public:
-	virtual ~Algorithm(void) // Destroys the visualization algorithm
-		{
-		delete pipe;
-		}
+	virtual ~Algorithm(void); // Destroys the visualization algorithm
 	
 	/* Methods: */
 	VariableManager* getVariableManager(void) const // Returns the algorithm's variable manager
@@ -79,17 +76,22 @@ class Algorithm
 		{
 		return pipe;
 		}
+	bool isMaster(void) const // Returns the master flag
+		{
+		return master;
+		}
+	virtual const char* getName(void) const =0; // Returns the algorithm's name
 	virtual bool hasGlobalCreator(void) const; // Returns true if the algorithm has a global creation method
 	virtual bool hasSeededCreator(void) const; // Returns true if the algorithm has a seeded creation method
 	virtual bool hasIncrementalCreator(void) const; // Returns true if the algorithm has incremental creation methods
 	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager); // Returns a new UI widget to change internal settings of the algorithm
-	virtual Element* createElement(void); // Creates a visualization element using the current settings
-	virtual Element* createElement(const DataSet::Locator* seedLocator); // Creates a seeded visualization element using the current settings
-	virtual Element* startElement(void); // Starts creating a visualization element using the current settings
-	virtual Element* startElement(const DataSet::Locator* seedLocator); // Starts creating a seeded visualization element using the current settings
+	virtual Parameters* cloneParameters(void) const =0; // Returns a copy of the algorithm's current extraction parameters
+	virtual void setSeedLocator(const DataSet::Locator* seedLocator); // Updates the algorithm's current extraction parameters according to the given seed locator
+	virtual Element* createElement(Parameters* extractParameters); // Creates a complete visualization element using the current extraction settings; inherits parameter object
+	virtual Element* startElement(Parameters* extractParameters); // Starts creating a visualization element using the current extraction settings; inherits parameter object
 	virtual bool continueElement(const Realtime::AlarmTimer& alarm); // Continues creating the current element; returns true if element is complete
 	virtual void finishElement(void); // Cleans up after an element has been created
-	virtual Element* startSlaveElement(void); // Starts creating a visualization element on the slave node(s) of a cluster environment
+	virtual Element* startSlaveElement(Parameters* extractParameters) =0; // Starts creating a visualization element on the slave node(s) of a cluster environment; inherits parameter object
 	virtual void continueSlaveElement(void); // Receives a fragment of a visualization element on the slave node(s) of a cluster environment
 	};
 

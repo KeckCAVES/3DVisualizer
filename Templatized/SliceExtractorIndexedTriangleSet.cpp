@@ -147,7 +147,7 @@ SliceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam>
 	const typename SliceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam> >::Plane& newSlicePlane,
 	typename SliceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam> >::Slice& newSlice)
 	{
-	/* Set the isosurface extraction parameters: */
+	/* Set the slice extraction parameters: */
 	slicePlane=newSlicePlane;
 	slice=&newSlice;
 	
@@ -191,7 +191,7 @@ SliceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam>
 	const typename SliceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam> >::Plane& newSlicePlane,
 	typename SliceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam> >::Slice& newSlice)
 	{
-	/* Set the isosurface extraction parameters: */
+	/* Set the slice extraction parameters: */
 	slicePlane=newSlicePlane;
 	slice=&newSlice;
 	
@@ -206,7 +206,7 @@ bool
 SliceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam> >::continueSeededSlice(
 	const ContinueFunctorParam& cf)
 	{
-	/* Extract isosurface fragments until the queue is empty: */
+	/* Extract slice fragments until the queue is empty: */
 	while(!cellQueue.empty()&&cf())
 		{
 		/* Get the next cell: */

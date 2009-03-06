@@ -98,6 +98,12 @@ class StreamlineExtractor
 		{
 		return epsilon;
 		}
+	void update(const DataSet* newDataSet,const VectorExtractor& newVectorExtractor,const ScalarExtractor& newScalarExtractor) // Sets a new data set and scalar / vector extractors for subsequent streamline extraction
+		{
+		dataSet=newDataSet;
+		vectorExtractor=newVectorExtractor;
+		scalarExtractor=newScalarExtractor;
+		}
 	void setEpsilon(Scalar newEpsilon); // Sets the integration error threshold
 	void extractStreamline(const Point& startPoint,const Locator& startLocator,Scalar startStepSize,Streamline& newStreamline); // Extracts a streamline for the given position and locator and stores it in the given streamline
 	void startStreamline(const Point& startPoint,const Locator& startLocator,Scalar startStepSize,Streamline& newStreamline); // Starts extracting a streamline for the given position and locator and stores it in the given streamline

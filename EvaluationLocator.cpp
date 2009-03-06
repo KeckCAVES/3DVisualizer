@@ -1,7 +1,7 @@
 /***********************************************************************
 EvaluationLocator - Base class for locators evaluating properties of
 data sets.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,11 +25,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLColorTemplates.h>
 #include <GL/GLGeometryWrappers.h>
 #include <Geometry/OrthogonalTransformation.h>
+#include <GLMotif/WidgetManager.h>
 #include <GLMotif/PopupWindow.h>
+#include <GLMotif/RowColumn.h>
 #include <GLMotif/Label.h>
 #include <GLMotif/TextField.h>
-#include <GLMotif/RowColumn.h>
-#include <GLMotif/WidgetManager.h>
 #include <Vrui/Vrui.h>
 
 #include <Abstract/DataSet.h>
@@ -38,11 +38,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include "Visualizer.h"
 
+#include "EvaluationLocator.h"
+
 /**********************************************
 Methods of class Visualizer::EvaluationLocator:
 **********************************************/
 
-Visualizer::EvaluationLocator::EvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,const char* dialogWindowTitle)
+EvaluationLocator::EvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,const char* dialogWindowTitle)
 	:BaseLocator(sLocatorTool,sApplication),
 	 evaluationDialogPopup(0),
 	 locator(application->dataSet->getLocator()),
@@ -85,7 +87,7 @@ Visualizer::EvaluationLocator::EvaluationLocator(Vrui::LocatorTool* sLocatorTool
 	posBox->manageChild();
 	}
 
-Visualizer::EvaluationLocator::~EvaluationLocator(void)
+EvaluationLocator::~EvaluationLocator(void)
 	{
 	/* Pop down the evaluation dialog: */
 	Vrui::popdownPrimaryWidget(evaluationDialogPopup);
@@ -97,7 +99,7 @@ Visualizer::EvaluationLocator::~EvaluationLocator(void)
 	delete locator;
 	}
 
-void Visualizer::EvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
+void EvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
 	{
 	/* Update the locator: */
 	locator->setPosition(cbData->currentTransformation.getOrigin());
@@ -116,19 +118,19 @@ void Visualizer::EvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCall
 		}
 	}
 
-void Visualizer::EvaluationLocator::buttonPressCallback(Vrui::LocatorTool::ButtonPressCallbackData* cbData)
+void EvaluationLocator::buttonPressCallback(Vrui::LocatorTool::ButtonPressCallbackData* cbData)
 	{
 	/* Create a new evaluation point and start dragging it: */
 	dragging=true;
 	}
 
-void Visualizer::EvaluationLocator::buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCallbackData* cbData)
+void EvaluationLocator::buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCallbackData* cbData)
 	{
 	/* Stop dragging the current evaluation point: */
 	dragging=false;
 	}
 
-void Visualizer::EvaluationLocator::highlightLocator(GLContextData& contextData) const
+void EvaluationLocator::highlightLocator(GLContextData& contextData) const
 	{
 	/* Render the evaluation point: */
 	if(hasPoint)

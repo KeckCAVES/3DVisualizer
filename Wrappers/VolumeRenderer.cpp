@@ -3,7 +3,7 @@ VolumeRenderer - Wrapper class for volume renderers as visualization
 elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -36,6 +36,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/Label.h>
 #include <GLMotif/TextField.h>
 
+#include <Wrappers/VolumeRendererExtractor.h>
+
 #include <Wrappers/VolumeRenderer.h>
 
 namespace Visualization {
@@ -49,19 +51,22 @@ Methods of class VolumeRenderer:
 template <class DataSetWrapperParam>
 inline
 VolumeRenderer<DataSetWrapperParam>::VolumeRenderer(
-	const typename VolumeRenderer<DataSetWrapperParam>::Parameters& sParameters,
+	Visualization::Abstract::Parameters* sParameters,
+	typename VolumeRenderer<DataSetWrapperParam>::Scalar sSliceFactor,
+	float sTransparencyGamma,
 	const typename VolumeRenderer<DataSetWrapperParam>::DS* sDs,
 	const typename VolumeRenderer<DataSetWrapperParam>::SE& sSe,
 	const GLColorMap* sColorMap,
 	Comm::MulticastPipe* pipe)
-	:parameters(sParameters),
+	:Visualization::Abstract::Element(sParameters),
+	 sliceFactor(sSliceFactor),transparencyGamma(sTransparencyGamma),
 	 svr(sDs,sSe,sColorMap,pipe),
 	 sliceFactorValue(0),sliceFactorSlider(0),
 	 transparencyGammaValue(0),transparencyGammaSlider(0)
 	{
 	/* Set the templatized volume renderer's parameters: */
-	svr.setSliceFactor(parameters.sliceFactor);
-	svr.setTransparencyGamma(parameters.transparencyGamma);
+	svr.setSliceFactor(sliceFactor);
+	svr.setTransparencyGamma(transparencyGamma);
 	}
 
 template <class DataSetWrapperParam>
@@ -69,14 +74,6 @@ inline
 VolumeRenderer<DataSetWrapperParam>::~VolumeRenderer(
 	void)
 	{
-	}
-
-template <class DataSetWrapperParam>
-inline
-bool
-VolumeRenderer<DataSetWrapperParam>::usesTransparency(void) const
-	{
-	return true;
 	}
 
 template <class DataSetWrapperParam>
@@ -101,11 +98,11 @@ VolumeRenderer<DataSetWrapperParam>::createSettingsDialog(
 	sliceFactorValue=new GLMotif::TextField("SliceFactorValue",settingsDialog,5);
 	sliceFactorValue->setPrecision(3);
 	sliceFactorValue->setFloatFormat(GLMotif::TextField::FIXED);
-	sliceFactorValue->setValue(double(parameters.sliceFactor));
+	sliceFactorValue->setValue(double(sliceFactor));
 	
 	sliceFactorSlider=new GLMotif::Slider("SliceFactorSlider",settingsDialog,GLMotif::Slider::HORIZONTAL,ss->fontHeight*10.0f);
 	sliceFactorSlider->setValueRange(0.25,4.0,0.05);
-	sliceFactorSlider->setValue(double(parameters.sliceFactor));
+	sliceFactorSlider->setValue(double(sliceFactor));
 	sliceFactorSlider->getValueChangedCallbacks().add(this,&VolumeRenderer::sliderValueChangedCallback);
 	
 	/* Create a slider/textfield combo to change the transparency gamma factor: */
@@ -114,11 +111,11 @@ VolumeRenderer<DataSetWrapperParam>::createSettingsDialog(
 	transparencyGammaValue=new GLMotif::TextField("TransparencyGammaValue",settingsDialog,5);
 	transparencyGammaValue->setPrecision(3);
 	transparencyGammaValue->setFloatFormat(GLMotif::TextField::FIXED);
-	transparencyGammaValue->setValue(double(parameters.transparencyGamma));
+	transparencyGammaValue->setValue(double(transparencyGamma));
 	
 	transparencyGammaSlider=new GLMotif::Slider("TransparencyGammaSlider",settingsDialog,GLMotif::Slider::HORIZONTAL,ss->fontHeight*10.0f);
 	transparencyGammaSlider->setValueRange(0.125,8.0,0.025);
-	transparencyGammaSlider->setValue(double(parameters.transparencyGamma));
+	transparencyGammaSlider->setValue(double(transparencyGamma));
 	transparencyGammaSlider->getValueChangedCallbacks().add(this,&VolumeRenderer::sliderValueChangedCallback);
 	
 	settingsDialog->manageChild();
@@ -170,36 +167,33 @@ VolumeRenderer<DataSetWrapperParam>::glRenderAction(
 template <class DataSetWrapperParam>
 inline
 void
-VolumeRenderer<DataSetWrapperParam>::saveParameters(
-	Misc::File& parameterFile) const
-	{
-	/* Save the parameters to file: */
-	parameters.write(parameterFile);
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
 VolumeRenderer<DataSetWrapperParam>::sliderValueChangedCallback(
 	GLMotif::Slider::ValueChangedCallbackData* cbData)
 	{
+	/* Get proper pointer to the parameter object: */
+	typename VolumeRendererExtractor<DataSetWrapper>::Parameters* myParameters=dynamic_cast<typename VolumeRendererExtractor<DataSetWrapper>::Parameters*>(getParameters());
+	if(myParameters==0)
+		Misc::throwStdErr("VolumeRenderer: Mismatching parameter object type");
+	
 	if(cbData->slider==sliceFactorSlider)
 		{
 		/* Change the slice factor: */
-		parameters.sliceFactor=Scalar(cbData->value);
-		svr.setSliceFactor(parameters.sliceFactor);
+		sliceFactor=Scalar(cbData->value);
+		myParameters->sliceFactor=sliceFactor;
+		svr.setSliceFactor(sliceFactor);
 		
 		/* Update the slice factor value text field: */
-		sliceFactorValue->setValue(double(cbData->value));
+		sliceFactorValue->setValue(double(sliceFactor));
 		}
 	else if(cbData->slider==transparencyGammaSlider)
 		{
 		/* Change the transparency gamma factor: */
-		parameters.transparencyGamma=float(cbData->value);
-		svr.setTransparencyGamma(parameters.transparencyGamma);
+		transparencyGamma=float(cbData->value);
+		myParameters->transparencyGamma=transparencyGamma;
+		svr.setTransparencyGamma(transparencyGamma);
 		
 		/* Update the transparency gamma value label: */
-		transparencyGammaValue->setValue(double(cbData->value));
+		transparencyGammaValue->setValue(double(transparencyGamma));
 		}
 	}
 

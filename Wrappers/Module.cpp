@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Wrappers/DataSetRenderer.h>
 #include <Wrappers/SeededSliceExtractor.h>
 #include <Wrappers/SeededIsosurfaceExtractor.h>
+#include <Wrappers/GlobalIsosurfaceExtractor.h>
 #include <Wrappers/SeededColoredIsosurfaceExtractor.h>
 #include <Wrappers/VolumeRendererExtractor.h>
 #include <Wrappers/ArrowRakeExtractor.h>
@@ -69,7 +70,7 @@ int
 Module<DSParam,DataValueParam>::getNumScalarAlgorithms(
 	void) const
 	{
-	return 4;
+	return 5;
 	}
 
 template <class DSParam,class DataValueParam>
@@ -78,15 +79,33 @@ const char*
 Module<DSParam,DataValueParam>::getScalarAlgorithmName(
 	int scalarAlgorithmIndex) const
 	{
-	if(scalarAlgorithmIndex<0||scalarAlgorithmIndex>=4)
+	if(scalarAlgorithmIndex<0||scalarAlgorithmIndex>=5)
 		Misc::throwStdErr("Module::getAlgorithmName: invalid algorithm index %d",scalarAlgorithmIndex);
 	
-	static const char* algorithmNames[4]=
+	const char* result=0;
+	switch(scalarAlgorithmIndex)
 		{
-		"Seeded Slice","Seeded Isosurface","Seeded Colored Isosurface","Volume Renderer"
-		};
-	
-	return algorithmNames[scalarAlgorithmIndex];
+		case 0:
+			result=SeededSliceExtractor::getClassName();
+			break;
+		
+		case 1:
+			result=SeededIsosurfaceExtractor::getClassName();
+			break;
+		
+		case 2:
+			result=GlobalIsosurfaceExtractor::getClassName();
+			break;
+		
+		case 3:
+			result=SeededColoredIsosurfaceExtractor::getClassName();
+			break;
+		
+		case 4:
+			result=VolumeRendererExtractor::getClassName();
+			break;
+		}
+	return result;
 	}
 
 template <class DSParam,class DataValueParam>
@@ -97,7 +116,7 @@ Module<DSParam,DataValueParam>::getScalarAlgorithm(
 	Visualization::Abstract::VariableManager* variableManager,
 	Comm::MulticastPipe* pipe) const
 	{
-	if(scalarAlgorithmIndex<0||scalarAlgorithmIndex>=4)
+	if(scalarAlgorithmIndex<0||scalarAlgorithmIndex>=5)
 		Misc::throwStdErr("Module::getAlgorithm: invalid algorithm index %d",scalarAlgorithmIndex);
 	
 	Visualization::Abstract::Algorithm* result=0;
@@ -108,25 +127,20 @@ Module<DSParam,DataValueParam>::getScalarAlgorithm(
 			break;
 		
 		case 1:
-			{
-			SeededIsosurfaceExtractor* ise=new SeededIsosurfaceExtractor(variableManager,pipe);
-			result=ise;
+			result=new SeededIsosurfaceExtractor(variableManager,pipe);
 			break;
-			}
 		
 		case 2:
-			{
-			SeededColoredIsosurfaceExtractor* ise=new SeededColoredIsosurfaceExtractor(variableManager,pipe);
-			result=ise;
+			result=new GlobalIsosurfaceExtractor(variableManager,pipe);
 			break;
-			}
 		
 		case 3:
-			{
-			VolumeRendererExtractor* vre=new VolumeRendererExtractor(variableManager,pipe);
-			result=vre;
+			result=new SeededColoredIsosurfaceExtractor(variableManager,pipe);
 			break;
-			}
+		
+		case 4:
+			result=new VolumeRendererExtractor(variableManager,pipe);
+			break;
 		}
 	return result;
 	}
@@ -149,12 +163,28 @@ Module<DSParam,DataValueParam>::getVectorAlgorithmName(
 	if(vectorAlgorithmIndex<0||vectorAlgorithmIndex>=3)
 		Misc::throwStdErr("Module::getVectorAlgorithmName: invalid algorithm index %d",vectorAlgorithmIndex);
 	
-	static const char* vectorAlgorithmNames[3]=
+	const char* result=0;
+	switch(vectorAlgorithmIndex)
 		{
-		"Arrow Rake","Streamline","Streamline Bundle"
-		};
-	
-	return vectorAlgorithmNames[vectorAlgorithmIndex];
+		case 0:
+			result=ArrowRakeExtractor::getClassName();
+			break;
+		
+		case 1:
+			result=StreamlineExtractor::getClassName();
+			break;
+		
+		case 2:
+			result=MultiStreamlineExtractor::getClassName();
+			break;
+		
+		#if 0
+		case 3:
+			result=StreamsurfaceExtractor::getClassName();
+			break;
+		#endif
+		}
+	return result;
 	}
 
 template <class DSParam,class DataValueParam>

@@ -115,6 +115,11 @@ class ColoredIsosurfaceExtractor
 		{
 		return extractionMode;
 		}
+	void update(const DataSet* newDataSet,const ScalarExtractor& newScalarExtractor) // Sets a new data set and scalar extractor for subsequent colored isosurface extraction
+		{
+		dataSet=newDataSet;
+		scalarExtractor=newScalarExtractor;
+		}
 	void setColorScalarExtractor(const ScalarExtractor& newColorScalarExtractor); // Sets the scalar extractor for isosurface color values
 	void setExtractionMode(ExtractionMode newExtractionMode); // Sets the current isosurface extraction mode
 	void extractIsosurface(VScalar newIsovalue,Isosurface& newIsosurface); // Extracts a global isosurface for the given isovalue and stores it in the given isosurface

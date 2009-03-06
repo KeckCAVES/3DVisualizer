@@ -2,7 +2,7 @@
 Streamline - Wrapper class for streamlines as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -47,72 +47,30 @@ class Streamline:public Visualization::Abstract::Element
 	typedef typename DataSetWrapper::DS DS; // Type of templatized data set
 	typedef typename DS::Scalar Scalar; // Scalar type of data set's domain
 	static const int dimension=DS::dimension; // Dimension of data set's domain
-	typedef typename DS::Point Point; // Type for points in the data set's domain
 	typedef typename DataSetWrapper::VScalar VScalar; // Scalar type of scalar extractor
-	typedef GLVertex<Scalar,1,void,0,Scalar,Scalar,dimension> Vertex; // Data type for streamline vertices
+	typedef GLVertex<VScalar,1,void,0,Scalar,Scalar,dimension> Vertex; // Data type for streamline vertices
 	typedef Visualization::Templatized::Polyline<Vertex> Polyline; // Data structure to represent streamlines
-	
-	struct Parameters
-		{
-		/* Elements: */
-		public:
-		int vectorVariableIndex; // Index of the vector variable defining the arrow rake
-		int colorScalarVariableIndex; // Index of the scalar variable used to color the arrows
-		size_t maxNumVertices; // Maximum number of vertices to be extracted
-		Scalar epsilon; // Per-step accuracy threshold for streamline integration
-		Point seedPoint; // The streamline's seeding point
-		
-		/* Constructors and destructors: */
-		Parameters(int sVectorVariableIndex,int sColorScalarVariableIndex,size_t sMaxNumVertices,Scalar sEpsilon) // Initializes permanent parameters
-			:vectorVariableIndex(sVectorVariableIndex),
-			 colorScalarVariableIndex(sColorScalarVariableIndex),
-			 maxNumVertices(sMaxNumVertices),
-			 epsilon(sEpsilon)
-			{
-			}
-		
-		/* Methods: */
-		template <class DataSinkParam>
-		void write(DataSinkParam& dataSink) const // Writes the parameters to a data sink (such as a file or a pipe)
-			{
-			dataSink.write<int>(vectorVariableIndex);
-			dataSink.write<int>(colorScalarVariableIndex);
-			dataSink.write<unsigned int>(maxNumVertices);
-			dataSink.write<Scalar>(epsilon);
-			dataSink.write<Scalar>(seedPoint.getComponents(),dimension);
-			}
-		template <class DataSourceParam>
-		Parameters& read(DataSourceParam& dataSource) // Reads the parameters from a data sink (such as a file or a pipe)
-			{
-			vectorVariableIndex=dataSource.read<int>();
-			colorScalarVariableIndex=dataSource.read<int>();
-			maxNumVertices=dataSource.read<unsigned int>();
-			epsilon=dataSource.read<Scalar>();
-			dataSource.read<Scalar>(seedPoint.getComponents(),dimension);
-			return *this;
-			}
-		};
 	
 	/* Elements: */
 	private:
-	Parameters parameters; // Streamline's extraction parameters
 	const GLColorMap* colorMap; // Color map for streamline vertex values
 	Polyline polyline; // Representation of the streamline
 	
 	/* Constructors and destructors: */
 	public:
-	Streamline(const Parameters& sParameters,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty streamline for the given parameters
+	Streamline(Visualization::Abstract::Parameters* sParameters,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty streamline for the given parameters
 	private:
 	Streamline(const Streamline& source); // Prohibit copy constructor
 	Streamline& operator=(const Streamline& source); // Prohibit assignment operator
 	public:
 	virtual ~Streamline(void);
 	
-	/* Methods: */
-	const Parameters& getParameters(void) const // Returns the isosurface's extraction parameters
-		{
-		return parameters;
-		}
+	/* Methods from Visualization::Abstract::Element: */
+	virtual std::string getName(void) const;
+	virtual size_t getSize(void) const;
+	virtual void glRenderAction(GLContextData& contextData) const;
+	
+	/* New methods: */
 	const GLColorMap* getColorMap(void) const // Returns the color map
 		{
 		return colorMap;
@@ -125,10 +83,6 @@ class Streamline:public Visualization::Abstract::Element
 		{
 		return polyline.getNumVertices();
 		}
-	virtual std::string getName(void) const;
-	virtual size_t getSize(void) const;
-	virtual void glRenderAction(GLContextData& contextData) const;
-	virtual void saveParameters(Misc::File& parameterFile) const;
 	};
 
 }

@@ -113,6 +113,11 @@ class IsosurfaceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<V
 		{
 		return extractionMode;
 		}
+	void update(const DataSet* newDataSet,const ScalarExtractor& newScalarExtractor) // Sets a new data set and scalar extractor for subsequent isosurface extraction
+		{
+		dataSet=newDataSet;
+		scalarExtractor=newScalarExtractor;
+		}
 	void setExtractionMode(ExtractionMode newExtractionMode); // Sets the current isosurface extraction mode
 	void extractIsosurface(VScalar newIsovalue,Isosurface& newIsosurface); // Extracts a global isosurface for the given isovalue and stores it in the given isosurface
 	void extractSeededIsosurface(const Locator& seedLocator,Isosurface& newIsosurface); // Extracts a seeded isosurface for the given isovalue from the given cell and stores it in the given isosurface

@@ -2,7 +2,7 @@
 StreamlineExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized streamline extractor
 implementation.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,8 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_WRAPPERS_STREAMLINEEXTRACTOR_IMPLEMENTATION
 
-#include <stdio.h>
 #include <Misc/ThrowStdErr.h>
+#include <Misc/File.h>
+#include <Comm/MulticastPipe.h>
+#include <Comm/ClusterPipe.h>
 #include <Math/Math.h>
 #include <GLMotif/StyleSheet.h>
 #include <GLMotif/WidgetManager.h>
@@ -38,7 +40,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Templatized/StreamlineExtractor.h>
 #include <Wrappers/VectorExtractor.h>
 #include <Wrappers/ScalarExtractor.h>
+#include <Wrappers/ElementSizeLimit.h>
 #include <Wrappers/AlarmTimerElement.h>
+#include <Wrappers/ParametersIOHelper.h>
 
 #include <Wrappers/StreamlineExtractor.h>
 
@@ -46,59 +50,239 @@ namespace Visualization {
 
 namespace Wrappers {
 
-/************************************
-Methods of class StreamlineExtractor:
-************************************/
+/************************************************
+Methods of class StreamlineExtractor::Parameters:
+************************************************/
+
+template <class DataSetWrapperParam>
+template <class DataSourceParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::readBinary(
+	DataSourceParam& dataSource,
+	bool raw,
+	const Visualization::Abstract::VariableManager* variableManager)
+	{
+	/* Read all elements: */
+	if(raw)
+		vectorVariableIndex=dataSource.template read<int>();
+	else
+		vectorVariableIndex=readVectorVariableNameBinary<DataSourceParam>(dataSource,variableManager);
+	if(raw)
+		colorScalarVariableIndex=dataSource.template read<int>();
+	else
+		colorScalarVariableIndex=readScalarVariableNameBinary<DataSourceParam>(dataSource,variableManager);
+	maxNumVertices=dataSource.template read<unsigned int>();
+	epsilon=dataSource.template read<Scalar>();
+	dataSource.template read<Scalar>(seedPoint.getComponents(),dimension);
+	}
+
+template <class DataSetWrapperParam>
+template <class DataSinkParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::writeBinary(
+	DataSinkParam& dataSink,
+	bool raw,
+	const Visualization::Abstract::VariableManager* variableManager) const
+	{
+	/* Write all elements: */
+	if(raw)
+		dataSink.template write<int>(vectorVariableIndex);
+	else
+		writeVectorVariableNameBinary<DataSinkParam>(dataSink,vectorVariableIndex,variableManager);
+	if(raw)
+		dataSink.template write<int>(colorScalarVariableIndex);
+	else
+		writeScalarVariableNameBinary<DataSinkParam>(dataSink,colorScalarVariableIndex,variableManager);
+	dataSink.template write<unsigned int>(maxNumVertices);
+	dataSink.template write<Scalar>(epsilon);
+	dataSink.template write<Scalar>(seedPoint.getComponents(),dimension);
+	}
 
 template <class DataSetWrapperParam>
 inline
-const typename StreamlineExtractor<DataSetWrapperParam>::DS*
-StreamlineExtractor<DataSetWrapperParam>::getDs(
+StreamlineExtractor<DataSetWrapperParam>::Parameters::Parameters(
+	Visualization::Abstract::VariableManager* variableManager)
+	:vectorVariableIndex(variableManager->getCurrentVectorVariable()),
+	 colorScalarVariableIndex(variableManager->getCurrentScalarVariable()),
+	 locatorValid(false)
+	{
+	update(variableManager,false);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::read(
+	Misc::File& file,
+	bool ascii,
+	Visualization::Abstract::VariableManager* variableManager)
+	{
+	if(ascii)
+		{
+		/* Parse the parameter section: */
+		AsciiParameterFileSectionHash* hash=parseAsciiParameterFileSection<Misc::File>(file);
+		
+		/* Extract the parameters: */
+		vectorVariableIndex=readVectorVariableNameAscii(hash,"vectorVariable",variableManager);
+		colorScalarVariableIndex=readScalarVariableNameAscii(hash,"colorScalarVariable",variableManager);
+		maxNumVertices=readParameterAscii<unsigned int>(hash,"maxNumVertices",maxNumVertices);
+		epsilon=readParameterAscii<Scalar>(hash,"epsilon",epsilon);
+		seedPoint=readParameterAscii<Point>(hash,"seedPoint",seedPoint);
+		
+		/* Clean up: */
+		deleteAsciiParameterFileSectionHash(hash);
+		}
+	else
+		{
+		/* Read from binary file: */
+		readBinary(file,false,variableManager);
+		}
+	
+	/* Update derived parameters: */
+	update(variableManager,true);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::read(
+	Comm::MulticastPipe& pipe,
+	Visualization::Abstract::VariableManager* variableManager)
+	{
+	/* Read from multicast pipe: */
+	readBinary(pipe,true,variableManager);
+	
+	/* Update derived parameters: */
+	update(variableManager,true);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::read(
+	Comm::ClusterPipe& pipe,
+	Visualization::Abstract::VariableManager* variableManager)
+	{
+	/* Read (and ignore) the parameter packet size from the cluster pipe: */
+	pipe.read<unsigned int>();
+	
+	/* Read from cluster pipe: */
+	readBinary(pipe,false,variableManager);
+	
+	/* Update derived parameters: */
+	update(variableManager,true);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::write(
+	Misc::File& file,
+	bool ascii,
+	const Visualization::Abstract::VariableManager* variableManager) const
+	{
+	if(ascii)
+		{
+		/* Write to ASCII file: */
+		file.write("{\n",2);
+		writeVectorVariableNameAscii<Misc::File>(file,"vectorVariable",vectorVariableIndex,variableManager);
+		writeScalarVariableNameAscii<Misc::File>(file,"colorScalarVariable",colorScalarVariableIndex,variableManager);
+		writeParameterAscii<Misc::File,unsigned int>(file,"maxNumVertices",maxNumVertices);
+		writeParameterAscii<Misc::File,Scalar>(file,"epsilon",epsilon);
+		writeParameterAscii<Misc::File,Point>(file,"seedPoint",seedPoint);
+		file.write("}\n",2);
+		}
+	else
+		{
+		/* Write to binary file: */
+		writeBinary(file,false,variableManager);
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::write(
+	Comm::MulticastPipe& pipe,
+	const Visualization::Abstract::VariableManager* variableManager) const
+	{
+	/* Write to multicast pipe: */
+	writeBinary(pipe,true,variableManager);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::write(
+	Comm::ClusterPipe& pipe,
+	const Visualization::Abstract::VariableManager* variableManager) const
+	{
+	/* Calculate the byte size of the marshalled parameter packet: */
+	size_t packetSize=0;
+	packetSize+=getVectorVariableNameLength(vectorVariableIndex,variableManager);
+	packetSize+=getScalarVariableNameLength(colorScalarVariableIndex,variableManager);
+	packetSize+=sizeof(unsigned int)+sizeof(Scalar);
+	packetSize+=sizeof(Scalar)*dimension;
+	
+	/* Write the packet size to the cluster pipe: */
+	pipe.write<unsigned int>(packetSize);
+	
+	/* Write to cluster pipe: */
+	writeBinary(pipe,false,variableManager);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::update(
 	Visualization::Abstract::VariableManager* variableManager,
-	int vectorVariableIndex,
-	int colorScalarVariableIndex)
+	bool track)
 	{
 	/* Get the abstract data set pointer: */
 	const Visualization::Abstract::DataSet* ds1=variableManager->getDataSetByVectorVariable(vectorVariableIndex);
 	const Visualization::Abstract::DataSet* ds2=variableManager->getDataSetByScalarVariable(colorScalarVariableIndex);
 	if(ds1!=ds2)
-		Misc::throwStdErr("StreamlineExtractor::StreamlineExtractor: Incompatible vector and scalar variables");
+		Misc::throwStdErr("StreamlineExtractor::Parameters::update: Incompatible vector and scalar variables");
 	
 	/* Get a pointer to the data set wrapper: */
 	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(ds1);
 	if(myDataSet==0)
-		Misc::throwStdErr("StreamlineExtractor::StreamlineExtractor: Mismatching data set type");
+		Misc::throwStdErr("StreamlineExtractor::Parameters::update: Mismatching data set type");
+	ds=&myDataSet->getDs();
 	
-	return &myDataSet->getDs();
-	}
-
-template <class DataSetWrapperParam>
-inline
-const typename StreamlineExtractor<DataSetWrapperParam>::VE&
-StreamlineExtractor<DataSetWrapperParam>::getVe(
-	const Visualization::Abstract::VectorExtractor* sVectorExtractor)
-	{
 	/* Get a pointer to the vector extractor wrapper: */
-	const VectorExtractor* myVectorExtractor=dynamic_cast<const VectorExtractor*>(sVectorExtractor);
+	const VectorExtractor* myVectorExtractor=dynamic_cast<const VectorExtractor*>(variableManager->getVectorExtractor(vectorVariableIndex));
 	if(myVectorExtractor==0)
-		Misc::throwStdErr("StreamlineExtractor::StreamlineExtractor: Mismatching vector extractor type");
+		Misc::throwStdErr("StreamlineExtractor::Parameters::update: Mismatching vector extractor type");
+	ve=&myVectorExtractor->getVe();
 	
-	return myVectorExtractor->getVe();
+	/* Get a pointer to the color scalar extractor wrapper: */
+	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(variableManager->getScalarExtractor(colorScalarVariableIndex));
+	if(myScalarExtractor==0)
+		Misc::throwStdErr("StreamlineExtractor::Parameters::update: Mismatching scalar extractor type");
+	cse=&myScalarExtractor->getSe();
+	
+	/* Get a templatized locator: */
+	dsl=ds->getLocator();
+	if(track)
+		{
+		/* Locate the seed point: */
+		locatorValid=dsl.locatePoint(seedPoint);
+		}
 	}
 
+/********************************************
+Static elements of class StreamlineExtractor:
+********************************************/
+
 template <class DataSetWrapperParam>
-inline
-const typename StreamlineExtractor<DataSetWrapperParam>::SE&
-StreamlineExtractor<DataSetWrapperParam>::getSe(
-	const Visualization::Abstract::ScalarExtractor* sScalarExtractor)
-	{
-	/* Get a pointer to the scalar extractor wrapper: */
-	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(sScalarExtractor);
-	if(myScalarExtractor==0)
-		Misc::throwStdErr("StreamlineExtractor::StreamlineExtractor: Mismatching scalar extractor type");
-	
-	return myScalarExtractor->getSe();
-	}
+const char* StreamlineExtractor<DataSetWrapperParam>::name="Streamline";
+
+/************************************
+Methods of class StreamlineExtractor:
+************************************/
 
 template <class DataSetWrapperParam>
 inline
@@ -106,14 +290,15 @@ StreamlineExtractor<DataSetWrapperParam>::StreamlineExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
 	Comm::MulticastPipe* sPipe)
 	:Abstract::Algorithm(sVariableManager,sPipe),
-	 parameters(sVariableManager->getCurrentVectorVariable(),sVariableManager->getCurrentScalarVariable(),100000,0),
-	 sle(getDs(sVariableManager,parameters.vectorVariableIndex,parameters.colorScalarVariableIndex),getVe(sVariableManager->getVectorExtractor(parameters.vectorVariableIndex)),getSe(sVariableManager->getScalarExtractor(parameters.colorScalarVariableIndex))),
+	 parameters(sVariableManager),
+	 sle(parameters.ds,*parameters.ve,*parameters.cse),
 	 currentStreamline(0),
 	 maxNumVerticesValue(0),maxNumVerticesSlider(0),
 	 epsilonValue(0),epsilonSlider(0)
 	{
-	/* Get the default epsilon from the templatized streamline extractor: */
-	parameters.epsilon=DSScalar(sle.getEpsilon());
+	/* Initialize parameters: */
+	parameters.maxNumVertices=100000;
+	parameters.epsilon=Scalar(sle.getEpsilon());
 	}
 
 template <class DataSetWrapperParam>
@@ -121,33 +306,6 @@ inline
 StreamlineExtractor<DataSetWrapperParam>::~StreamlineExtractor(
 	void)
 	{
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
-StreamlineExtractor<DataSetWrapperParam>::setMaxNumVertices(
-	size_t newMaxNumVertices)
-	{
-	parameters.maxNumVertices=newMaxNumVertices;
-	}
-
-template <class DataSetWrapperParam>
-inline
-bool
-StreamlineExtractor<DataSetWrapperParam>::hasSeededCreator(
-	void) const
-	{
-	return true;
-	}
-
-template <class DataSetWrapperParam>
-inline
-bool
-StreamlineExtractor<DataSetWrapperParam>::hasIncrementalCreator(
-	void) const
-	{
-	return true;
 	}
 
 template <class DataSetWrapperParam>
@@ -194,32 +352,46 @@ StreamlineExtractor<DataSetWrapperParam>::createSettingsDialog(
 
 template <class DataSetWrapperParam>
 inline
-Visualization::Abstract::Element*
-StreamlineExtractor<DataSetWrapperParam>::createElement(
+void
+StreamlineExtractor<DataSetWrapperParam>::setSeedLocator(
 	const Visualization::Abstract::DataSet::Locator* seedLocator)
 	{
 	/* Get a pointer to the locator wrapper: */
 	const Locator* myLocator=dynamic_cast<const Locator*>(seedLocator);
 	if(myLocator==0)
-		Misc::throwStdErr("StreamlineExtractor::createElement: Mismatching locator type");
-	const DSL& dsl=myLocator->getDsl();
+		Misc::throwStdErr("StreamlineExtractor::setSeedLocator: Mismatching locator type");
 	
-	/* Calculate the seeding point: */
-	Parameters newParameters=parameters;
-	newParameters.seedPoint=seedLocator->getPosition();
+	/* Update the seed point: */
+	parameters.seedPoint=Point(seedLocator->getPosition());
 	
-	/* Send the parameters to all slaves: */
-	if(getPipe()!=0)
-		{
-		newParameters.write(*getPipe());
-		getPipe()->finishMessage();
-		}
+	/* Copy the locator: */
+	parameters.dsl=myLocator->getDsl();
+	parameters.locatorValid=myLocator->isValid();
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+StreamlineExtractor<DataSetWrapperParam>::createElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("StreamlineExtractor::createElement: Mismatching parameter object type");
+	int csvi=myParameters->colorScalarVariableIndex;
 	
 	/* Create a new streamline visualization element: */
-	Streamline* result=new Streamline(newParameters,getVariableManager()->getColorMap(newParameters.colorScalarVariableIndex),getPipe());
+	Streamline* result=new Streamline(myParameters,getVariableManager()->getColorMap(csvi),getPipe());
+	
+	/* Update the streamline extractor: */
+	sle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
 	
 	/* Extract the streamline into the visualization element: */
-	sle.extractStreamline(seedLocator->getPosition(),dsl,typename SLE::Scalar(0.1),result->getPolyline());
+	sle.startStreamline(myParameters->seedPoint,myParameters->dsl,typename SLE::Scalar(0.1),result->getPolyline());
+	ElementSizeLimit<Streamline> esl(*result,myParameters->maxNumVertices);
+	sle.continueStreamline(esl);
+	sle.finishStreamline();
 	
 	/* Return the result: */
 	return result;
@@ -229,30 +401,22 @@ template <class DataSetWrapperParam>
 inline
 Visualization::Abstract::Element*
 StreamlineExtractor<DataSetWrapperParam>::startElement(
-	const Visualization::Abstract::DataSet::Locator* seedLocator)
+	Visualization::Abstract::Parameters* extractParameters)
 	{
-	/* Get a pointer to the locator wrapper: */
-	const Locator* myLocator=dynamic_cast<const Locator*>(seedLocator);
-	if(myLocator==0)
-		Misc::throwStdErr("StreamlineExtractor::createElement: Mismatching locator type");
-	const DSL& dsl=myLocator->getDsl();
-	
-	/* Calculate the seeding point: */
-	Parameters newParameters=parameters;
-	newParameters.seedPoint=seedLocator->getPosition();
-	
-	/* Send the parameters to all slaves: */
-	if(getPipe()!=0)
-		{
-		newParameters.write(*getPipe());
-		getPipe()->finishMessage();
-		}
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("StreamlineExtractor::createElement: Mismatching parameter object type");
+	int csvi=myParameters->colorScalarVariableIndex;
 	
 	/* Create a new streamline visualization element: */
-	currentStreamline=new Streamline(newParameters,getVariableManager()->getColorMap(newParameters.colorScalarVariableIndex),getPipe());
+	currentStreamline=new Streamline(myParameters,getVariableManager()->getColorMap(csvi),getPipe());
 	
-	/* Start extracting the streamline into the visualization element: */
-	sle.startStreamline(seedLocator->getPosition(),dsl,typename SLE::Scalar(0.1),currentStreamline->getPolyline());
+	/* Update the streamline extractor: */
+	sle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
+	
+	/* Extract the streamline into the visualization element: */
+	sle.startStreamline(myParameters->seedPoint,myParameters->dsl,typename SLE::Scalar(0.1),currentStreamline->getPolyline());
 	
 	/* Return the result: */
 	return currentStreamline.getPointer();
@@ -265,8 +429,9 @@ StreamlineExtractor<DataSetWrapperParam>::continueElement(
 	const Realtime::AlarmTimer& alarm)
 	{
 	/* Continue extracting the streamline into the visualization element: */
-	AlarmTimerElement<Streamline> atcf(alarm,*currentStreamline,parameters.maxNumVertices);
-	return sle.continueStreamline(atcf)||currentStreamline->getElementSize()>=parameters.maxNumVertices;
+	size_t maxNumVertices=dynamic_cast<Parameters*>(currentStreamline->getParameters())->maxNumVertices;
+	AlarmTimerElement<Streamline> atcf(alarm,*currentStreamline,maxNumVertices);
+	return sle.continueStreamline(atcf)||currentStreamline->getElementSize()>=maxNumVertices;
 	}
 
 template <class DataSetWrapperParam>
@@ -283,17 +448,18 @@ template <class DataSetWrapperParam>
 inline
 Visualization::Abstract::Element*
 StreamlineExtractor<DataSetWrapperParam>::startSlaveElement(
-	void)
+	Visualization::Abstract::Parameters* extractParameters)
 	{
-	if(getPipe()==0||getPipe()->isMaster())
+	if(isMaster())
 		Misc::throwStdErr("StreamlineExtractor::startSlaveElement: Cannot be called on master node");
 	
-	/* Read all parameters from the master: */
-	Parameters newParameters=parameters;
-	newParameters.read(*getPipe());
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("StreamlineExtractor::startSlaveElement: Mismatching parameter object type");
 	
 	/* Create a new streamline visualization element: */
-	currentStreamline=new Streamline(newParameters,getVariableManager()->getColorMap(newParameters.colorScalarVariableIndex),getPipe());
+	currentStreamline=new Streamline(myParameters,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
 	
 	return currentStreamline.getPointer();
 	}
@@ -304,7 +470,7 @@ void
 StreamlineExtractor<DataSetWrapperParam>::continueSlaveElement(
 	void)
 	{
-	if(getPipe()==0||getPipe()->isMaster())
+	if(isMaster())
 		Misc::throwStdErr("StreamlineExtractor::continueSlaveElement: Cannot be called on master node");
 	
 	currentStreamline->getPolyline().receive();
@@ -331,7 +497,7 @@ StreamlineExtractor<DataSetWrapperParam>::epsilonSliderCallback(
 	{
 	/* Get the new slider value and convert to step size: */
 	double epsilon=Math::pow(10.0,double(cbData->value));
-	parameters.epsilon=DSScalar(epsilon);
+	parameters.epsilon=Scalar(epsilon);
 	
 	/* Update the streamline extractor's error threshold: */
 	sle.setEpsilon(typename SLE::Scalar(epsilon));

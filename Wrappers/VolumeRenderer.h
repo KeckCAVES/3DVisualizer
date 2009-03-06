@@ -3,7 +3,7 @@ VolumeRenderer - Wrapper class for volume renderers as visualization
 elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -39,6 +39,7 @@ class GLColorMap;
 namespace GLMotif {
 class TextField;
 }
+
 namespace Visualization {
 
 namespace Wrappers {
@@ -52,47 +53,13 @@ class VolumeRenderer:public Visualization::Abstract::Element
 	typedef DataSetWrapperParam DataSetWrapper; // Compatible data set type
 	typedef typename DataSetWrapper::DS DS; // Type of templatized data set
 	typedef typename DS::Scalar Scalar; // Scalar type of data set's domain
-	static const int dimension=DS::dimension; // Dimension of data set's domain
 	typedef typename DataSetWrapper::SE SE; // Type of templatized scalar extractor
 	typedef Visualization::Templatized::SliceVolumeRenderer<DS,SE> SVR; // Type of templatized volume renderer
 	
-	struct Parameters // Extraction parameters defining a volume renderer
-		{
-		/* Elements: */
-		public:
-		int scalarVariableIndex; // Index of the scalar variable defining the isosurface
-		Scalar sliceFactor; // Average number of slices to generate per grid cell
-		float transparencyGamma; // Overall gamma value to apply to palette transparencies
-		
-		/* Constructors and destructors: */
-		Parameters(int sScalarVariableIndex,Scalar sSliceFactor,float sTransparencyGamma) // Initializes permanent parameters
-			:scalarVariableIndex(sScalarVariableIndex),
-			 sliceFactor(sSliceFactor),
-			 transparencyGamma(sTransparencyGamma)
-			{
-			}
-		
-		/* Methods: */
-		template <class DataSinkParam>
-		void write(DataSinkParam& dataSink) const // Writes the parameters to a data sink (such as a file or a pipe)
-			{
-			dataSink.write<int>(scalarVariableIndex);
-			dataSink.write<Scalar>(sliceFactor);
-			dataSink.write<float>(transparencyGamma);
-			}
-		template <class DataSourceParam>
-		Parameters& read(DataSourceParam& dataSource) // Reads the parameters from a data sink (such as a file or a pipe)
-			{
-			scalarVariableIndex=dataSource.read<int>();
-			sliceFactor=dataSource.read<Scalar>();
-			transparencyGamma=dataSource.read<float>();
-			return *this;
-			}
-		};
-	
 	/* Elements: */
 	private:
-	Parameters parameters; // The volume renderer's extraction parameters
+	Scalar sliceFactor; // Current slice distance for texture- or raycasting-based volume rendering
+	float transparencyGamma; // Overall transparency adjustment factor
 	SVR svr; // The slice volume renderer
 	
 	/* UI components: */
@@ -103,24 +70,28 @@ class VolumeRenderer:public Visualization::Abstract::Element
 	
 	/* Constructors and destructors: */
 	public:
-	VolumeRenderer(const Parameters& sParameters,const DS* sDs,const SE& sSe,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates a volume renderer for the given data set and parameters
+	VolumeRenderer(Visualization::Abstract::Parameters* sParameters,Scalar sSliceFactor,float sTransparencyGamma,const DS* sDs,const SE& sSe,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates a volume renderer for the given data set and parameters
 	private:
 	VolumeRenderer(const VolumeRenderer& source); // Prohibit copy constructor
 	VolumeRenderer& operator=(const VolumeRenderer& source); // Prohibit assignment operator
 	public:
 	virtual ~VolumeRenderer(void);
 	
-	/* Methods: */
-	const Parameters& getParameters(void) const // Returns the volume renderers's extraction parameters
-		{
-		return parameters;
-		}
+	/* Methods from Visualization::Abstract::Element: */
 	virtual std::string getName(void) const;
 	virtual size_t getSize(void) const;
-	virtual bool usesTransparency(void) const;
-	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager);
+	virtual bool usesTransparency(void) const
+		{
+		return true;
+		}
+	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager); // Returns a new UI widget to change internal settings of the element
 	virtual void glRenderAction(GLContextData& contextData) const;
-	virtual void saveParameters(Misc::File& parameterFile) const;
+	
+	/* New methods: */
+	SVR& getSvr(void) // Returns the slice volume renderer
+		{
+		return svr;
+		}
 	void sliderValueChangedCallback(GLMotif::Slider::ValueChangedCallbackData* cbData); // Callback when the sliders in the settings dialog change value
 	};
 

@@ -2,7 +2,7 @@
 Slice - Wrapper class for slices as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_WRAPPERS_SLICE_IMPLEMENTATION
 
-#include <Misc/File.h>
 #include <GL/gl.h>
 #include <GL/GLColorMap.h>
 
@@ -40,10 +39,10 @@ Methods of class Slice:
 template <class DataSetWrapperParam>
 inline
 Slice<DataSetWrapperParam>::Slice(
-	const typename Slice<DataSetWrapperParam>::Parameters& sParameters,
+	Visualization::Abstract::Parameters* sParameters,
 	const GLColorMap* sColorMap,
 	 Comm::MulticastPipe* pipe)
-	:parameters(sParameters),
+	:Visualization::Abstract::Element(sParameters),
 	 colorMap(sColorMap),
 	 surface(pipe)
 	{
@@ -135,16 +134,6 @@ Slice<DataSetWrapperParam>::glRenderAction(
 		glEnable(GL_LIGHTING);
 	if(cullFaceEnabled)
 		glEnable(GL_CULL_FACE);
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
-Slice<DataSetWrapperParam>::saveParameters(
-	Misc::File& parameterFile) const
-	{
-	/* Save the parameters to file: */
-	parameters.write(parameterFile);
 	}
 
 }

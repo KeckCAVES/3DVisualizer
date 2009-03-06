@@ -520,7 +520,7 @@ Simplical<ScalarParam,dimensionParam,ValueParam>::finalizeGrid(
 		}
 	
 	/* Create the cell center tree: */
-	cellCenterTree.releasePoints();
+	cellCenterTree.releasePoints(4); // Let's just go ahead and use the multithreaded version
 	
 	/* Initialize the vertex list bounds: */
 	firstVertex=Vertex(this,firstGridVertex);

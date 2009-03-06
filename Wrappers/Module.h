@@ -37,6 +37,8 @@ class SeededSliceExtractor;
 template <class DataSetWrapperParam>
 class SeededIsosurfaceExtractor;
 template <class DataSetWrapperParam>
+class GlobalIsosurfaceExtractor;
+template <class DataSetWrapperParam>
 class SeededColoredIsosurfaceExtractor;
 template <class DataSetWrapperParam>
 class VolumeRendererExtractor;
@@ -66,8 +68,9 @@ class Module:public Visualization::Abstract::Module
 	typedef Visualization::Wrappers::DataSet<DS,VScalar,DataValue> DataSet; // Data set class
 	typedef Visualization::Wrappers::DataSetRenderer<DataSet> DataSetRenderer; // Data set renderer class
 	typedef Visualization::Wrappers::SeededSliceExtractor<DataSet> SeededSliceExtractor; // Slice extractor class
-	typedef Visualization::Wrappers::SeededIsosurfaceExtractor<DataSet> SeededIsosurfaceExtractor; // Isosurface extractor class
-	typedef Visualization::Wrappers::SeededColoredIsosurfaceExtractor<DataSet> SeededColoredIsosurfaceExtractor; // Colored isosurface extractor class
+	typedef Visualization::Wrappers::SeededIsosurfaceExtractor<DataSet> SeededIsosurfaceExtractor; // Seeded isosurface extractor class
+	typedef Visualization::Wrappers::GlobalIsosurfaceExtractor<DataSet> GlobalIsosurfaceExtractor; // Global isosurface extractor class
+	typedef Visualization::Wrappers::SeededColoredIsosurfaceExtractor<DataSet> SeededColoredIsosurfaceExtractor; // Colored seeded isosurface extractor class
 	typedef Visualization::Wrappers::VolumeRendererExtractor<DataSet> VolumeRendererExtractor; // Volume renderer extractor class
 	typedef Visualization::Wrappers::ArrowRakeExtractor<DataSet> ArrowRakeExtractor; // Arrow rake extractor class
 	typedef Visualization::Wrappers::StreamlineExtractor<DataSet> StreamlineExtractor; // Streamline extractor class

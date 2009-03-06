@@ -2,7 +2,7 @@
 VolumeRendererExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized volume renderer
 implementation.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -24,6 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #define VISUALIZATION_WRAPPERS_VOLUMERENDEREREXTRACTOR_IMPLEMENTATION
 
 #include <Misc/ThrowStdErr.h>
+#include <Misc/File.h>
+#include <Comm/MulticastPipe.h>
+#include <Comm/ClusterPipe.h>
 
 #include <Abstract/VariableManager.h>
 #include <Wrappers/ScalarExtractor.h>
@@ -33,6 +36,160 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 namespace Visualization {
 
 namespace Wrappers {
+
+/****************************************************
+Methods of class VolumeRendererExtractor::Parameters:
+****************************************************/
+
+template <class DataSetWrapperParam>
+template <class DataSourceParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::readBinary(
+	DataSourceParam& dataSource,
+	bool raw,
+	const Visualization::Abstract::VariableManager* variableManager)
+	{
+	/* Read all elements: */
+	if(raw)
+		scalarVariableIndex=dataSource.template read<int>();
+	else
+		scalarVariableIndex=readScalarVariableNameBinary<DataSourceParam>(dataSource,variableManager);
+	sliceFactor=dataSource.template read<Scalar>();
+	transparencyGamma=dataSource.template read<float>();
+	}
+
+template <class DataSetWrapperParam>
+template <class DataSinkParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::writeBinary(
+	DataSinkParam& dataSink,
+	bool raw,
+	const Visualization::Abstract::VariableManager* variableManager) const
+	{
+	/* Write all elements: */
+	if(raw)
+		dataSink.template write<int>(scalarVariableIndex);
+	else
+		writeScalarVariableNameBinary<DataSinkParam>(dataSink,scalarVariableIndex,variableManager);
+	dataSink.template write<Scalar>(sliceFactor);
+	dataSink.template write<float>(transparencyGamma);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::read(
+	Misc::File& file,
+	bool ascii,
+	Visualization::Abstract::VariableManager* variableManager)
+	{
+	if(ascii)
+		{
+		/* Parse the parameter section: */
+		AsciiParameterFileSectionHash* hash=parseAsciiParameterFileSection<Misc::File>(file);
+		
+		/* Extract the parameters: */
+		scalarVariableIndex=readScalarVariableNameAscii(hash,"scalarVariable",variableManager);
+		sliceFactor=readParameterAscii<Scalar>(hash,"sliceFactor",sliceFactor);
+		transparencyGamma=readParameterAscii<float>(hash,"transparencyGamma",transparencyGamma);
+		
+		/* Clean up: */
+		deleteAsciiParameterFileSectionHash(hash);
+		}
+	else
+		{
+		/* Read from binary file: */
+		readBinary(file,false,variableManager);
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::read(
+	Comm::MulticastPipe& pipe,
+	Visualization::Abstract::VariableManager* variableManager)
+	{
+	/* Read from multicast pipe: */
+	readBinary(pipe,true,variableManager);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::read(
+	Comm::ClusterPipe& pipe,
+	Visualization::Abstract::VariableManager* variableManager)
+	{
+	/* Read (and ignore) the parameter packet size from the cluster pipe: */
+	pipe.read<unsigned int>();
+	
+	/* Read from cluster pipe: */
+	readBinary(pipe,false,variableManager);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::write(
+	Misc::File& file,
+	bool ascii,
+	const Visualization::Abstract::VariableManager* variableManager) const
+	{
+	if(ascii)
+		{
+		/* Write to ASCII file: */
+		file.write("{\n",2);
+		writeScalarVariableNameAscii<Misc::File>(file,"scalarVariable",scalarVariableIndex,variableManager);
+		writeParameterAscii<Misc::File,Scalar>(file,"sliceFactor",sliceFactor);
+		writeParameterAscii<Misc::File,float>(file,"transparencyGamma",transparencyGamma);
+		file.write("}\n",2);
+		}
+	else
+		{
+		/* Write to binary file: */
+		writeBinary(file,false,variableManager);
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::write(
+	Comm::MulticastPipe& pipe,
+	const Visualization::Abstract::VariableManager* variableManager) const
+	{
+	/* Write to multicast pipe: */
+	writeBinary(pipe,true,variableManager);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::write(
+	Comm::ClusterPipe& pipe,
+	const Visualization::Abstract::VariableManager* variableManager) const
+	{
+	/* Calculate the byte size of the marshalled parameter packet: */
+	size_t packetSize=0;
+	packetSize+=getScalarVariableNameLength(scalarVariableIndex,variableManager);
+	packetSize+=sizeof(Scalar)+sizeof(float);
+	
+	/* Write the packet size to the cluster pipe: */
+	pipe.write<unsigned int>(packetSize);
+	
+	/* Write to cluster pipe: */
+	writeBinary(pipe,false,variableManager);
+	}
+
+/************************************************
+Static elements of class VolumeRendererExtractor:
+************************************************/
+
+template <class DataSetWrapperParam>
+const char* VolumeRendererExtractor<DataSetWrapperParam>::name="Volume Renderer";
 
 /****************************************
 Methods of class VolumeRendererExtractor:
@@ -72,10 +229,11 @@ VolumeRendererExtractor<DataSetWrapperParam>::VolumeRendererExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
 	 Comm::MulticastPipe* sPipe)
 	:Abstract::Algorithm(sVariableManager,sPipe),
-	 parameters(sVariableManager->getCurrentScalarVariable(),typename DS::Scalar(2),1.0f),
-	 ds(getDs(sVariableManager->getDataSetByScalarVariable(parameters.scalarVariableIndex))),
-	 se(getSe(sVariableManager->getScalarExtractor(parameters.scalarVariableIndex)))
+	 parameters(sVariableManager->getCurrentScalarVariable())
 	{
+	/* Initialize parameters: */
+	parameters.sliceFactor=Scalar(2);
+	parameters.transparencyGamma=1.0f;
 	}
 
 template <class DataSetWrapperParam>
@@ -87,28 +245,22 @@ VolumeRendererExtractor<DataSetWrapperParam>::~VolumeRendererExtractor(
 
 template <class DataSetWrapperParam>
 inline
-bool
-VolumeRendererExtractor<DataSetWrapperParam>::hasGlobalCreator(
-	void) const
-	{
-	return true;
-	}
-
-template <class DataSetWrapperParam>
-inline
 Visualization::Abstract::Element*
 VolumeRendererExtractor<DataSetWrapperParam>::createElement(
-	void)
+	Visualization::Abstract::Parameters* extractParameters)
 	{
-	/* Send the parameters to all slaves: */
-	if(getPipe()!=0)
-		{
-		parameters.write(*getPipe());
-		getPipe()->finishMessage();
-		}
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("VolumeRendererExtractor::createElement: Mismatching parameter object type");
+	int svi=myParameters->scalarVariableIndex;
+	
+	/* Get the data set and scalar extractor: */
+	const DS* ds=getDs(getVariableManager()->getDataSetByScalarVariable(svi));
+	const SE& se=getSe(getVariableManager()->getScalarExtractor(svi));
 	
 	/* Create a new volume renderer visualization element: */
-	VolumeRenderer* result=new VolumeRenderer(parameters,ds,se,getVariableManager()->getColorMap(parameters.scalarVariableIndex),getPipe());
+	VolumeRenderer* result=new VolumeRenderer(myParameters,myParameters->sliceFactor,myParameters->transparencyGamma,ds,se,getVariableManager()->getColorMap(svi),getPipe());
 	
 	/* Return the result: */
 	return result;
@@ -118,29 +270,26 @@ template <class DataSetWrapperParam>
 inline
 Visualization::Abstract::Element*
 VolumeRendererExtractor<DataSetWrapperParam>::startSlaveElement(
-	void)
+	Visualization::Abstract::Parameters* extractParameters)
 	{
-	if(getPipe()==0||getPipe()->isMaster())
+	if(isMaster())
 		Misc::throwStdErr("VolumeRendererExtractor::startSlaveElement: Cannot be called on master node");
 	
-	/* Read all parameters from the master: */
-	Parameters newParameters=parameters;
-	newParameters.read(*getPipe());
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("VolumeRendererExtractor::startSlaveElement: Mismatching parameter object type");
+	int svi=myParameters->scalarVariableIndex;
+	
+	/* Get the data set and scalar extractor: */
+	const DS* ds=getDs(getVariableManager()->getDataSetByScalarVariable(svi));
+	const SE& se=getSe(getVariableManager()->getScalarExtractor(svi));
 	
 	/* Create a new volume renderer visualization element: */
-	return new VolumeRenderer(newParameters,ds,se,getVariableManager()->getColorMap(newParameters.scalarVariableIndex),getPipe());
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
-VolumeRendererExtractor<DataSetWrapperParam>::continueSlaveElement(
-	void)
-	{
-	if(getPipe()==0||getPipe()->isMaster())
-		Misc::throwStdErr("VolumeRendererExtractor::continueSlaveElement: Cannot be called on master node");
+	VolumeRenderer* result=new VolumeRenderer(myParameters,myParameters->sliceFactor,myParameters->transparencyGamma,ds,se,getVariableManager()->getColorMap(svi),getPipe());
 	
-	/* It's really a dummy function; startSlaveElement() does all the work... */
+	/* Return the result: */
+	return result;
 	}
 
 }

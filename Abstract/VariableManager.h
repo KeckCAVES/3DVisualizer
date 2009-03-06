@@ -125,11 +125,16 @@ class VariableManager
 	void setCurrentScalarVariable(int newCurrentScalarVariable); // Sets the currently selected scalar variable
 	void setCurrentVectorVariable(int newCurrentVectorVariable); // Sets the currently selected vector variable
 	const ScalarExtractor* getScalarExtractor(int scalarVariableIndex); // Returns a new scalar extractor for the given scalar variable
+	const DataSet::VScalarRange& getScalarValueRange(int scalarVariableIndex); // Returns the value range of the given scalar variable
 	const GLColorMap* getColorMap(int scalarVariableIndex); // Returns the color map for the given scalar variable
 	const VectorExtractor* getVectorExtractor(int vectorVariableIndex); // Returns a new vector extractor for the given vector variable
 	const ScalarExtractor* getCurrentScalarExtractor(void) const // Returns the current scalar extractor
 		{
 		return scalarVariables[currentScalarVariableIndex].scalarExtractor;
+		}
+	const DataSet::VScalarRange& getCurrentScalarValueRange(void) const // Returns the current scalar value range
+		{
+		return scalarVariables[currentScalarVariableIndex].valueRange;
 		}
 	const GLColorMap* getCurrentColorMap(void) const // Returns the current color map
 		{

@@ -30,3 +30,11 @@
 - Fixed makefile to be in line with Visualizer development sources.
 - Evaluation dialogs can now measure coordinates in the same system as
   the source data, for example in spherical lat/long/radius coordinates.
+
+3D Visualizer 1.3:
+- Bumped required Vrui version to 1.0-056 due to API changes in Vrui.
+- Added algorithm to extract global isosurfaces by selecting an isovalue
+  with a slider.
+- Added ability to save and load extracted visualization elements.
+- Added collaboration infrastructure to create spatially distributed
+  shared data exploration environments.

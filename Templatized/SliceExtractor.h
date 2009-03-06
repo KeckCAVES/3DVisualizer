@@ -96,6 +96,11 @@ class SliceExtractor
 		{
 		return scalarExtractor;
 		}
+	void update(const DataSet* newDataSet,const ScalarExtractor& newScalarExtractor) // Sets a new data set and scalar extractor for subsequent slice extraction
+		{
+		dataSet=newDataSet;
+		scalarExtractor=newScalarExtractor;
+		}
 	void extractSlice(const Plane& newSlicePlane,Slice& newSlice); // Extracts a global slice for the given plane and stores it in the given slice
 	void extractSeededSlice(const Locator& seedLocator,const Plane& newSlicePlane,Slice& newSlice); // Extracts a seeded slice for the given plane from the given cell and stores it in the given slice
 	void startSeededSlice(const Locator& seedLocator,const Plane& newSlicePlane,Slice& newSlice); // Starts extracting a seeded slice for the given plane from the given cell

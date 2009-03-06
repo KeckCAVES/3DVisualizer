@@ -3,7 +3,7 @@ Algorithm - Abstract base class for visualization algorithms that
 extract visualization elements from data sets.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
 #include <Misc/ThrowStdErr.h>
+#include <Comm/MulticastPipe.h>
+
+#include <Abstract/Parameters.h>
 
 #include <Abstract/Algorithm.h>
 
@@ -33,6 +36,18 @@ namespace Abstract {
 /***************************
 Methods of class Algortithm:
 ***************************/
+
+Algorithm::Algorithm(VariableManager* sVariableManager,Comm::MulticastPipe* sPipe)
+	:variableManager(sVariableManager),pipe(sPipe),
+	 master(pipe==0||pipe->isMaster())
+	{
+	}
+
+Algorithm::~Algorithm(void)
+	{
+	/* Shut down a cluster communication pipe (doesn't do anything if there was no pipe): */
+	delete pipe;
+	}
 
 bool Algorithm::hasGlobalCreator(void) const
 	{
@@ -54,50 +69,46 @@ GLMotif::Widget* Algorithm::createSettingsDialog(GLMotif::WidgetManager* widgetM
 	return 0;
 	}
 
-Element* Algorithm::createElement(void)
+void Algorithm::setSeedLocator(const DataSet::Locator* seedLocator)
 	{
-	Misc::throwStdErr("Algorithm::createElement: No global visualization element creation defined");
+	/* Signal an error: */
+	Misc::throwStdErr("Algorithm: No seeded element creation method defined");
+	}
+
+Element* Algorithm::createElement(Parameters* extractParameters)
+	{
+	/* Inherit the parameters object: */
+	delete extractParameters;
+	
+	/* Signal an error: */
+	Misc::throwStdErr("Algorithm: No immediate element creation method defined");
 	return 0;
 	}
 
-Element* Algorithm::createElement(const DataSet::Locator* seedLocator)
+Element* Algorithm::startElement(Parameters* extractParameters)
 	{
-	Misc::throwStdErr("Algorithm::createElement: No seeded visualization element creation defined");
-	return 0;
-	}
-
-Element* Algorithm::startElement(void)
-	{
-	Misc::throwStdErr("Algorithm::startElement: No global incremental visualization element creation defined");
-	return 0;
-	}
-
-Element* Algorithm::startElement(const DataSet::Locator* seedLocator)
-	{
-	Misc::throwStdErr("Algorithm::startElement: No seeded incremental visualization element creation defined");
+	/* Inherit the parameters object: */
+	delete extractParameters;
+	
+	/* Signal an error: */
+	Misc::throwStdErr("Algorithm: No incremental element creation methods defined");
 	return 0;
 	}
 
 bool Algorithm::continueElement(const Realtime::AlarmTimer& alarm)
 	{
-	Misc::throwStdErr("Algorithm::continueElement: No incremental visualization element creation defined");
-	return false;
+	Misc::throwStdErr("Algorithm: No incremental element creation methods defined");
+	return true;
 	}
 
 void Algorithm::finishElement(void)
 	{
-	Misc::throwStdErr("Algorithm::finishElement: No incremental visualization element creation defined");
-	}
-
-Element* Algorithm::startSlaveElement(void)
-	{
-	Misc::throwStdErr("Algorithm::startSlaveElement: No cluster-optimized element creation defined");
-	return 0;
+	/* Just don't do anything */
 	}
 
 void Algorithm::continueSlaveElement(void)
 	{
-	Misc::throwStdErr("Algorithm::continueSlaveElement: No cluster-optimized element creation defined");
+	/* Just don't do anything */
 	}
 
 }

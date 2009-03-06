@@ -3,7 +3,7 @@ MultiStreamline - Wrapper class for multiple related streamlines as
 visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -39,12 +39,13 @@ Methods of class MultiStreamline:
 template <class DataSetWrapperParam>
 inline
 MultiStreamline<DataSetWrapperParam>::MultiStreamline(
-	const typename MultiStreamline<DataSetWrapperParam>::Parameters& sParameters,
+	Visualization::Abstract::Parameters* sParameters,
+	unsigned int numStreamlines,
 	const GLColorMap* sColorMap,
 	Comm::MulticastPipe* pipe)
-	:parameters(sParameters),
+	:Visualization::Abstract::Element(sParameters),
 	 colorMap(sColorMap),
-	 multiPolyline(parameters.numStreamlines,pipe)
+	 multiPolyline(numStreamlines,pipe)
 	{
 	}
 
@@ -129,16 +130,6 @@ MultiStreamline<DataSetWrapperParam>::glRenderAction(
 		glDisable(GL_TEXTURE_1D);
 	if(lightingEnabled)
 		glEnable(GL_LIGHTING);
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
-MultiStreamline<DataSetWrapperParam>::saveParameters(
-	Misc::File& parameterFile) const
-	{
-	/* Save the parameters to file: */
-	parameters.write(parameterFile);
 	}
 
 }

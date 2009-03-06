@@ -1,7 +1,7 @@
 /***********************************************************************
 VectorEvaluationLocator - Class for locators evaluating vector
 properties of data sets.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/gl.h>
 #include <GL/GLVertexTemplates.h>
 #include <GL/GLMaterial.h>
+#include <GL/GLColorMap.h>
 #include <GL/GLGeometryWrappers.h>
 #include <GLMotif/StyleSheet.h>
 #include <GLMotif/WidgetManager.h>
@@ -35,23 +36,23 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/RowColumn.h>
 #include <Vrui/Vrui.h>
 
-#include <Abstract/ScalarExtractor.h>
-#include <Abstract/VectorExtractor.h>
 #include <Abstract/DataSet.h>
 #include <Abstract/VariableManager.h>
 #include <Wrappers/RenderArrow.h>
 
 #include "Visualizer.h"
 
-/****************************************************
-Methods of class Visualizer::VectorEvaluationLocator:
-****************************************************/
+#include "VectorEvaluationLocator.h"
 
-Visualizer::VectorEvaluationLocator::VectorEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication)
+/****************************************
+Methods of class VectorEvaluationLocator:
+****************************************/
+
+VectorEvaluationLocator::VectorEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication)
 	:EvaluationLocator(sLocatorTool,sApplication,"Vector Evaluation Dialog"),
+	 vectorExtractor(application->variableManager->getCurrentVectorExtractor()),
 	 scalarExtractor(application->variableManager->getCurrentScalarExtractor()),
 	 colorMap(application->variableManager->getCurrentColorMap()),
-	 vectorExtractor(application->variableManager->getCurrentVectorExtractor()),
 	 valueValid(false),
 	 arrowLengthScale(1)
 	{
@@ -98,11 +99,11 @@ Visualizer::VectorEvaluationLocator::VectorEvaluationLocator(Vrui::LocatorTool* 
 	Vrui::popupPrimaryWidget(evaluationDialogPopup,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
 	}
 
-Visualizer::VectorEvaluationLocator::~VectorEvaluationLocator(void)
+VectorEvaluationLocator::~VectorEvaluationLocator(void)
 	{
 	}
 
-void Visualizer::VectorEvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
+void VectorEvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
 	{
 	/* Call the base class method: */
 	EvaluationLocator::motionCallback(cbData);
@@ -130,7 +131,7 @@ void Visualizer::VectorEvaluationLocator::motionCallback(Vrui::LocatorTool::Moti
 		}
 	}
 
-void Visualizer::VectorEvaluationLocator::highlightLocator(GLContextData& contextData) const
+void VectorEvaluationLocator::highlightLocator(GLContextData& contextData) const
 	{
 	/* Render the evaluated vector value if valid: */
 	if(valueValid)
@@ -164,7 +165,7 @@ void Visualizer::VectorEvaluationLocator::highlightLocator(GLContextData& contex
 		}
 	}
 
-void Visualizer::VectorEvaluationLocator::arrowScaleSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData)
+void VectorEvaluationLocator::arrowScaleSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData)
 	{
 	/* Get the new slider value and convert to step size: */
 	arrowLengthScale=Scalar(Math::pow(10.0,double(cbData->value)));

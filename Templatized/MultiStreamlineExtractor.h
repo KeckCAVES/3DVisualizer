@@ -111,6 +111,12 @@ class MultiStreamlineExtractor
 		{
 		return numStreamlines;
 		}
+	void update(const DataSet* newDataSet,const VectorExtractor& newVectorExtractor,const ScalarExtractor& newScalarExtractor) // Sets a new data set and scalar / vector extractors for subsequent multi-streamline extraction
+		{
+		dataSet=newDataSet;
+		vectorExtractor=newVectorExtractor;
+		scalarExtractor=newScalarExtractor;
+		}
 	void setEpsilon(Scalar newEpsilon); // Sets the integration accuracy threshold
 	void setNumStreamlines(unsigned int newNumStreamlines); // Sets number of streamlines without setting the multi-streamline itself
 	void setMultiStreamline(MultiStreamline& newMultiStreamline); // Sets the multi-streamline object

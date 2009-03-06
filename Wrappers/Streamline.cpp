@@ -2,7 +2,7 @@
 Streamline - Wrapper class for streamlines as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -38,10 +38,10 @@ Methods of class Streamline:
 template <class DataSetWrapperParam>
 inline
 Streamline<DataSetWrapperParam>::Streamline(
-	const typename Streamline<DataSetWrapperParam>::Parameters& sParameters,
+	Visualization::Abstract::Parameters* sParameters,
 	const GLColorMap* sColorMap,
 	Comm::MulticastPipe* pipe)
-	:parameters(sParameters),
+	:Visualization::Abstract::Element(sParameters),
 	 colorMap(sColorMap),
 	 polyline(pipe)
 	{
@@ -128,16 +128,6 @@ Streamline<DataSetWrapperParam>::glRenderAction(
 		glDisable(GL_TEXTURE_1D);
 	if(lightingEnabled)
 		glEnable(GL_LIGHTING);
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
-Streamline<DataSetWrapperParam>::saveParameters(
-	Misc::File& parameterFile) const
-	{
-	/* Save the parameters to file: */
-	parameters.write(parameterFile);
 	}
 
 }

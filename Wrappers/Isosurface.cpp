@@ -2,7 +2,7 @@
 Isosurface - Wrapper class for isosurfaces as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -39,10 +39,12 @@ Methods of class Isosurface:
 template <class DataSetWrapperParam>
 inline
 Isosurface<DataSetWrapperParam>::Isosurface(
-	const typename Isosurface<DataSetWrapperParam>::Parameters& sParameters,
+	Visualization::Abstract::Parameters* sParameters,
+	typename Isosurface<DataSetWrapperParam>::VScalar sIsovalue,
 	const GLColorMap* sColorMap,
 	Comm::MulticastPipe* pipe)
-	:parameters(sParameters),
+	:Visualization::Abstract::Element(sParameters),
+	 isovalue(sIsovalue),
 	 colorMap(sColorMap),
 	 surface(pipe)
 	{
@@ -98,7 +100,7 @@ Isosurface<DataSetWrapperParam>::glRenderAction(
 		glDisable(GL_COLOR_MATERIAL);
 	GLMaterial frontMaterial=glGetMaterial(GLMaterialEnums::FRONT);
 	GLMaterial backMaterial=glGetMaterial(GLMaterialEnums::BACK);
-	GLMaterial::Color surfaceColor=(*colorMap)(parameters.isovalue);
+	GLMaterial::Color surfaceColor=(*colorMap)(isovalue);
 	glMaterial(GLMaterialEnums::FRONT_AND_BACK,GLMaterial(surfaceColor,GLMaterial::Color(0.6f,0.6f,0.6f),25.0f));
 	
 	/* Render the surface representation: */
@@ -117,16 +119,6 @@ Isosurface<DataSetWrapperParam>::glRenderAction(
 		glDisable(GL_LIGHTING);
 	if(cullFaceEnabled)
 		glEnable(GL_CULL_FACE);
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
-Isosurface<DataSetWrapperParam>::saveParameters(
-	Misc::File& parameterFile) const
-	{
-	/* Save the parameters to file: */
-	parameters.write(parameterFile);
 	}
 
 }

@@ -1,7 +1,7 @@
 /***********************************************************************
 Visualizer - Test application for the new visualization component
 framework.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -21,12 +21,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
 #include <ctype.h>
+#include <string.h>
 #include <stdexcept>
 #include <vector>
 #include <iostream>
 #include <string>
 #include <Misc/ThrowStdErr.h>
 #include <Misc/Timer.h>
+#include <Misc/FileNameExtensions.h>
+#include <Misc/CreateNumberedFileName.h>
 #include <Misc/File.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GL/gl.h>
@@ -46,6 +49,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/RowColumn.h>
 #include <GLMotif/WidgetManager.h>
 #include <Vrui/Vrui.h>
+#ifdef VISUALIZER_USE_COLLABORATION
+#include <Collaboration/CollaborationClient.h>
+#ifdef VISUALIZER_USE_EMINEO
+#include <Collaboration/EmineoClient.h>
+#endif
+#endif
 
 #include <Abstract/DataSetRenderer.h>
 #include <Abstract/CoordinateTransformer.h>
@@ -53,6 +62,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/Algorithm.h>
 #include <Abstract/Element.h>
 #include <Abstract/Module.h>
+
+#include "CuttingPlane.h"
+#include "SharedVisualizationClient.h"
+#include "BaseLocator.h"
+#include "CuttingPlaneLocator.h"
+#include "ScalarEvaluationLocator.h"
+#include "VectorEvaluationLocator.h"
+#include "ExtractorLocator.h"
 
 #include "Visualizer.h"
 
@@ -313,6 +330,12 @@ GLMotif::PopupMenu* Visualizer::createMainMenu(void)
 	showElementListToggle=new GLMotif::ToggleButton("ShowElementListToggle",mainMenu,"Show Element List");
 	showElementListToggle->getValueChangedCallbacks().add(this,&Visualizer::showElementListCallback);
 	
+	GLMotif::Button* loadElementsButton=new GLMotif::Button("LoadElementsButton",mainMenu,"Load Visualization Elements");
+	loadElementsButton->getSelectCallbacks().add(this,&Visualizer::loadElementsCallback);
+	
+	GLMotif::Button* saveElementsButton=new GLMotif::Button("SaveElementsButton",mainMenu,"Save Visualization Elements");
+	saveElementsButton->getSelectCallbacks().add(this,&Visualizer::saveElementsCallback);
+	
 	GLMotif::Button* clearElementsButton=new GLMotif::Button("ClearElementsButton",mainMenu,"Clear Visualization Elements");
 	clearElementsButton->getSelectCallbacks().add(this,&Visualizer::clearElementsCallback);
 	
@@ -339,12 +362,12 @@ GLMotif::PopupWindow* Visualizer::createElementListDialog(void)
 	}
 
 
-void Visualizer::addElement(Visualizer::Element* newElement)
+void Visualizer::addElement(Visualizer::Element* newElement,const char* algorithmName)
 	{
 	/* Create the element's list structure: */
 	ListElement le;
 	le.element=newElement;
-	le.name=newElement->getName();
+	le.name=algorithmName;
 	le.settingsDialog=newElement->createSettingsDialog(Vrui::getWidgetManager());
 	le.settingsDialogVisible=false;
 	le.show=true;
@@ -365,50 +388,297 @@ void Visualizer::addElement(Visualizer::Element* newElement)
 	showElementToggle->getValueChangedCallbacks().add(this,&Visualizer::showElementCallback);
 	}
 
+void Visualizer::loadElements(const char* elementFileName,bool ascii)
+	{
+	/* Open a pipe for cluster communication: */
+	Comm::MulticastPipe* pipe=Vrui::openPipe();
+	
+	if(pipe==0||pipe->isMaster())
+		{
+		/* Open the element file: */
+		Misc::File elementFile(elementFileName,ascii?"r":"rb",ascii?Misc::File::DontCare:Misc::File::LittleEndian);
+		
+		/* Read all elements from the file: */
+		while(true)
+			{
+			/* Read the next algorithm name: */
+			unsigned int nameLength=0;
+			char name[256];
+			if(ascii)
+				{
+				/* Skip whitespace: */
+				int nextChar;
+				while((nextChar=elementFile.getc())!=EOF&&isspace(nextChar))
+					;
+				
+				/* Read until end of line: */
+				while(nextChar!='\n'&&nextChar!=EOF)
+					{
+					name[nameLength]=char(nextChar);
+					++nameLength;
+					nextChar=elementFile.getc();
+					}
+				
+				if(nextChar==EOF) // Check for end-of-file indicator
+					{
+					/* Tell the slaves to bail out: */
+					if(pipe!=0)
+						pipe->write<unsigned int>(0);
+					
+					/* Bail out: */
+					break;
+					}
+				
+				/* Remove trailing whitespace: */
+				while(isspace(name[nameLength-1]))
+					--nameLength;
+				}
+			else
+				{
+				nameLength=elementFile.read<unsigned int>();
+				if(nameLength==0) // Check for end-of-file indicator
+					{
+					/* Tell the slaves to bail out: */
+					if(pipe!=0)
+						pipe->write<unsigned int>(0);
+					
+					/* Bail out: */
+					break;
+					}
+				elementFile.read(name,nameLength);
+				}
+			name[nameLength]='\0';
+			
+			if(pipe!=0)
+				{
+				/* Send the algorithm name to the slaves: */
+				pipe->write<unsigned int>(nameLength);
+				pipe->write(name,nameLength);
+				}
+			
+			/* Create an extractor for the given name: */
+			Algorithm* algorithm=0;
+			for(int i=0;algorithm==0&&i<module->getNumScalarAlgorithms();++i)
+				if(strcmp(name,module->getScalarAlgorithmName(i))==0)
+					algorithm=module->getScalarAlgorithm(i,variableManager,Vrui::openPipe());
+			for(int i=0;algorithm==0&&i<module->getNumVectorAlgorithms();++i)
+				if(strcmp(name,module->getVectorAlgorithmName(i))==0)
+					algorithm=module->getVectorAlgorithm(i,variableManager,Vrui::openPipe());
+			
+			/* Extract an element using the given extractor: */
+			if(algorithm!=0)
+				{
+				std::cout<<"Creating "<<name<<"..."<<std::flush;
+				Misc::Timer extractionTimer;
+				
+				/* Read the element's extraction parameters from the file: */
+				Parameters* parameters=algorithm->cloneParameters();
+				parameters->read(elementFile,ascii,variableManager);
+				
+				if(pipe!=0)
+					{
+					/* Send the extraction parameters to the slaves: */
+					parameters->write(*pipe,variableManager);
+					pipe->finishMessage();
+					}
+				
+				/* Extract the element: */
+				Element* element=algorithm->createElement(parameters);
+				
+				/* Store the element: */
+				addElement(element,name);
+				
+				/* Destroy the extractor: */
+				delete algorithm;
+				
+				extractionTimer.elapse();
+				std::cout<<" done in "<<extractionTimer.getTime()*1000.0<<" ms"<<std::endl;
+				}
+			}
+		}
+	else
+		{
+		/* Receive all visualization elements from the master: */
+		while(true)
+			{
+			/* Receive the algorithm name from the master: */
+			unsigned int nameLength=pipe->read<unsigned int>();
+			if(nameLength==0) // Check for end-of-file indicator
+				break;
+			char name[256];
+			pipe->read(name,nameLength);
+			name[nameLength]=0;
+			
+			/* Create an extractor for the given name: */
+			Algorithm* algorithm=0;
+			for(int i=0;algorithm==0&&i<module->getNumScalarAlgorithms();++i)
+				if(strcmp(name,module->getScalarAlgorithmName(i))==0)
+					algorithm=module->getScalarAlgorithm(i,variableManager,Vrui::openPipe());
+			for(int i=0;algorithm==0&&i<module->getNumVectorAlgorithms();++i)
+				if(strcmp(name,module->getVectorAlgorithmName(i))==0)
+					algorithm=module->getVectorAlgorithm(i,variableManager,Vrui::openPipe());
+			
+			/* Extract an element using the given extractor: */
+			if(algorithm!=0)
+				{
+				/* Receive the extraction parameters: */
+				Parameters* parameters=algorithm->cloneParameters();
+				parameters->read(*pipe,variableManager);
+				
+				/* Receive the element: */
+				Element* element=algorithm->startSlaveElement(parameters);
+				algorithm->continueSlaveElement();
+				
+				/* Store the element: */
+				addElement(element,name);
+				
+				/* Destroy the extractor: */
+				delete algorithm;
+				}
+			}
+		}
+	
+	if(pipe!=0)
+		{
+		/* Close the communication pipe: */
+		delete pipe;
+		}
+	}
+
+void Visualizer::saveElements(const char* elementFileName,bool ascii)
+	{
+	if(Vrui::isMaster())
+		{
+		if(ascii)
+			{
+			/* Create the ASCII element file: */
+			Misc::File elementFile(elementFileName,"w",Misc::File::DontCare);
+			
+			/* Save all visible visualization elements: */
+			for(ElementList::iterator veIt=elements.begin();veIt!=elements.end();++veIt)
+				if(veIt->show)
+					{
+					/* Write the element's name: */
+					fprintf(elementFile.getFilePtr(),"%s\n",veIt->name.c_str());
+					
+					/* Write the element's parameters: */
+					veIt->element->getParameters()->write(elementFile,true,variableManager);
+					}
+			}
+		else
+			{
+			/* Create the binary element file: */
+			Misc::File elementFile(elementFileName,"wb",Misc::File::LittleEndian);
+			
+			/* Save all visible visualization elements: */
+			for(ElementList::iterator veIt=elements.begin();veIt!=elements.end();++veIt)
+				if(veIt->show)
+					{
+					/* Write the element's name: */
+					elementFile.write<int>(int(veIt->name.length()));
+					elementFile.write<char>(veIt->name.c_str(),veIt->name.length());
+					
+					/* Write the element's parameters: */
+					veIt->element->getParameters()->write(elementFile,false,variableManager);
+					}
+			
+			/* Finish the file: */
+			elementFile.write<int>(0);
+			}
+		}
+	}
+
 Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	:Vrui::Application(argc,argv,appDefaults),
 	 moduleManager(VISUALIZER_MODULENAMETEMPLATE),
 	 module(0),dataSet(0),variableManager(0),
 	 dataSetRenderer(0),coordinateTransformer(0),
 	 firstScalarAlgorithmIndex(0),firstVectorAlgorithmIndex(0),
+	 #ifdef VISUALIZER_USE_COLLABORATION
+	 collaborationClient(0),sharedVisualizationClient(0),
+	 #endif
 	 numCuttingPlanes(0),cuttingPlanes(0),
 	 algorithm(0),
 	 mainMenu(0),
 	 showElementListToggle(0),
 	 elementListDialogPopup(0),elementListDialog(0),
-	 inLoadPalette(false)
+	 inLoadPalette(false),inLoadElements(false)
 	{
 	/* Parse the command line: */
 	std::string moduleClassName="";
 	std::vector<std::string> dataSetArgs;
 	const char* argColorMapName=0;
-	const char* viewFileName=0;
+	std::vector<const char*> loadFileNames;
 	for(int i=1;i<argc;++i)
 		{
 		if(argv[i][0]=='-')
 			{
-			if(strcasecmp(argv[i]+1,"PALETTE")==0)
-				{
-				++i;
-				argColorMapName=argv[i];
-				}
-			else if(strcasecmp(argv[i]+1,"VIEW")==0)
-				{
-				++i;
-				viewFileName=argv[i];
-				}
-			else if(strcasecmp(argv[i]+1,"CLASS")==0)
+			if(strcasecmp(argv[i]+1,"class")==0)
 				{
 				/* Get visualization module class name and data set arguments from command line: */
 				++i;
+				if(i>=argc)
+					Misc::throwStdErr("Visualizer::Visualizer: missing module class name after -class");
 				moduleClassName=argv[i];
 				++i;
-				while(i<argc)
+				while(i<argc&&strcmp(argv[i],";")!=0)
 					{
 					dataSetArgs.push_back(argv[i]);
 					++i;
 					}
 				}
+			else if(strcasecmp(argv[i]+1,"palette")==0)
+				{
+				++i;
+				if(i<argc)
+					argColorMapName=argv[i];
+				else
+					std::cerr<<"Missing palette file name after -palette"<<std::endl;
+				}
+			else if(strcasecmp(argv[i]+1,"load")==0)
+				{
+				++i;
+				if(i<argc)
+					{
+					/* Load an element file later: */
+					loadFileNames.push_back(argv[i]);
+					}
+				else
+					std::cerr<<"Missing element file name after -load"<<std::endl;
+				}
+			#ifdef VISUALIZER_USE_COLLABORATION
+			else if(strcasecmp(argv[i]+1,"share")==0)
+				{
+				if(i<argc-2)
+					{
+					try
+						{
+						/* Connect to the specified shared Visualizer server: */
+						collaborationClient=new Collaboration::CollaborationClient(argv[i+1],atoi(argv[i+2]));
+						collaborationClient->setFixGlyphScaling(true);
+						collaborationClient->setRenderRemoteEnvironments(false);
+						
+						#ifdef VISUALIZER_USE_EMINEO
+						/* Register the Emineo protocol: */
+						collaborationClient->registerProtocol(new Collaboration::EmineoClient);
+						#endif
+						
+						/* Register a shared Visualizer plug-in: */
+						sharedVisualizationClient=new Collaboration::SharedVisualizationClient(this);
+						collaborationClient->registerProtocol(sharedVisualizationClient);
+						}
+					catch(std::runtime_error err)
+						{
+						std::cerr<<"Caught exception "<<err.what()<<" while creating shared Visualizer client"<<std::endl;
+						delete collaborationClient;
+						collaborationClient=0;
+						}
+					}
+				else
+					std::cerr<<"Ignoring dangling -share flag"<<std::endl;
+				i+=2;
+				}
+			#endif
 			}
 		else
 			{
@@ -451,7 +721,7 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 		/* Load a data set: */
 		Misc::Timer t;
 		Comm::MulticastPipe* pipe=Vrui::openPipe(); // Implicit synchronization point
-		dataSet=module->load(dataSetArgs,0); // pipe); // Don't actually use pipe for now
+		dataSet=module->load(dataSetArgs,pipe);
 		delete pipe; // Implicit synchronization point
 		t.elapse();
 		if(Vrui::isMaster())
@@ -485,6 +755,40 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 		cuttingPlanes[i].active=false;
 		}
 	
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		{
+		try
+			{
+			/* Try a special environment variable first: */
+			const char* clientName=getenv("SHAREDVISUALIZER_CLIENTNAME");
+			
+			if(clientName==0)
+				{
+				/* Try the local host name next: */
+				clientName=getenv("HOSTNAME");
+				if(clientName==0)
+					clientName=getenv("HOST");
+				}
+			
+			if(clientName==0)
+				{
+				/* Assign a default name: */
+				clientName="Anonymous Visualizer";
+				}
+			
+			/* Connect to the server: */
+			collaborationClient->connect(clientName);
+			}
+		catch(std::runtime_error err)
+			{
+			std::cerr<<"Caught exception "<<err.what()<<" while connecting to shared Visualizer server"<<std::endl;
+			delete collaborationClient;
+			collaborationClient=0;
+			}
+		}
+	#endif
+	
 	/* Create the main menu: */
 	mainMenu=createMainMenu();
 	Vrui::setMainMenu(mainMenu);
@@ -492,24 +796,24 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	/* Create the element list dialog: */
 	elementListDialogPopup=createElementListDialog();
 	
-	/* Initialize navigation transformation: */
-	if(viewFileName!=0)
+	/* Load all element files listed on the command line: */
+	for(std::vector<const char*>::const_iterator lfnIt=loadFileNames.begin();lfnIt!=loadFileNames.end();++lfnIt)
 		{
-		/* Open viewpoint file: */
-		Misc::File viewpointFile(viewFileName,"rb",Misc::File::LittleEndian);
-		
-		/* Read the navigation transformation: */
-		Vrui::NavTransform::Vector translation;
-		viewpointFile.read(translation.getComponents(),3);
-		Vrui::NavTransform::Rotation::Scalar quaternion[4];
-		viewpointFile.read(quaternion,4);
-		Vrui::NavTransform::Scalar scaling=viewpointFile.read<Vrui::NavTransform::Scalar>();
-		
-		/* Set the navigation transformation: */
-		Vrui::setNavigationTransformation(Vrui::NavTransform(translation,Vrui::NavTransform::Rotation::fromQuaternion(quaternion),scaling));
+		/* Determine the type of the element file: */
+		if(Misc::hasCaseExtension(*lfnIt,".asciielem"))
+			{
+			/* Load an ASCII elements file: */
+			loadElements(*lfnIt,true);
+			}
+		else if(Misc::hasCaseExtension(*lfnIt,".binelem"))
+			{
+			/* Load a binary elements file: */
+			loadElements(*lfnIt,false);
+			}
 		}
-	else
-		centerDisplayCallback(0);
+	
+	/* Initialize navigation transformation: */
+	centerDisplayCallback(0);
 	}
 
 Visualizer::~Visualizer(void)
@@ -531,6 +835,11 @@ Visualizer::~Visualizer(void)
 	
 	/* Delete the cutting planes: */
 	delete[] cuttingPlanes;
+	
+	#ifdef VISUALIZER_USE_COLLABORATION
+	/* Delete a shared visualization client: */
+	delete collaborationClient;
+	#endif
 	
 	/* Delete the coordinate transformer: */
 	delete coordinateTransformer;
@@ -566,8 +875,8 @@ void Visualizer::toolCreationCallback(Vrui::ToolManager::ToolCreationCallbackDat
 			{
 			/* Create a data locator object and associate it with the new tool: */
 			int algorithmIndex=algorithm-firstScalarAlgorithmIndex;
-			Visualization::Abstract::Algorithm* extractor=module->getScalarAlgorithm(algorithmIndex,variableManager,Vrui::openPipe());
-			newLocator=new DataLocator(locatorTool,this,module->getScalarAlgorithmName(algorithmIndex),extractor);
+			Algorithm* extractor=module->getScalarAlgorithm(algorithmIndex,variableManager,Vrui::openPipe());
+			newLocator=new ExtractorLocator(locatorTool,this,extractor);
 			}
 		else if(algorithm<firstVectorAlgorithmIndex)
 			{
@@ -578,8 +887,8 @@ void Visualizer::toolCreationCallback(Vrui::ToolManager::ToolCreationCallbackDat
 			{
 			/* Create a data locator object and associate it with the new tool: */
 			int algorithmIndex=algorithm-firstVectorAlgorithmIndex;
-			Visualization::Abstract::Algorithm* extractor=module->getVectorAlgorithm(algorithmIndex,variableManager,Vrui::openPipe());
-			newLocator=new DataLocator(locatorTool,this,module->getScalarAlgorithmName(algorithmIndex),extractor);
+			Algorithm* extractor=module->getVectorAlgorithm(algorithmIndex,variableManager,Vrui::openPipe());
+			newLocator=new ExtractorLocator(locatorTool,this,extractor);
 			}
 		
 		/* Add new locator to list: */
@@ -605,8 +914,27 @@ void Visualizer::toolDestructionCallback(Vrui::ToolManager::ToolDestructionCallb
 		}
 	}
 
+void Visualizer::frame(void)
+	{
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		{
+		/* Call the collaboratoin client's frame method: */
+		collaborationClient->frame();
+		}
+	#endif
+	}
+
 void Visualizer::display(GLContextData& contextData) const
 	{
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		{
+		/* Call the collaboration client's display method: */
+		collaborationClient->display(contextData);
+		}
+	#endif
+	
 	/* Highlight all locators: */
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->highlightLocator(contextData);
@@ -808,6 +1136,71 @@ void Visualizer::showElementCallback(GLMotif::ToggleButton::ValueChangedCallback
 		cbData->toggle->setToggle(false);
 	}
 
+void Visualizer::loadElementsCallback(Misc::CallbackData*)
+	{
+	if(!inLoadElements)
+		{
+		/* Create a file selection dialog to select an element file: */
+		GLMotif::FileSelectionDialog* fsDialog=new GLMotif::FileSelectionDialog(Vrui::getWidgetManager(),"Load Visualization Elements...",0,".asciielem;.binelem",Vrui::openPipe());
+		fsDialog->getOKCallbacks().add(this,&Visualizer::loadElementsOKCallback);
+		fsDialog->getCancelCallbacks().add(this,&Visualizer::loadElementsCancelCallback);
+		Vrui::popupPrimaryWidget(fsDialog,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
+		inLoadElements=true;
+		}
+	}
+
+void Visualizer::loadElementsOKCallback(GLMotif::FileSelectionDialog::OKCallbackData* cbData)
+	{
+	try
+		{
+		/* Determine the type of the element file: */
+		if(Misc::hasCaseExtension(cbData->selectedFileName.c_str(),".asciielem"))
+			{
+			/* Load the ASCII elements file: */
+			loadElements(cbData->selectedFileName.c_str(),true);
+			}
+		else if(Misc::hasCaseExtension(cbData->selectedFileName.c_str(),".binelem"))
+			{
+			/* Load the binary elements file: */
+			loadElements(cbData->selectedFileName.c_str(),false);
+			}
+		}
+	catch(std::runtime_error err)
+		{
+		std::cerr<<"Caught exception "<<err.what()<<" while loading element file"<<std::endl;
+		}
+	
+	/* Destroy the file selection dialog: */
+	Vrui::getWidgetManager()->deleteWidget(cbData->fileSelectionDialog);
+	inLoadElements=false;
+	}
+
+void Visualizer::loadElementsCancelCallback(GLMotif::FileSelectionDialog::CancelCallbackData* cbData)
+	{
+	/* Destroy the file selection dialog: */
+	Vrui::getWidgetManager()->deleteWidget(cbData->fileSelectionDialog);
+	inLoadElements=false;
+	}
+
+void Visualizer::saveElementsCallback(Misc::CallbackData*)
+	{
+	#if 1
+	/* Create the ASCII element file: */
+	char elementFileNameBuffer[256];
+	Misc::createNumberedFileName("SavedElements.asciielem",4,elementFileNameBuffer);
+	
+	/* Save the visible elements to a binary file: */
+	saveElements(elementFileNameBuffer,true);
+	#else
+	/* Create the binary element file: */
+	char elementFileNameBuffer[256];
+	Misc::createNumberedFileName("SavedElements.binelem",4,elementFileNameBuffer);
+	
+	/* Save the visible elements to a binary file: */
+	saveElements(elementFileNameBuffer,false);
+	#endif
+	}
+
 void Visualizer::clearElementsCallback(Misc::CallbackData*)
 	{
 	/* Delete all finished visualization elements: */
@@ -830,8 +1223,8 @@ void Visualizer::centerDisplayCallback(Misc::CallbackData*)
 	{
 	/* Get the data set's domain box: */
 	DataSet::Box domain=dataSet->getDomainBox();
-	Vrui::Point center=Geometry::mid(domain.getMin(),domain.getMax());
-	Vrui::Scalar radius=Geometry::dist(domain.getMin(),domain.getMax());
+	Vrui::Point center=Geometry::mid(domain.min,domain.max);
+	Vrui::Scalar radius=Geometry::dist(domain.min,domain.max);
 	
 	Vrui::setNavigationTransformation(center,radius);
 	}

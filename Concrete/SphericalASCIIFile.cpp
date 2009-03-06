@@ -86,6 +86,7 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 	int numHeaderLines=0;
 	DS::Index numVertices(0,0,0); // Order is radius, (co)latitude, longitude
 	int nodeCountOrder[3]={0,1,2};
+	bool flip=false;
 	int coordColumnIndices[3]={-1,-1,-1};
 	bool coordColatitude=false;
 	bool coordDegrees=false;
@@ -93,7 +94,7 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 	std::vector<ScalarVariable> scalars;
 	std::vector<VectorVariable> vectors;
 	bool storeSphericals=false;
-	int sphericalBaseIndex;
+	int sphericalBaseIndex=-1;
 	int maxColumnIndex=-1;
 	int numDataSlices=0;
 	for(std::vector<std::string>::const_iterator argIt=args.begin();argIt!=args.end();++argIt)
@@ -121,18 +122,23 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 				for(int i=0;i<3;++i)
 					{
 					++argIt;
-					nodeCountOrder[i]=atoi(argIt->c_str());
+					int speed=atoi(argIt->c_str());
+					if(speed<0||speed>=3)
+						Misc::throwStdErr("SphericalASCIIFile::load: Invalid node counting speed %d specified, must be 0, 1, or 2",speed);
+					nodeCountOrder[speed]=i;
 					}
 				}
+			else if(strcasecmp(argIt->c_str()+1,"flip")==0)
+				flip=true;
 			else if(strcasecmp(argIt->c_str()+1,"coords")==0)
 				{
 				/* Read the coordinate column indices: */
 				for(int i=0;i<3;++i)
 					{
 					++argIt;
-					coordColumnIndices[i]=atoi(argIt->c_str());
-					if(maxColumnIndex<coordColumnIndices[i])
-						maxColumnIndex=coordColumnIndices[i];
+					coordColumnIndices[2-i]=atoi(argIt->c_str());
+					if(maxColumnIndex<coordColumnIndices[2-i])
+						maxColumnIndex=coordColumnIndices[2-i];
 					}
 				}
 			else if(strcasecmp(argIt->c_str()+1,"colat")==0)
@@ -258,7 +264,20 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 	std::cout<<"Reading grid vertex positions and values...   0%"<<std::flush;
 	DS::GridArray& grid=dataSet.getGrid();
 	DS::Index index;
-	for(index[nodeCountOrder[0]]=0;index[nodeCountOrder[0]]<numVertices[nodeCountOrder[0]];++index[nodeCountOrder[0]])
+	int index0Min,index0Max,index0Increment;
+	if(flip)
+		{
+		index0Min=numVertices[nodeCountOrder[0]]-1;
+		index0Max=-1;
+		index0Increment=-1;
+		}
+	else
+		{
+		index0Min=0;
+		index0Max=numVertices[nodeCountOrder[0]];
+		index0Increment=1;
+		}
+	for(index[nodeCountOrder[0]]=index0Min;index[nodeCountOrder[0]]!=index0Max;index[nodeCountOrder[0]]+=index0Increment)
 		{
 		for(index[nodeCountOrder[1]]=0;index[nodeCountOrder[1]]<numVertices[nodeCountOrder[1]];++index[nodeCountOrder[1]])
 			for(index[nodeCountOrder[2]]=0;index[nodeCountOrder[2]]<numVertices[nodeCountOrder[2]];++index[nodeCountOrder[2]])

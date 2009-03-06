@@ -2,7 +2,7 @@
 SeededColoredIsosurfaceExtractor - Wrapper class to map from the
 abstract visualization algorithm interface to a templatized colored
 isosurface extractor implementation.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/Slider.h>
 
 #include <Abstract/DataSet.h>
+#include <Abstract/Parameters.h>
 #include <Abstract/Algorithm.h>
 
 #include <Wrappers/ColoredIsosurface.h>
@@ -68,29 +69,82 @@ class SeededColoredIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 	typedef Visualization::Abstract::Algorithm Base; // Base class
 	typedef DataSetWrapperParam DataSetWrapper; // Compatible data set type
 	typedef typename DataSetWrapper::DS DS; // Type of templatized data set
+	typedef typename DS::Scalar Scalar; // Scalar type of data set's domain
+	static const int dimension=DS::dimension; // Dimension of data set's domain
+	typedef typename DS::Point Point; // Type for points in data set's domain
 	typedef typename DS::Value DSValue; // Value type of templatized data set
+	typedef typename DataSetWrapper::VScalar VScalar; // Scalar type of scalar extractor
 	typedef typename DataSetWrapper::DSL DSL; // Type of templatized locator
 	typedef typename DataSetWrapper::Locator Locator; // Type of locator wrapper
 	typedef typename DataSetWrapper::SE SE; // Type of templatized scalar extractor
 	typedef typename DataSetWrapper::ScalarExtractor ScalarExtractor; // Compatible scalar extractor wrapper class
-	typedef ColoredIsosurface<DataSetWrapper> Isosurface; // Type of created visualization elements
-	typedef Misc::Autopointer<Isosurface> IsosurfacePointer; // Type for pointers to created visualization elements
-	typedef typename Isosurface::Parameters Parameters; // Type for colored isosurface extraction parameters
-	typedef typename Isosurface::Surface Surface; // Type of low-level surface representation
-	typedef Visualization::Templatized::ColoredIsosurfaceExtractor<DS,SE,Surface> ISE; // Type of templatized isosurface extractor
+	typedef Visualization::Wrappers::ColoredIsosurface<DataSetWrapper> ColoredIsosurface; // Type of created visualization elements
+	typedef Misc::Autopointer<ColoredIsosurface> ColoredIsosurfacePointer; // Type for pointers to created visualization elements
+	typedef typename ColoredIsosurface::Surface Surface; // Type of low-level surface representation
+	typedef Visualization::Templatized::ColoredIsosurfaceExtractor<DS,SE,Surface> CISE; // Type of templatized colored isosurface extractor
+	
+	private:
+	class Parameters:public Visualization::Abstract::Parameters // Class to store extraction parameters for seeded isosurfaces
+		{
+		friend class SeededColoredIsosurfaceExtractor;
+		
+		/* Elements: */
+		private:
+		int scalarVariableIndex; // Index of the scalar variable to color the isosurface
+		int colorScalarVariableIndex; // Index of the scalar variable to color the isosurface
+		size_t maxNumTriangles; // Maximum number of triangles to be extracted
+		bool smoothShading; // Flag to enable smooth shading by calculating scalar field gradients at each vertex position
+		bool lighting; // Flag whether to use a lighting when rendering the isosurface
+		VScalar isovalue; // The isosurface's isovalue
+		Point seedPoint; // Point from which the isosurface was seeded
+		DSL dsl; // Templatized data set locator following the seed point
+		bool locatorValid; // Flag if the locator has been properly initialized, and is inside the data set's domain
+		
+		/* Private methods: */
+		template <class DataSourceParam>
+		void readBinary(DataSourceParam& dataSource,bool raw,const Visualization::Abstract::VariableManager* variableManager); // Reads parameters from a binary data source
+		template <class DataSourceParam>
+		void writeBinary(DataSourceParam& dataSink,bool raw,const Visualization::Abstract::VariableManager* variableManager) const; // Writes parameters to a binary data source
+		
+		/* Constructors and destructors: */
+		public:
+		Parameters(int sScalarVariableIndex,int sColorScalarVariableIndex)
+			:scalarVariableIndex(sScalarVariableIndex),
+			 colorScalarVariableIndex(sColorScalarVariableIndex),
+			 locatorValid(false)
+			{
+			}
+		
+		/* Methods from Abstract::Parameters: */
+		virtual bool isValid(void) const
+			{
+			return locatorValid;
+			}
+		virtual void read(Misc::File& file,bool ascii,Visualization::Abstract::VariableManager* variableManager);
+		virtual void read(Comm::MulticastPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
+		virtual void read(Comm::ClusterPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
+		virtual void write(Misc::File& file,bool ascii,const Visualization::Abstract::VariableManager* variableManager) const;
+		virtual void write(Comm::MulticastPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
+		virtual void write(Comm::ClusterPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
+		virtual Visualization::Abstract::Parameters* clone(void) const
+			{
+			return new Parameters(*this);
+			}
+		};
 	
 	/* Elements: */
 	private:
+	static const char* name; // Identifying name of this algorithm
 	Parameters parameters; // The colored isosurface extraction parameters used by this extractor
-	ISE ise; // The templatized isosurface extractor
-	IsosurfacePointer currentIsosurface; // The currently extracted isosurface visualization element
+	CISE cise; // The templatized colored isosurface extractor
+	ColoredIsosurfacePointer currentColoredIsosurface; // The currently extracted colored isosurface visualization element
 	
 	/* UI components: */
 	GLMotif::TextField* maxNumTrianglesValue; // Text field to display current maximum number of triangles
 	GLMotif::Slider* maxNumTrianglesSlider; // Slider to change current maximum number of triangles
 	GLMotif::DropdownBox* colorScalarVariableBox; // Dropdown box to interactively change the coloring scalar variable
 	GLMotif::RadioBox* extractionModeBox; // Radio box with toggles for extraction modes
-	GLMotif::ToggleButton* lightSurfacesToggle; // Toggle button to enable/disable surface lighting
+	GLMotif::ToggleButton* lightingToggle; // Toggle button to enable/disable surface lighting
 	GLMotif::TextField* currentValue; // Text field to display scalar value at current locator position
 	
 	/* Private methods: */
@@ -102,33 +156,49 @@ class SeededColoredIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 	SeededColoredIsosurfaceExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates a colored isosurface extractor
 	virtual ~SeededColoredIsosurfaceExtractor(void);
 	
-	/* Methods: */
-	const ISE& getIse(void) const // Returns the templatized isosurface extractor
+	/* Methods from Visualization::Abstract::Algorithm: */
+	virtual const char* getName(void) const
 		{
-		return ise;
+		return name;
 		}
-	ISE& getIse(void) // Ditto
+	virtual bool hasSeededCreator(void) const
 		{
-		return ise;
+		return true;
 		}
-	size_t getMaxNumTriangles(void) const // Returns the maximum number of triangles to be extracted
+	virtual bool hasIncrementalCreator(void) const
 		{
-		return parameters.maxNumTriangles;
+		return true;
 		}
-	void setMaxNumTriangles(size_t newMaxNumTriangles); // Sets the maximum number of triangles to be extracted
-	virtual bool hasSeededCreator(void) const;
-	virtual bool hasIncrementalCreator(void) const;
 	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager);
-	virtual Visualization::Abstract::Element* createElement(const Visualization::Abstract::DataSet::Locator* seedLocator);
-	virtual Visualization::Abstract::Element* startElement(const Visualization::Abstract::DataSet::Locator* seedLocator);
+	virtual Visualization::Abstract::Parameters* cloneParameters(void) const
+		{
+		return new Parameters(parameters);
+		}
+	virtual void setSeedLocator(const Visualization::Abstract::DataSet::Locator* seedLocator);
+	virtual Visualization::Abstract::Element* createElement(Visualization::Abstract::Parameters* extractParameters);
+	virtual Visualization::Abstract::Element* startElement(Visualization::Abstract::Parameters* extractParameters);
 	virtual bool continueElement(const Realtime::AlarmTimer& alarm);
 	virtual void finishElement(void);
-	virtual Visualization::Abstract::Element* startSlaveElement(void);
+	virtual Visualization::Abstract::Element* startSlaveElement(Visualization::Abstract::Parameters* extractParameters);
 	virtual void continueSlaveElement(void);
+	
+	/* New methods: */
+	static const char* getClassName(void) // Returns the algorithm class name
+		{
+		return name;
+		}
+	const CISE& getCise(void) const // Returns the templatized colored isosurface extractor
+		{
+		return cise;
+		}
+	CISE& getCise(void) // Ditto
+		{
+		return cise;
+		}
 	void maxNumTrianglesSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
 	void colorScalarVariableBoxCallback(GLMotif::DropdownBox::ValueChangedCallbackData* cbData);
 	void extractionModeBoxCallback(GLMotif::RadioBox::ValueChangedCallbackData* cbData);
-	void lightSurfacesToggleCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	void lightingToggleCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
 	};
 
 }

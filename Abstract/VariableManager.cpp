@@ -264,6 +264,18 @@ const ScalarExtractor* VariableManager::getScalarExtractor(int scalarVariableInd
 	return scalarVariables[scalarVariableIndex].scalarExtractor;
 	}
 
+const DataSet::VScalarRange& VariableManager::getScalarValueRange(int scalarVariableIndex)
+	{
+	if(scalarVariableIndex<0||scalarVariableIndex>=numScalarVariables)
+		return scalarVariables[currentScalarVariableIndex].valueRange;
+	
+	/* Check if the scalar variable has not been requested before: */
+	if(scalarVariables[scalarVariableIndex].scalarExtractor==0)
+		prepareScalarVariable(scalarVariableIndex);
+	
+	return scalarVariables[scalarVariableIndex].valueRange;
+	}
+
 const GLColorMap* VariableManager::getColorMap(int scalarVariableIndex)
 	{
 	if(scalarVariableIndex<0||scalarVariableIndex>=numScalarVariables)

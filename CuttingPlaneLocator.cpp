@@ -1,6 +1,6 @@
 /***********************************************************************
 CuttingPlaneLocator - Class for locators rendering cutting planes.
-Copyright (c) 2006-2007 Oliver Kreylos
+Copyright (c) 2006-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -22,13 +22,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Geometry/Point.h>
 #include <Geometry/Vector.h>
 #include <Geometry/OrthogonalTransformation.h>
+
+#include "CuttingPlane.h"
 #include "Visualizer.h"
 
-/************************************************
-Methods of class Visualizer::CuttingPlaneLocator:
-************************************************/
+#include "CuttingPlaneLocator.h"
 
-Visualizer::CuttingPlaneLocator::CuttingPlaneLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication)
+/************************************
+Methods of class CuttingPlaneLocator:
+************************************/
+
+CuttingPlaneLocator::CuttingPlaneLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication)
 	:BaseLocator(sLocatorTool,sApplication),
 	 cuttingPlane(0)
 	{
@@ -48,7 +52,7 @@ Visualizer::CuttingPlaneLocator::CuttingPlaneLocator(Vrui::LocatorTool* sLocator
 		}
 	}
 
-Visualizer::CuttingPlaneLocator::~CuttingPlaneLocator(void)
+CuttingPlaneLocator::~CuttingPlaneLocator(void)
 	{
 	/* De-allocate the cutting plane: */
 	if(cuttingPlane!=0)
@@ -58,7 +62,7 @@ Visualizer::CuttingPlaneLocator::~CuttingPlaneLocator(void)
 		}
 	}
 
-void Visualizer::CuttingPlaneLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
+void CuttingPlaneLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
 	{
 	if(cuttingPlane!=0&&cuttingPlane->active)
 		{
@@ -69,14 +73,14 @@ void Visualizer::CuttingPlaneLocator::motionCallback(Vrui::LocatorTool::MotionCa
 		}
 	}
 
-void Visualizer::CuttingPlaneLocator::buttonPressCallback(Vrui::LocatorTool::ButtonPressCallbackData* cbData)
+void CuttingPlaneLocator::buttonPressCallback(Vrui::LocatorTool::ButtonPressCallbackData* cbData)
 	{
 	/* Activate the cutting plane: */
 	if(cuttingPlane!=0)
 		cuttingPlane->active=true;
 	}
 
-void Visualizer::CuttingPlaneLocator::buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCallbackData* cbData)
+void CuttingPlaneLocator::buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCallbackData* cbData)
 	{
 	/* Deactivate the cutting plane: */
 	if(cuttingPlane!=0)

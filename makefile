@@ -36,9 +36,6 @@ VRUIDIR = $(HOME)/Vrui-1.0
 # directories underneath the given base directory, respectively.
 INSTALLDIR = $(shell pwd)
 
-# Set up additional flags for the C++ compiler:
-CFLAGS = 
-
 # List of default visualization modules:
 MODULE_NAMES = SphericalASCIIFile \
                StructuredGridASCII \
@@ -73,11 +70,19 @@ UNSUPPORTED_MODULE_NAMES = AnalyzeFile \
                            VanKekenFile \
                            UnstructuredPlot3DFile
 
+# Flag whether to build the 3D Visualizer collaboration module for
+# spatially distributed shared data exploration.
+USE_COLLABORATION = 0
+
+# Flag whether the Vrui collaboration infrastructure has built-in
+# support for 3D video using the Emineo rendering architecture.
+USE_EMINEO = 0
+
 # Version number for installation subdirectories. This is used to keep
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.2
+VERSION = 1.3
 
 # Set up destination directories for compilation products:
 OBJDIRBASE = o
@@ -86,6 +91,9 @@ MODULEDIRBASE = 3DVisualizer-$(VERSION)
 
 # Set resource directory:
 RESOURCEDIR = share/3DVisualizer-$(VERSION)
+
+# Set up additional flags for the C++ compiler:
+CFLAGS = 
 
 # Create debug or fully optimized versions of the software:
 ifdef DEBUG
@@ -138,6 +146,9 @@ $(call PLUGINNAME,%): $(OBJDIR)/Concrete/%.o
 MODULES = $(MODULE_NAMES:%=$(call PLUGINNAME,%))
 ALL = $(BINDIR)/3DVisualizer \
       $(MODULES)
+ifneq ($(USE_COLLABORATION),0)
+  ALL += $(BINDIR)/SharedVisualizationServer
+endif
 .PHONY: all
 all: $(ALL)
 
@@ -158,8 +169,8 @@ ABSTRACT_SOURCES = Abstract/ScalarExtractor.cpp \
                    Abstract/DataSet.cpp \
                    Abstract/VariableManager.cpp \
                    Abstract/DataSetRenderer.cpp \
-                   Abstract/Element.cpp \
                    Abstract/Algorithm.cpp \
+                   Abstract/Element.cpp \
                    Abstract/CoordinateTransformer.cpp \
                    Abstract/Module.cpp
 
@@ -170,7 +181,8 @@ TEMPLATIZED_SOURCES = Templatized/Simplex.cpp \
                       Templatized/IsosurfaceCaseTableSimplex.cpp \
                       Templatized/IsosurfaceCaseTableTesseract.cpp
 
-WRAPPERS_SOURCES = Wrappers/RenderArrow.cpp \
+WRAPPERS_SOURCES = Wrappers/ParametersIOHelper.cpp \
+                   Wrappers/RenderArrow.cpp \
                    Wrappers/CartesianCoordinateTransformer.cpp \
                    Wrappers/SlicedScalarVectorDataValue.cpp
 
@@ -189,16 +201,34 @@ VISUALIZER_SOURCES = $(ABSTRACT_SOURCES) \
                      EvaluationLocator.cpp \
                      ScalarEvaluationLocator.cpp \
                      VectorEvaluationLocator.cpp \
-                     DataLocator.cpp \
+                     Extractor.cpp \
+                     ExtractorLocator.cpp \
                      ColorBar.cpp \
                      ColorMap.cpp \
                      PaletteEditor.cpp \
                      Visualizer.cpp
+ifneq ($(USE_COLLABORATION),0)
+  VISUALIZER_SOURCES += SharedVisualizationPipe.cpp \
+                        SharedVisualizationClient.cpp
+endif
 
 # Per-source compiler flags:
 $(OBJDIR)/Concrete/EarthRenderer.o: CFLAGS += -DEARTHRENDERER_IMAGEDIR='"$(INSTALLDIR)/$(RESOURCEDIR)"'
 $(OBJDIR)/Visualizer.o: CFLAGS += -DVISUALIZER_MODULENAMETEMPLATE='"$(INSTALLDIR)/$(call PLUGINNAME,%s)"'
+ifneq ($(USE_COLLABORATION),0)
+  ifneq ($(USE_EMINEO),0)
+    $(OBJDIR)/Visualizer.o: CFLAGS += -DVISUALIZER_USE_EMINEO
+  endif
+endif
 
+#
+# Rule to build 3D Visualizer main program
+#
+
+ifneq ($(USE_COLLABORATION),0)
+  $(BINDIR)/3DVisualizer: CFLAGS += -DVISUALIZER_USE_COLLABORATION
+  $(BINDIR)/3DVisualizer: VRUI_LINKFLAGS += -lCollaboration.g++-3
+endif
 $(BINDIR)/3DVisualizer: $(VISUALIZER_SOURCES:%.cpp=$(OBJDIR)/%.o)
 	@mkdir -p $(BINDIR)
 	@echo Linking $@...
@@ -219,11 +249,28 @@ $(call PLUGINNAME,DicomImageStack): $(OBJDIR)/Concrete/DicomImageStack.o \
 # Keep module object files around after building:
 .SECONDARY: $(MODULE_NAMES:%=$(OBJDIR)/Concrete/%.o)
 
+#
+# Rule to build shared Visualizer server
+#
+
+SHAREDVISUALIZATIONSERVER_SOURCES = SharedVisualizationPipe.cpp \
+                                    SharedVisualizationServer.cpp \
+                                    SharedVisualizationServerMain.cpp
+
+$(BINDIR)/SharedVisualizationServer: VRUI_LINKFLAGS += -lCollaboration.g++-3
+$(BINDIR)/SharedVisualizationServer: $(SHAREDVISUALIZATIONSERVER_SOURCES:%.cpp=$(OBJDIR)/%.o)
+	@mkdir -p $(BINDIR)
+	@echo Linking $@...
+	@g++ -o $@ $^ $(VRUI_LINKFLAGS) $(VRUI_PLUGINHOSTLINKFLAGS)
+
 install: $(ALL)
 	@echo Installing 3D Visualizer in $(INSTALLDIR)...
 	@install -d $(INSTALLDIR)
 	@install -d $(INSTALLDIR)/bin
 	@install $(BINDIR)/3DVisualizer $(INSTALLDIR)/bin
+ifneq ($(USE_COLLABORATION),0)
+	@install $(BINDIR)/SharedVisualizationServer $(INSTALLDIR)/bin
+endif
 	@install -d $(INSTALLDIR)/$(LIBDIR)/$(MODULEDIR)
 	@install $(MODULES) $(INSTALLDIR)/$(LIBDIR)/$(MODULEDIR)
 	@install -d $(INSTALLDIR)/$(RESOURCEDIR)

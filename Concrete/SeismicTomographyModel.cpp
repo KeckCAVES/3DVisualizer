@@ -289,7 +289,7 @@ Visualization::Abstract::DataSet* SeismicTomographyModel::load(const std::vector
 	
 	/* Read all grid points from the input file(s): */
 	Misc::File* vFile=0;
-	double depth;
+	double depth=0.0;
 	DS::GridArray& vertices=result->getDs().getGrid(0).getGrid();
 	DS::Index index;
 	VScalar* valueSlices[4];
@@ -415,7 +415,6 @@ Visualization::Abstract::DataSet* SeismicTomographyModel::load(const std::vector
 	if(cellCentered)
 		{
 		/* Stitch the grid across the longitude boundaries: */
-		int numSlices=storeSphericals?4:1;
 		for(index[0]=0;index[0]<numVertices[0];++index[0])
 			for(index[2]=0;index[2]<numVertices[2];++index[2])
 				{

@@ -1,7 +1,7 @@
 /***********************************************************************
 ArrowRake - Class to represent rakes of arrow glyphs as visualization
 elements.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -35,6 +35,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/Extensions/GLARBVertexBufferObject.h>
 #include <Vrui/Vrui.h>
 
+#include <Wrappers/ParametersIOHelper.h>
 #include <Wrappers/RenderArrow.h>
 
 #include <Wrappers/ArrowRake.h>
@@ -86,13 +87,20 @@ Methods of class ArrowRake:
 template <class DataSetWrapperParam>
 inline
 ArrowRake<DataSetWrapperParam>::ArrowRake(
-	const typename ArrowRake<DataSetWrapperParam>::Parameters& sParameters,
+	Visualization::Abstract::Parameters* sParameters,
+	const typename ArrowRake<DataSetWrapperParam>::Index& sRakeSize,
+	typename ArrowRake<DataSetWrapperParam>::Scalar sLengthScale,
+	typename ArrowRake<DataSetWrapperParam>::Scalar sShaftRadius,
+	unsigned int sNumArrowVertices,
 	const GLColorMap* sColorMap,
 	Comm::MulticastPipe* sPipe)
-	:parameters(sParameters),
+	:Visualization::Abstract::Element(sParameters),
 	 colorMap(sColorMap),
 	 pipe(sPipe),
-	 rake(parameters.rakeSize),
+	 rake(sRakeSize),
+	 lengthScale(sLengthScale),
+	 shaftRadius(sShaftRadius),
+	 numArrowVertices(sNumArrowVertices),
 	 version(0)
 	{
 	/* Invalidate all arrows: */
@@ -105,49 +113,6 @@ inline
 ArrowRake<DataSetWrapperParam>::~ArrowRake(
 	void)
 	{
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
-ArrowRake<DataSetWrapperParam>::update(
-	void)
-	{
-	if(pipe!=0)
-		{
-		if(pipe->isMaster())
-			{
-			/* Send the state of all arrows across the pipe: */
-			for(typename Rake::const_iterator rIt=rake.begin();rIt!=rake.end();++rIt)
-				{
-				pipe->write<int>(rIt->valid?1:0);
-				if(rIt->valid)
-					{
-					pipe->write<Scalar>(rIt->base.getComponents(),dimension);
-					pipe->write<Scalar>(rIt->direction.getComponents(),dimension);
-					pipe->write<Scalar>(rIt->scalarValue);
-					}
-				}
-			pipe->finishMessage();
-			}
-		else
-			{
-			/* Receive the state of all arrows from the master: */
-			for(typename Rake::iterator rIt=rake.begin();rIt!=rake.end();++rIt)
-				{
-				rIt->valid=pipe->read<int>()!=0;
-				if(rIt->valid)
-					{
-					pipe->read<Scalar>(rIt->base.getComponents(),dimension);
-					pipe->read<Scalar>(rIt->direction.getComponents(),dimension);
-					rIt->scalarValue=pipe->read<Scalar>();
-					}
-				}
-			}
-		}
-	
-	/* Update the arrow rake's version number: */
-	++version;
 	}
 
 template <class DataSetWrapperParam>
@@ -166,25 +131,6 @@ ArrowRake<DataSetWrapperParam>::getSize(
 	void) const
 	{
 	return rake.getNumElements();
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
-ArrowRake<DataSetWrapperParam>::initContext(
-	GLContextData& contextData) const
-	{
-	/* Create a new context data item: */
-	DataItem* dataItem=new DataItem;
-	contextData.addDataItem(this,dataItem);
-	
-	/* Create a vertex buffer and index buffer: */
-	glBindBufferARB(GL_ARRAY_BUFFER_ARB,dataItem->vertexBufferId);
-	glBufferDataARB(GL_ARRAY_BUFFER_ARB,rake.getNumElements()*getArrowNumVertices(parameters.numArrowVertices)*sizeof(Vertex),0,GL_STATIC_DRAW_ARB);
-	glBindBufferARB(GL_ARRAY_BUFFER_ARB,0);
-	glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB,dataItem->indexBufferId);
-	glBufferDataARB(GL_ELEMENT_ARRAY_BUFFER_ARB,rake.getNumElements()*getArrowNumIndices(parameters.numArrowVertices)*sizeof(GLuint),0,GL_STATIC_DRAW_ARB);
-	glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB,0);
 	}
 
 template <class DataSetWrapperParam>
@@ -215,7 +161,7 @@ ArrowRake<DataSetWrapperParam>::glRenderAction(
 	glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB,dataItem->indexBufferId);
 	
 	/* Retrieve the updated arrow shaft radius: */
-	Scalar scaledArrowShaftRadius=Scalar(Vrui::Scalar(parameters.shaftRadius)/Vrui::getNavigationTransformation().getScaling());
+	Scalar scaledArrowShaftRadius=Scalar(Vrui::Scalar(shaftRadius)/Vrui::getNavigationTransformation().getScaling());
 	
 	/* Update the vertex and index buffers: */
 	if(dataItem->version!=version||dataItem->scaledArrowShaftRadius!=scaledArrowShaftRadius)
@@ -230,11 +176,11 @@ ArrowRake<DataSetWrapperParam>::glRenderAction(
 			if(rIt->valid)
 				{
 				/* Create the arrow glyph: */
-				createArrow(rIt->base,rIt->direction*parameters.lengthScale,scaledArrowShaftRadius,scaledArrowShaftRadius*Scalar(3),scaledArrowShaftRadius*Scalar(6),parameters.numArrowVertices,vertexPtr,vertexBase,indexPtr);
+				createArrow(rIt->base,rIt->direction*lengthScale,scaledArrowShaftRadius,scaledArrowShaftRadius*Scalar(3),scaledArrowShaftRadius*Scalar(6),numArrowVertices,vertexPtr,vertexBase,indexPtr);
 				
 				/* Move forward in the buffers: */
-				vertexBase+=getArrowNumVertices(parameters.numArrowVertices);
-				indexPtr+=getArrowNumIndices(parameters.numArrowVertices);
+				vertexBase+=getArrowNumVertices(numArrowVertices);
+				indexPtr+=getArrowNumIndices(numArrowVertices);
 				}
 		
 		/* Unmap the buffers: */
@@ -253,8 +199,8 @@ ArrowRake<DataSetWrapperParam>::glRenderAction(
 			{
 			/* Render the arrow glyph: */
 			glColor((*colorMap)(rIt->scalarValue));
-			renderArrow(parameters.numArrowVertices,indexPtr);
-			indexPtr+=getArrowNumIndices(parameters.numArrowVertices);
+			renderArrow(numArrowVertices,indexPtr);
+			indexPtr+=getArrowNumIndices(numArrowVertices);
 			}
 	
 	/* Unbind the buffers: */
@@ -275,11 +221,63 @@ ArrowRake<DataSetWrapperParam>::glRenderAction(
 template <class DataSetWrapperParam>
 inline
 void
-ArrowRake<DataSetWrapperParam>::saveParameters(
-	Misc::File& parameterFile) const
+ArrowRake<DataSetWrapperParam>::initContext(
+	GLContextData& contextData) const
 	{
-	/* Save the parameters to file: */
-	parameters.write(parameterFile);
+	/* Create a new context data item: */
+	DataItem* dataItem=new DataItem;
+	contextData.addDataItem(this,dataItem);
+	
+	/* Create a vertex buffer and index buffer: */
+	glBindBufferARB(GL_ARRAY_BUFFER_ARB,dataItem->vertexBufferId);
+	glBufferDataARB(GL_ARRAY_BUFFER_ARB,rake.getNumElements()*getArrowNumVertices(numArrowVertices)*sizeof(Vertex),0,GL_STATIC_DRAW_ARB);
+	glBindBufferARB(GL_ARRAY_BUFFER_ARB,0);
+	glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB,dataItem->indexBufferId);
+	glBufferDataARB(GL_ELEMENT_ARRAY_BUFFER_ARB,rake.getNumElements()*getArrowNumIndices(numArrowVertices)*sizeof(GLuint),0,GL_STATIC_DRAW_ARB);
+	glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB,0);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRake<DataSetWrapperParam>::update(
+	void)
+	{
+	if(pipe!=0)
+		{
+		if(pipe->isMaster())
+			{
+			/* Send the state of all arrows across the pipe: */
+			for(typename Rake::const_iterator rIt=rake.begin();rIt!=rake.end();++rIt)
+				{
+				pipe->write<int>(rIt->valid?1:0);
+				if(rIt->valid)
+					{
+					pipe->write<Scalar>(rIt->base.getComponents(),dimension);
+					pipe->write<Scalar>(rIt->direction.getComponents(),dimension);
+					pipe->write<VScalar>(rIt->scalarValue);
+					}
+				}
+			pipe->finishMessage();
+			}
+		else
+			{
+			/* Receive the state of all arrows from the master: */
+			for(typename Rake::iterator rIt=rake.begin();rIt!=rake.end();++rIt)
+				{
+				rIt->valid=pipe->read<int>()!=0;
+				if(rIt->valid)
+					{
+					pipe->read<Scalar>(rIt->base.getComponents(),dimension);
+					pipe->read<Scalar>(rIt->direction.getComponents(),dimension);
+					rIt->scalarValue=pipe->read<VScalar>();
+					}
+				}
+			}
+		}
+	
+	/* Update the arrow rake's version number: */
+	++version;
 	}
 
 }

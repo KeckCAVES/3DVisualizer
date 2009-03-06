@@ -1,7 +1,7 @@
 /***********************************************************************
 ScalarEvaluationLocator - Class for locators evaluating scalar
 properties of data sets.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -29,17 +29,18 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/RowColumn.h>
 #include <Vrui/Vrui.h>
 
-#include <Abstract/ScalarExtractor.h>
 #include <Abstract/DataSet.h>
 #include <Abstract/VariableManager.h>
 
 #include "Visualizer.h"
 
-/****************************************************
-Methods of class Visualizer::ScalarEvaluationLocator:
-****************************************************/
+#include "ScalarEvaluationLocator.h"
 
-Visualizer::ScalarEvaluationLocator::ScalarEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication)
+/****************************************
+Methods of class ScalarEvaluationLocator:
+****************************************/
+
+ScalarEvaluationLocator::ScalarEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication)
 	:EvaluationLocator(sLocatorTool,sApplication,"Scalar Evaluation Dialog"),
 	 scalarExtractor(application->variableManager->getCurrentScalarExtractor()),
 	 valueValid(false)
@@ -64,7 +65,7 @@ Visualizer::ScalarEvaluationLocator::ScalarEvaluationLocator(Vrui::LocatorTool* 
 	insertControlPointMargin->setAlignment(GLMotif::Alignment::RIGHT);
 	
 	GLMotif::Button* insertControlPointButton=new GLMotif::Button("InsertControlPointButton",insertControlPointMargin,"Insert Color Map Control Point");
-	insertControlPointButton->getSelectCallbacks().add(this,&Visualizer::ScalarEvaluationLocator::insertControlPointCallback);
+	insertControlPointButton->getSelectCallbacks().add(this,&ScalarEvaluationLocator::insertControlPointCallback);
 	
 	insertControlPointMargin->manageChild();
 	
@@ -74,11 +75,11 @@ Visualizer::ScalarEvaluationLocator::ScalarEvaluationLocator(Vrui::LocatorTool* 
 	Vrui::popupPrimaryWidget(evaluationDialogPopup,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
 	}
 
-Visualizer::ScalarEvaluationLocator::~ScalarEvaluationLocator(void)
+ScalarEvaluationLocator::~ScalarEvaluationLocator(void)
 	{
 	}
 
-void Visualizer::ScalarEvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
+void ScalarEvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
 	{
 	/* Call the base class method: */
 	EvaluationLocator::motionCallback(cbData);
@@ -103,7 +104,7 @@ void Visualizer::ScalarEvaluationLocator::motionCallback(Vrui::LocatorTool::Moti
 		}
 	}
 
-void Visualizer::ScalarEvaluationLocator::insertControlPointCallback(Misc::CallbackData* cbData)
+void ScalarEvaluationLocator::insertControlPointCallback(Misc::CallbackData* cbData)
 	{
 	/* Insert a new control point into the color map: */
 	if(valueValid)

@@ -189,8 +189,8 @@ createArrow(
 	
 	/* Create a polygon to render the arrow base: */
 	GLuint* indexPtr=indices;
-	for(GLuint i=0;i<numPoints;++i,++indexPtr)
-		*indexPtr=vertexBase+numPoints-i;
+	for(GLuint i=numPoints;i>0;--i,++indexPtr)
+		*indexPtr=vertexBase+(i-1);
 	
 	/* Create a quad strip to render the arrow shaft: */
 	for(GLuint i=0;i<numPoints;++i,indexPtr+=2)

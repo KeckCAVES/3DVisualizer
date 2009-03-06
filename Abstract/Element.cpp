@@ -4,7 +4,7 @@ data sets. Elements use thread-safe reference counting for automatic
 garbage collection.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -41,11 +41,6 @@ bool Element::usesTransparency(void) const
 GLMotif::Widget* Element::createSettingsDialog(GLMotif::WidgetManager* widgetManager)
 	{
 	return 0;
-	}
-
-void Element::saveParameters(Misc::File& parameterFile) const
-	{
-	/* Default behavior is not to save anything */
 	}
 
 }

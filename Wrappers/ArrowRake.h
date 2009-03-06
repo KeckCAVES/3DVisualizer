@@ -1,7 +1,7 @@
 /***********************************************************************
 ArrowRake - Class to represent rakes of arrow glyphs as visualization
 elements.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -50,6 +50,7 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 	typedef typename DataSetWrapper::DS DS; // Type of templatized data set
 	typedef typename DS::Scalar Scalar; // Scalar type of data set's domain
 	static const int dimension=DS::dimension; // Dimension of data set's domain
+	typedef typename DataSetWrapper::VScalar VScalar; // Scalar type of scalar extractor
 	typedef typename DS::Point Point; // Point type in data set's domain
 	typedef typename DS::Vector Vector; // Vector type in data set's domain
 	
@@ -59,75 +60,15 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 		public:
 		Point base; // Arrow base point
 		bool valid; // Flag if the arrow is valid
-		Vector direction; // Vector from arrow base point to arrow tip
-		Scalar scalarValue; // Scalar value used to color arrow glyph
+		Vector direction; // Vector from arrow base point to arrow tip, before length scaling is applied
+		VScalar scalarValue; // Scalar value used to color arrow glyph
 		};
 	
 	typedef Misc::ArrayIndex<2> Index; // Type for rake array indices
 	typedef Misc::Array<Arrow,2> Rake; // 2D array of arrows forming a rake
-	
-	struct Parameters
-		{
-		/* Elements: */
-		public:
-		int vectorVariableIndex; // Index of the vector variable defining the arrow rake
-		int colorScalarVariableIndex; // Index of the scalar variable used to color the arrows
-		Index rakeSize; // Number of columns/rows of the arrow rake
-		Scalar cellSize[2]; // Distance between adjacent arrows in the same column/row
-		Scalar lengthScale; // Arrow length scale
-		Scalar shaftRadius; // Radius of the shafts of the arrow glyphs
-		unsigned int numArrowVertices; // Number of vertices per arrow for arrow glyph creation
-		Point base; // The rake base point
-		Vector direction[2]; // The directions of columns and rows in the rake
-		
-		/* Constructors and destructors: */
-		Parameters(int sVectorVariableIndex,int sColorScalarVariableIndex,const Index& sRakeSize,Scalar sCellSize,Scalar sLengthScale,Scalar sShaftRadius,unsigned int sNumArrowVertices) // Initializes permanent parameters
-			:vectorVariableIndex(sVectorVariableIndex),
-			 colorScalarVariableIndex(sColorScalarVariableIndex),
-			 rakeSize(sRakeSize),
-			 lengthScale(sLengthScale),
-			 shaftRadius(sShaftRadius),
-			 numArrowVertices(sNumArrowVertices)
-			{
-			for(int i=0;i<2;++i)
-				cellSize[i]=sCellSize;
-			}
-		
-		/* Methods: */
-		template <class DataSinkParam>
-		void write(DataSinkParam& dataSink) const // Writes the parameters to a data sink (such as a file or a pipe)
-			{
-			dataSink.write<int>(vectorVariableIndex);
-			dataSink.write<int>(colorScalarVariableIndex);
-			dataSink.write<int>(rakeSize.getComponents(),2);
-			dataSink.write<Scalar>(cellSize,2);
-			dataSink.write<Scalar>(lengthScale);
-			dataSink.write<Scalar>(shaftRadius);
-			dataSink.write<unsigned int>(numArrowVertices);
-			dataSink.write<Scalar>(base.getComponents(),dimension);
-			for(int i=0;i<2;++i)
-				dataSink.write<Scalar>(direction[i].getComponents(),dimension);
-			}
-		template <class DataSourceParam>
-		Parameters& read(DataSourceParam& dataSource) // Reads the parameters from a data sink (such as a file or a pipe)
-			{
-			vectorVariableIndex=dataSource.read<int>();
-			colorScalarVariableIndex=dataSource.read<int>();
-			dataSource.read<int>(rakeSize.getComponents(),2);
-			dataSource.read<Scalar>(cellSize,2);
-			lengthScale=dataSource.read<Scalar>();
-			shaftRadius=dataSource.read<Scalar>();
-			numArrowVertices=dataSource.read<unsigned int>();
-			dataSource.read<Scalar>(base.getComponents(),dimension);
-			for(int i=0;i<2;++i)
-				dataSource.read<Scalar>(direction[i].getComponents(),dimension);
-			return *this;
-			}
-		};
-	
-	private:
 	typedef GLVertex<void,0,void,0,Scalar,Scalar,dimension> Vertex; // Data type for arrow glyph vertices
 	
+	private:
 	struct DataItem:public GLObject::DataItem
 		{
 		/* Elements: */
@@ -144,26 +85,32 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 	
 	/* Elements: */
 	private:
-	Parameters parameters; // The arrow rake's extraction parameters
 	const GLColorMap* colorMap; // Color map to color arrow glyphs
 	Comm::MulticastPipe* pipe; // Pipe to stream arrow rake data in a cluster environment (owned by caller)
 	Rake rake; // Array containing the arrow definitions
+	Scalar lengthScale; // Arrow length scale
+	Scalar shaftRadius; // Radius of the shafts of the arrow glyphs
+	unsigned int numArrowVertices; // Number of vertices per arrow for arrow glyph creation
 	unsigned int version; // Version number of the arrow rake
 	
 	/* Constructors and destructors: */
 	public:
-	ArrowRake(const Parameters& sParameters,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty arrow rake for the given parameters
+	ArrowRake(Visualization::Abstract::Parameters* sParameters,const Index& sRakeSize,Scalar sLengthScale,Scalar sShaftRadius,unsigned int sNumArrowVertices,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty arrow rake for the given parameters
 	private:
 	ArrowRake(const ArrowRake& source); // Prohibit copy constructor
 	ArrowRake& operator=(const ArrowRake& source); // Prohibit assignment operator
 	public:
 	virtual ~ArrowRake(void);
 	
+	/* Methods from Visualization::Abstract::Element: */
+	virtual std::string getName(void) const;
+	virtual size_t getSize(void) const;
+	virtual void glRenderAction(GLContextData& contextData) const;
+	
+	/* Methods from GLObject: */
+	virtual void initContext(GLContextData& contextData) const;
+	
 	/* Methods: */
-	const Parameters& getParameters(void) const // Returns the arrow rake's extraction parameters
-		{
-		return parameters;
-		}
 	const GLColorMap* getColorMap(void) const // Returns the color map
 		{
 		return colorMap;
@@ -177,11 +124,6 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 		return rake;
 		}
 	void update(void); // Updates the rake array and synchronizes across a cluster
-	virtual std::string getName(void) const;
-	virtual size_t getSize(void) const;
-	virtual void initContext(GLContextData& contextData) const;
-	virtual void glRenderAction(GLContextData& contextData) const;
-	virtual void saveParameters(Misc::File& parameterFile) const;
 	};
 
 }

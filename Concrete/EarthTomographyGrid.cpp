@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <Misc/ThrowStdErr.h>
 #include <Misc/File.h>
 #include <Plugins/FactoryManager.h>
 #include <Math/Math.h>
@@ -88,13 +89,15 @@ Visualization::Abstract::DataSet* EarthTomographyGrid::load(const std::vector<st
 	/* Read all grid file names from the given directory: */
 	std::vector<GridFile> gridFiles;
 	DIR* gridFileDir=opendir(args[0].c_str());
+	if(gridFileDir==0)
+		Misc::throwStdErr("EarthTomographyGrid::load: Could not open grid file directory %s",args[0].c_str());
 	struct dirent* dirEntry;
 	while((dirEntry=readdir(gridFileDir))!=0)
 		{
 		/* Check if the directory entry is a grid file: */
 		const char* extPtr=0;
 		int depthState=0;
-		int depth;
+		int depth=-1;
 		for(const char* dnPtr=dirEntry->d_name;*dnPtr!='\0';++dnPtr)
 			{
 			/* Parse the depth value encoded in the file name: */
@@ -177,18 +180,16 @@ Visualization::Abstract::DataSet* EarthTomographyGrid::load(const std::vector<st
 	/* Set the data value's name: */
 	result->getDataValue().setScalarVariableName("Differential Wave Velocity");
 	
-	/* Change to the grid file directory: */
-	char currentDirectory[1024];
-	getcwd(currentDirectory,sizeof(currentDirectory));
-	chdir(args[0].c_str());
-	
 	/* Read all grid files: */
 	DS::Array& vertices=result->getDs().getGrid(0).getVertices();
 	DS::Index index;
 	for(index[0]=0;index[0]<vertices.getSize(0);++index[0])
 		{
 		/* Open the grid file: */
-		Misc::File gridFile(gridFiles[vertices.getSize(0)-1-index[0]].fileName.c_str(),"rt");
+		std::string gridFileName=args[0];
+		gridFileName.push_back('/');
+		gridFileName.append(gridFiles[vertices.getSize(0)-1-index[0]].fileName);
+		Misc::File gridFile(gridFileName.c_str(),"rt");
 		double depth=double(gridFiles[vertices.getSize(0)-1-index[0]].depth)*1000.0;
 		
 		/* Constant parameters for geoid formula: */
@@ -196,16 +197,18 @@ Visualization::Abstract::DataSet* EarthTomographyGrid::load(const std::vector<st
 		const double f=1.0/298.247; // Geoid flattening factor
 		
 		/* Read all vertices from the grid file: */
+		unsigned int lineNumber=1;
 		for(index[2]=0;index[2]<vertices.getSize(2);++index[2])
 			{
-			for(index[1]=0;index[1]<vertices.getSize(1)-1;++index[1])
+			for(index[1]=0;index[1]<vertices.getSize(1)-1;++index[1],++lineNumber)
 				{
 				/* Read latitude, longitude, and density from grid file: */
 				char line[80];
 				gridFile.gets(line,sizeof(line));
 				double lat,lng;
 				float density;
-				sscanf(line,"%lf %lf %f",&lng,&lat,&density);
+				if(sscanf(line,"%lf %lf %f",&lng,&lat,&density)!=3)
+					Misc::throwStdErr("EarthTomographyGrid::load: invalid data in line %u in grid file %s",lineNumber,gridFileName.c_str());
 				lat=Math::rad(-lat);
 				lng=Math::rad(lng);
 				
@@ -227,9 +230,6 @@ Visualization::Abstract::DataSet* EarthTomographyGrid::load(const std::vector<st
 			vertices(index[0],vertices.getSize(1)-1,index[2])=vertices(index[0],0,index[2]);
 			}
 		}
-	
-	/* Go back to the previous directory: */
-	chdir(currentDirectory);
 	
 	/* Finalize the grid structure: */
 	result->getDs().finalizeGrid();

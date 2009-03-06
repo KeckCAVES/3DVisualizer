@@ -257,7 +257,7 @@ PointSet::PointSet(const char* pointFileName,double flatteningFactor,double scal
 	enum RadiusMode
 		{
 		RADIUS,DEPTH,NEGDEPTH
-		} radiusMode;
+		} radiusMode=RADIUS;
 	int index=0;
 	while(true)
 		{
@@ -299,7 +299,7 @@ PointSet::PointSet(const char* pointFileName,double flatteningFactor,double scal
 		{
 		/* Read the next line from the input file: */
 		int index=0;
-		float sphericalCoordinates[3];
+		float sphericalCoordinates[3]={0.0f,0.0f,0.0f}; // Initialization just to shut up gcc
 		int parsedComponentsMask=0x0;
 		while(true)
 			{
@@ -335,6 +335,7 @@ PointSet::PointSet(const char* pointFileName,double flatteningFactor,double scal
 			{
 			/* Convert the read spherical coordinates to Cartesian coordinates: */
 			Vertex p;
+			p.position=Vertex::Position(0,0,0); // To shut up gcc
 			switch(radiusMode)
 				{
 				case RADIUS:

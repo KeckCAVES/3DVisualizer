@@ -3,7 +3,7 @@ ColoredIsosurface - Wrapper class for color-mapped isosurfaces as
 visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -40,10 +40,12 @@ Methods of class ColoredIsosurface:
 template <class DataSetWrapperParam>
 inline
 ColoredIsosurface<DataSetWrapperParam>::ColoredIsosurface(
-	const typename ColoredIsosurface<DataSetWrapperParam>::Parameters& sParameters,
+	Visualization::Abstract::Parameters* sParameters,
+	bool sLighting,
 	const GLColorMap* sColorMap,
 	Comm::MulticastPipe* pipe)
-	:parameters(sParameters),
+	:Visualization::Abstract::Element(sParameters),
+	 lighting(sLighting),
 	 colorMap(sColorMap),
 	 surface(pipe)
 	{
@@ -90,7 +92,7 @@ ColoredIsosurface<DataSetWrapperParam>::glRenderAction(
 	glGetBooleanv(GL_LIGHT_MODEL_TWO_SIDE,&lightModelTwoSide);
 	GLint lightModelColorControl;
 	glGetIntegerv(GL_LIGHT_MODEL_COLOR_CONTROL,&lightModelColorControl);
-	if(parameters.lightSurface)
+	if(lighting)
 		{
 		if(!lightingEnabled)
 			glEnable(GL_LIGHTING);
@@ -123,7 +125,7 @@ ColoredIsosurface<DataSetWrapperParam>::glRenderAction(
 		glDisable(GL_TEXTURE_3D);
 	GLboolean colorMaterialEnabled=false; // Redundant initialization; just to make compiler happy
 	GLMaterial frontMaterial,backMaterial;
-	if(parameters.lightSurface)
+	if(lighting)
 		{
 		colorMaterialEnabled=glIsEnabled(GL_COLOR_MATERIAL);
 		if(colorMaterialEnabled)
@@ -142,7 +144,7 @@ ColoredIsosurface<DataSetWrapperParam>::glRenderAction(
 	glTexImage1D(GL_TEXTURE_1D,0,GL_RGBA8,256,0,GL_RGBA,GL_FLOAT,colorMap->getColors());
 	
 	/* Set the texture environment to disable or enable lighting: */
-	if(parameters.lightSurface)
+	if(lighting)
 		glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
 	else
 		glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_REPLACE);
@@ -165,7 +167,7 @@ ColoredIsosurface<DataSetWrapperParam>::glRenderAction(
 	glPopMatrix();
 	if(matrixMode!=GL_TEXTURE)
 		glMatrixMode(matrixMode);
-	if(parameters.lightSurface)
+	if(lighting)
 		{
 		glMaterial(GLMaterialEnums::FRONT,frontMaterial);
 		glMaterial(GLMaterialEnums::BACK,backMaterial);
@@ -178,7 +180,7 @@ ColoredIsosurface<DataSetWrapperParam>::glRenderAction(
 		glEnable(GL_TEXTURE_2D);
 	if(!texture1DEnabled)
 		glDisable(GL_TEXTURE_1D);
-	if(parameters.lightSurface)
+	if(lighting)
 		{
 		if(lightModelColorControl!=GL_SEPARATE_SPECULAR_COLOR)
 			glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL,lightModelColorControl);
@@ -202,16 +204,6 @@ ColoredIsosurface<DataSetWrapperParam>::glRenderAction(
 		}
 	if(cullFaceEnabled)
 		glEnable(GL_CULL_FACE);
-	}
-
-template <class DataSetWrapperParam>
-inline
-void
-ColoredIsosurface<DataSetWrapperParam>::saveParameters(
-	Misc::File& parameterFile) const
-	{
-	/* Save the parameters to file: */
-	parameters.write(parameterFile);
 	}
 
 }

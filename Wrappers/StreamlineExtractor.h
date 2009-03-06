@@ -2,7 +2,7 @@
 StreamlineExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized streamline extractor
 implementation.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/Slider.h>
 
 #include <Abstract/DataSet.h>
+#include <Abstract/Parameters.h>
 #include <Abstract/Algorithm.h>
 
 #include <Wrappers/Streamline.h>
@@ -70,8 +71,9 @@ class StreamlineExtractor:public Visualization::Abstract::Algorithm
 	typedef Visualization::Abstract::Algorithm Base; // Base class
 	typedef DataSetWrapperParam DataSetWrapper; // Compatible data set type
 	typedef typename DataSetWrapper::DS DS; // Type of templatized data set
-	typedef typename DS::Scalar DSScalar; // Scalar type of templatized data set
-	typedef typename DS::Point DSPoint; // Type for points in data set's domain
+	typedef typename DS::Scalar Scalar; // Scalar type of templatized data set
+	static const int dimension=DS::dimension; // Dimension of data set's domain
+	typedef typename DS::Point Point; // Type for points in data set's domain
 	typedef typename DS::Value DSValue; // Value type of templatized data set
 	typedef typename DataSetWrapper::DSL DSL; // Type of templatized locator
 	typedef typename DataSetWrapper::Locator Locator; // Type of locator wrapper
@@ -81,12 +83,60 @@ class StreamlineExtractor:public Visualization::Abstract::Algorithm
 	typedef typename DataSetWrapper::ScalarExtractor ScalarExtractor; // Compatible scalar extractor wrapper class
 	typedef Visualization::Wrappers::Streamline<DataSetWrapper> Streamline; // Type of created visualization elements
 	typedef Misc::Autopointer<Streamline> StreamlinePointer; // Type for pointers to created visualization elements
-	typedef typename Streamline::Parameters Parameters; // Type for streamline extraction parameters
 	typedef typename Streamline::Polyline Polyline; // Type of low-level streamline representation
 	typedef Visualization::Templatized::StreamlineExtractor<DS,VE,SE,Polyline> SLE; // Type of templatized streamline extractor
 	
+	private:
+	class Parameters:public Visualization::Abstract::Parameters // Class to store extraction parameters for streamlines
+		{
+		friend class StreamlineExtractor;
+		
+		/* Elements: */
+		private:
+		int vectorVariableIndex; // Index of the vector variable defining the arrow rake
+		int colorScalarVariableIndex; // Index of the scalar variable used to color the arrows
+		size_t maxNumVertices; // Maximum number of vertices to be extracted
+		Scalar epsilon; // Per-step accuracy threshold for streamline integration
+		Point seedPoint; // The streamline's seeding point
+		const DS* ds; // Data set from which to extract streamlines
+		const VE* ve; // Vector extractor for data set
+		const SE* cse; // Color scalar extractor for data set
+		DSL dsl; // Templatized data set locator following the seed point
+		bool locatorValid; // Flag if the locator has been properly initialized, and is inside the data set's domain
+		
+		/* Private methods: */
+		template <class DataSourceParam>
+		void readBinary(DataSourceParam& dataSource,bool raw,const Visualization::Abstract::VariableManager* variableManager); // Reads parameters from a binary data source
+		template <class DataSourceParam>
+		void writeBinary(DataSourceParam& dataSink,bool raw,const Visualization::Abstract::VariableManager* variableManager) const; // Writes parameters to a binary data source
+		
+		/* Constructors and destructors: */
+		public:
+		Parameters(Visualization::Abstract::VariableManager* variableManager);
+		
+		/* Methods from Abstract::Parameters: */
+		virtual bool isValid(void) const
+			{
+			return locatorValid;
+			}
+		virtual void read(Misc::File& file,bool ascii,Visualization::Abstract::VariableManager* variableManager);
+		virtual void read(Comm::MulticastPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
+		virtual void read(Comm::ClusterPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
+		virtual void write(Misc::File& file,bool ascii,const Visualization::Abstract::VariableManager* variableManager) const;
+		virtual void write(Comm::MulticastPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
+		virtual void write(Comm::ClusterPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
+		virtual Visualization::Abstract::Parameters* clone(void) const
+			{
+			return new Parameters(*this);
+			}
+		
+		/* New methods: */
+		void update(Visualization::Abstract::VariableManager* variableManager,bool track); // Updates derived parameters after a read operation
+		};
+	
 	/* Elements: */
 	private:
+	static const char* name; // Identifying name of this algorithm
 	Parameters parameters; // The streamline extraction parameters used by this extractor
 	SLE sle; // The templatized streamline extractor
 	StreamlinePointer currentStreamline; // The currently extracted streamline visualization element
@@ -97,17 +147,42 @@ class StreamlineExtractor:public Visualization::Abstract::Algorithm
 	GLMotif::TextField* epsilonValue; // Text field to display current error threshold value
 	GLMotif::Slider* epsilonSlider; // Slider to change current error threshold value
 	
-	/* Private methods: */
-	static const DS* getDs(Visualization::Abstract::VariableManager* sVariableManager,int vectorVariableIndex,int colorScalarVariableIndex);
-	static const VE& getVe(const Visualization::Abstract::VectorExtractor* sVectorExtractor);
-	static const SE& getSe(const Visualization::Abstract::ScalarExtractor* sScalarExtractor);
-	
 	/* Constructors and destructors: */
 	public:
 	StreamlineExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates a streamline extractor
 	virtual ~StreamlineExtractor(void);
 	
-	/* Methods: */
+	/* Methods from Visualization::Abstract::Algorithm: */
+	virtual const char* getName(void) const
+		{
+		return name;
+		}
+	virtual bool hasSeededCreator(void) const
+		{
+		return true;
+		}
+	virtual bool hasIncrementalCreator(void) const
+		{
+		return true;
+		}
+	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager);
+	virtual Visualization::Abstract::Parameters* cloneParameters(void) const
+		{
+		return new Parameters(parameters);
+		}
+	virtual void setSeedLocator(const Visualization::Abstract::DataSet::Locator* seedLocator);
+	virtual Visualization::Abstract::Element* createElement(Visualization::Abstract::Parameters* extractParameters);
+	virtual Visualization::Abstract::Element* startElement(Visualization::Abstract::Parameters* extractParameters);
+	virtual bool continueElement(const Realtime::AlarmTimer& alarm);
+	virtual void finishElement(void);
+	virtual Visualization::Abstract::Element* startSlaveElement(Visualization::Abstract::Parameters* extractParameters);
+	virtual void continueSlaveElement(void);
+	
+	/* New methods: */
+	static const char* getClassName(void) // Returns the algorithm class name
+		{
+		return name;
+		}
 	const SLE& getSle(void) const // Returns the templatized streamline extractor
 		{
 		return sle;
@@ -116,20 +191,6 @@ class StreamlineExtractor:public Visualization::Abstract::Algorithm
 		{
 		return sle;
 		}
-	size_t getMaxNumVertices(void) const // Returns the maximum number of vertices to be extracted
-		{
-		return parameters.maxNumVertices;
-		}
-	void setMaxNumVertices(size_t newMaxNumVertices); // Sets the maximum number of vertices to be extracted
-	virtual bool hasSeededCreator(void) const;
-	virtual bool hasIncrementalCreator(void) const;
-	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager);
-	virtual Visualization::Abstract::Element* createElement(const Visualization::Abstract::DataSet::Locator* seedLocator);
-	virtual Visualization::Abstract::Element* startElement(const Visualization::Abstract::DataSet::Locator* seedLocator);
-	virtual bool continueElement(const Realtime::AlarmTimer& alarm);
-	virtual void finishElement(void);
-	virtual Visualization::Abstract::Element* startSlaveElement(void);
-	virtual void continueSlaveElement(void);
 	void maxNumVerticesSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
 	void epsilonSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
 	};
