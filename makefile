@@ -25,7 +25,7 @@
 # same setting in Vrui's makefile. By default the directories match; if
 # the installation directory was adjusted during Vrui's installation, it
 # must be adjusted here as well.
-VRUIDIR = $(HOME)/Vrui-1.0
+VRUIDIR = /usr/local/Vrui-1.0-057
 
 # Base installation directory for 3D Visualizer and its module
 # plug-ins. The module plug-ins cannot be moved from this location
@@ -34,7 +34,7 @@ VRUIDIR = $(HOME)/Vrui-1.0
 # installed to be run. 3D Visualizer's executable, plug-ins, and
 # resources will be installed in the bin, lib (or lib64), and share
 # directories underneath the given base directory, respectively.
-INSTALLDIR = $(shell pwd)
+INSTALLDIR = /usr/local/VruiApplications
 
 # List of default visualization modules:
 MODULE_NAMES = SphericalASCIIFile \

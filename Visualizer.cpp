@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Misc/FileNameExtensions.h>
 #include <Misc/CreateNumberedFileName.h>
 #include <Misc/File.h>
+#include <Comm/MulticastPipe.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GL/gl.h>
 #include <GL/GLColorTemplates.h>
@@ -64,7 +65,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/Module.h>
 
 #include "CuttingPlane.h"
+#ifdef VISUALIZER_USE_COLLABORATION
 #include "SharedVisualizationClient.h"
+#endif
 #include "BaseLocator.h"
 #include "CuttingPlaneLocator.h"
 #include "ScalarEvaluationLocator.h"
