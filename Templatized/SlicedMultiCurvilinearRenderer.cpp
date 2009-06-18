@@ -441,8 +441,7 @@ DataSetRenderer<SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarPar
 		case 1:
 			/* Render each grid's outline: */
 			for(int gridIndex=0;gridIndex<dataSet->getNumGrids();++gridIndex)
-			
-SlicedMultiCurvilinearRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueScalarParam>::renderGridOutline(dataSet->getGrid(gridIndex).getGrid());
+				SlicedMultiCurvilinearRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueScalarParam>::renderGridOutline(dataSet->getGrid(gridIndex).getGrid());
 			break;
 		
 		case 2:

@@ -1,5 +1,5 @@
 ========================================================================
-README for 3D Visualizer version 1.3
+README for 3D Visualizer version 1.4
 Copyright (c) 2005-2009 Oliver Kreylos
 ========================================================================
 
@@ -26,7 +26,7 @@ http://www.keckcaves.org), and the W.M Keck Foundation.
 Requirements
 ============
 
-3D Visualizer requires Vrui version 1.0 build 056 or newer.
+3D Visualizer requires Vrui version 1.0 build 062 or newer.
 To read images in PNG format, libpng has to be installed, and Vrui has
 to be configured with support for PNG images (see Vrui README file).
 
@@ -48,12 +48,12 @@ accounts.
 
 1. Change into ~/src directory and unpack the 3D Visualizer tarball:
    > cd ~/src
-   > tar xfz <download path>/3DVisualizer-1.3.tar.gz
+   > tar xfz <download path>/3DVisualizer-<version>.tar.gz
    - or -
-   > tar xf <download path>/3DVisualizer-1.3.tar
+   > tar xf <download path>/3DVisualizer-<version>.tar
 
 2. Change into 3D Visualizer base directory:
-   > cd 3DVisualizer-1.3
+   > cd 3DVisualizer-<version>
 
 3. Adapt makefile if Vrui installation path is *not* ~/Vrui-1.0 by
    setting the VRUIDIR variable to the correct location. VRUIDIR is
@@ -66,6 +66,11 @@ accounts.
    desired target location. 3D Visualizer will be then be installed in
    $(INSTALLDIR)/bin, $(INSTALLDIR)/lib (or $(INSTALLDIR)/lib64 on
    64-bit Linux systems), and $(INSTALLDIR)/share.
+   Important note: Do not use ~ as a shortcut for the user's home
+   directory here; use $(HOME) instead. For example, write
+   INSTALLDIR = $(HOME)/apps
+   instead of
+   INSTALLDIR = ~/apps
 
 5. Build 3D Visualizer:
    > make
@@ -79,15 +84,15 @@ accounts.
    > sudo make install
 
 7. Optional: Add directory containing the 3D Visualizer executable
-   (~/src/3DVisualizer-1.3/bin in the default installation,
+   (~/src/3DVisualizer-<version>/bin in the default installation,
    $(INSTALLDIR)/bin otherwise) to the user's search path. This allows
    running 3D Visualizer from any directory. Using csh or tcsh:
-   > setenv PATH ${PATH}:~/src/3DVisualizer-1.3/bin
+   > setenv PATH ${PATH}:~/src/3DVisualizer-<version>/bin
    - or -
    > setenv PATH ${PATH}:<INSTALLDIR>/bin
    where <INSTALLDIR> is the target location set in the makefile.
    Using bash:
-   > export PATH=${PATH}:~/src/3DVisualizer-1.3/bin
+   > export PATH=${PATH}:~/src/3DVisualizer-<version>/bin
    - or -
    > export PATH=${PATH}:<INSTALLDIR>/bin
    These lines can also be added to the user's .cshrc or .bashrc files
@@ -100,7 +105,7 @@ These instructions assume that 3D Visualizer was installed in its base
 directory, (see steps 4 and 6 above).
 
 1. Change into 3D Visualizer base directory:
-   > cd ~/src/3DVisualizer-1.3
+   > cd ~/src/3DVisualizer-<version>
 
 2. Download example data tarball AlaskaData.tar.gz.
 

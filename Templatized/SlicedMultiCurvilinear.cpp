@@ -3,7 +3,7 @@ SlicedSlicedMultiCurvilinear - Base class for vertex-centered multi-block
 curvilinear data sets containing arbitrary numbers of independent scalar
 fields, combined into vector and/or tensor fields using special value
 extractors.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Math/Math.h>
 #include <Math/Constants.h>
 #include <Geometry/AffineCombiner.h>
+#include <Geometry/Matrix.h>
 
 #include <Templatized/LinearInterpolator.h>
 #include <Templatized/FindClosestPointFunctor.h>
@@ -209,10 +210,13 @@ Methods of class SlicedMultiCurvilinear::Locator:
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Point
-SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::transformCellPosition(
-	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::CellPosition& cellPos) const
+bool
+SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::newtonRaphsonStep(
+	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Point& position)
 	{
+	typedef Geometry::Matrix<Scalar,dimension,dimension> Matrix;
+	
+	/* Transform the current cell position to domain space: */
 	const Grid& grid=ds->grids[gridIndex];
 	const Point* baseVertex=grid.grid.getArray()+(baseVertexIndex-grid.gridBaseLinearIndex);
 	
@@ -233,19 +237,15 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::tr
 			p[pi]=Geometry::affineCombination(p[pi],p[pi+numSteps],cellPos[interpolationDimension]);
 		}
 	
-	/* Return final result: */
-	return p[0];
-	}
-
-template <class ScalarParam,int dimensionParam,class ValueScalarParam>
-inline
-typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Matrix
-SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::calcTransformDerivative(
-	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::CellPosition& cellPos) const
-	{
-	Matrix result=Matrix::zero;
+	/* Calculate f(x_i): */
+	Vector fi=p[0]-position;
 	
-	/* Calculate columns of Jacobian matrix: */
+	/* Check for convergence: */
+	if(fi.sqr()<epsilon2)
+		return true;
+	
+	/* Calculate f'(x_i): */
+	Matrix fpi=Matrix::zero;
 	for(int i=0;i<dimension;++i)
 		{
 		/* Calculate cell's edge vectors for current dimension: */
@@ -254,8 +254,8 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::ca
 			if((v0&iMask)==0)
 				{
 				/* Calculate edge vector and convex combination weight: */
-				int v1=v0|iMask;
-				Vector d=Cell::getVertexPosition(v1)-Cell::getVertexPosition(v0);
+				const Point* vPtr=baseVertex+grid.vertexOffsets[v0];
+				Vector d=vPtr[grid.vertexStrides[i]]-vPtr[0];
 				Scalar weight=Scalar(1);
 				for(int j=0;j<dimension;++j)
 					if(j!=i)
@@ -269,17 +269,25 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::ca
 				
 				/* Add weighted vector to Jacobian matrix: */
 				for(int j=0;j<dimension;++j)
-					result(j,i)+=d[j]*weight;
+					fpi(j,i)+=d[j]*weight;
 				}
 		}
 	
-	return result;
+	/* Calculate the step vector as f(x_i) / f'(x_i): */
+	CellPosition stepi=fi/fpi;
+	
+	/* Adjust the cell position: */
+	for(int i=0;i<dimension;++i)
+		cellPos[i]-=stepi[i];
+	
+	return false;
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
 SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::Locator(
 	void)
+	:cantTrace(true)
 	{
 	}
 
@@ -289,7 +297,8 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::Lo
 	const SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>* sDs,
 	typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Scalar sEpsilon)
 	:Cell(sDs),
-	 epsilon(sEpsilon),epsilon2(Math::sqr(epsilon))
+	 epsilon(sEpsilon),epsilon2(Math::sqr(epsilon)),
+	 cantTrace(true)
 	{
 	}
 
@@ -310,8 +319,8 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::lo
 	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Point& position,
 	bool traceHint)
 	{
-	/* If traceHint parameter is false or locator is invalid, start searching from scratch: */
-	if(true) // !traceHint||baseVertexIndex==-1) Currently not working properly; from scratch is faster anyways
+	/* If traceHint parameter is false or locator can't trace, start searching from scratch: */
+	if(!traceHint||cantTrace)
 		{
 		/* Start searching from cell whose cell center is closest to query position: */
 		FindClosestPointFunctor<CellCenter> f(position,ds->maxCellRadius2);
@@ -325,97 +334,149 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::lo
 		/* Initialize local cell position: */
 		for(int i=0;i<dimension;++i)
 			cellPos[i]=Scalar(0.5);
+		
+		/* Now we can trace: */
+		cantTrace=false;
 		}
 	
 	/* Perform Newton-Raphson iteration until it converges and the current cell contains the query point: */
-	for(int i=0;i<10;++i)
+	Scalar maxOut;
+	CellID previousCellID; // Cell ID to detect "thrashing" between cells
+	CellID currentCellID=getCellID(); // Ditto
+	Scalar previousMaxMove=Scalar(0); // Reason we went into the current cell
+	int iteration=0;
+	for(iteration=0;iteration<10;++iteration)
 		{
-		/* Calculate f(x_i): */
-		Vector fi=transformCellPosition(cellPos)-position;
-		
-		/* Stop iteration if f(x_i) is small enough: */
-		if(Geometry::sqr(fi)<epsilon2)
-			break;
-		
-		/* Calculate f'(x_i): */
-		Matrix fpi=calcTransformDerivative(cellPos);
-		
-		/* Calculate x_{i+1}: */
-		CellPosition step=fi/fpi;
-		for(int i=0;i<dimension;++i)
-			cellPos[i]-=step[i];
-		
-		/* Move one step towards the cell containing x_{i+1}: */
-		Scalar maxOut(0);
-		int moveDim=0; // Redundant initialization; just to make compiler happy
-		int moveDir=0;
-		for(int i=0;i<dimension;++i)
+		/* Perform Newton-Raphson iteration in the current cell until it converges, or goes really bad: */
+		while(true)
 			{
-			if(cellPos[i]<Scalar(0))
+			/* Do one step: */
+			bool converged=newtonRaphsonStep(position);
+			
+			/* Check for signs of convergence failure: */
+			maxOut=Scalar(0);
+			for(int i=0;i<dimension;++i)
 				{
 				if(maxOut<-cellPos[i])
-					{
 					maxOut=-cellPos[i];
+				else if(maxOut<cellPos[i]-Scalar(1))
+					maxOut=cellPos[i]-Scalar(1);
+				}
+			if(converged||maxOut>Scalar(1)) // Tolerate at most one cell size out (this is somewhat ad-hoc)
+				break;
+			}
+		
+		/* Check if the current cell contains the query position: */
+		if(maxOut==Scalar(0))
+			return true;
+		
+		/* Check if this was the first step, and we're way off: */
+		if(iteration==0&&maxOut>Scalar(5))
+			{
+			/* We had a tracing failure; just start searching from scratch: */
+			FindClosestPointFunctor<CellCenter> f(position,ds->maxCellRadius2);
+			ds->cellCenterTree.traverseTreeDirected(f);
+			if(f.getClosestPoint()==0) // Bail out if no cell is close enough
+				{
+				/* At this point, the locator is borked. Better not trace next time: */
+				cantTrace=true;
+				
+				/* And we're outside the grid, too: */
+				return false;
+				}
+			
+			/* Go to the found cell: */
+			Cell::operator=(ds->getCell(f.getClosestPoint()->value));
+			previousCellID=currentCellID;
+			currentCellID=f.getClosestPoint()->value;
+			previousMaxMove=maxOut;
+			
+			/* Initialize the local cell position: */
+			for(int i=0;i<dimension;++i)
+				cellPos[i]=Scalar(0.5);
+			
+			/* Start over: */
+			continue;
+			}
+		
+		/* Otherwise, try moving to a different cell: */
+		Scalar maxMove=Scalar(0);
+		int moveDim=0;
+		int moveDir=0;
+		CellID moveCellID; // Cleverly keep track of this ID to reduce work later!
+		for(int i=0;i<dimension;++i)
+			{
+			if(maxMove<-cellPos[i])
+				{
+				/* Check if we can actually move in this direction: */
+				moveCellID=CellID();
+				if(index[i]>0||(moveCellID=ds->retrieveGridConnector(*this,i*2+0)).isValid())
+					{
+					maxMove=-cellPos[i];
 					moveDim=i;
 					moveDir=-1;
 					}
 				}
-			else if(cellPos[i]>Scalar(1))
+			else if(maxMove<cellPos[i]-Scalar(1))
 				{
-				if(maxOut<cellPos[i]-Scalar(1))
+				/* Check if we can actually move in this direction: */
+				moveCellID=CellID();
+				if(index[i]<ds->grids[gridIndex].numCells[moveDim]-1||(moveCellID=ds->retrieveGridConnector(*this,i*2+1)).isValid())
 					{
-					maxOut=cellPos[i]-Scalar(1);
+					maxMove=cellPos[i]-Scalar(1);
 					moveDim=i;
 					moveDir=1;
 					}
 				}
 			}
-		if(moveDir==-1)
+		
+		/* If we can move somewhere, do it: */
+		if(moveCellID.isValid())
 			{
-			if(index[moveDim]>0)
-				{
-				cellPos[moveDim]+=Scalar(1);
-				--index[moveDim];
-				baseVertexIndex-=ds->grids[gridIndex].vertexStrides[moveDim];
-				}
-			else
-				{
-				CellID neighbourID=ds->retrieveGridConnector(*this,moveDim*2+0);
-				if(neighbourID.isValid())
-					{
-					Cell::operator=(ds->getCell(neighbourID));
-					for(int i=0;i<dimension;++i)
-						cellPos[i]=Scalar(0.5);
-					}
-				}
+			/* Move to another grid: */
+			Cell::operator=(ds->getCell(moveCellID));
+			for(int i=0;i<dimension;++i)
+				cellPos[i]=Scalar(0.5);
+			}
+		else if(moveDir==-1)
+			{
+			/* Move in the same grid: */
+			cellPos[moveDim]+=Scalar(1);
+			--index[moveDim];
+			baseVertexIndex-=ds->grids[gridIndex].vertexStrides[moveDim];
 			}
 		else if(moveDir==1)
 			{
-			if(index[moveDim]<ds->grids[gridIndex].numCells[moveDim]-1)
-				{
-				cellPos[moveDim]-=Scalar(1);
-				++index[moveDim];
-				baseVertexIndex+=ds->grids[gridIndex].vertexStrides[moveDim];
-				}
-			else
-				{
-				CellID neighbourID=ds->retrieveGridConnector(*this,moveDim*2+1);
-				if(neighbourID.isValid())
-					{
-					Cell::operator=(ds->getCell(neighbourID));
-					for(int i=0;i<dimension;++i)
-						cellPos[i]=Scalar(0.5);
-					}
-				}
+			/* Move in the same grid: */
+			cellPos[moveDim]-=Scalar(1);
+			++index[moveDim];
+			baseVertexIndex+=ds->grids[gridIndex].vertexStrides[moveDim];
 			}
+		else
+			{
+			/* At this point, the locator is borked. Better not trace next time: */
+			cantTrace=true;
+			
+			/* We're not in the current cell, and can't move anywhere else -- we're outside the grid: */
+			return false;
+			}
+		
+		/* Check if we've just moved back into the cell we just came from: */
+		CellID nextCellID=getCellID();
+		if(nextCellID==previousCellID&&maxMove<=previousMaxMove)
+			return true;
+		
+		/* Check for thrashing on the next iteration step: */
+		previousCellID=currentCellID;
+		currentCellID=nextCellID;
+		previousMaxMove=maxMove;
 		}
 	
-	/* Check if the final cell contains the query position: */
-	bool result=true;
-	for(int i=0;i<dimension;++i)
-		if(cellPos[i]<Scalar(0)||cellPos[i]>Scalar(1))
-			result=false;
-	return result;
+	/* Just to be safe, don't trace on the next step: */
+	cantTrace=true;
+	
+	/* Return true if the final cell contains the query position, with some fudge: */
+	return maxOut<Scalar(1.0e-4);
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
@@ -500,43 +561,6 @@ Methods of class SlicedMultiCurvilinear:
 ***************************************/
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
-inline
-void
-SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::initStructure(
-	void)
-	{
-	/* Calculate total number of vertices and cells: */
-	totalNumVertices=0;
-	totalNumCells=0;
-	for(int gridIndex=0;gridIndex<numGrids;++gridIndex)
-		{
-		totalNumVertices+=grids[gridIndex].numVertices.calcIncrement(-1);
-		totalNumCells+=grids[gridIndex].numCells.calcIncrement(-1);
-		}
-	
-	/* Calculate grids' linear index bases: */
-	int gridBaseLinearIndex=0;
-	for(int gridIndex=0;gridIndex<numGrids;++gridIndex)
-		{
-		grids[gridIndex].gridBaseLinearIndex=gridBaseLinearIndex;
-		gridBaseLinearIndex+=grids[gridIndex].numVertices.calcIncrement(-1);
-		}
-	
-	/* Initialize vertex list bounds: */
-	Index vertexIndex(0);
-	firstVertex=Vertex(this,0,vertexIndex);
-	lastVertex=Vertex(this,numGrids,vertexIndex);
-	
-	/* Initialize cell list bounds: */
-	Index cellIndex(0);
-	firstCell=Cell(this,0,cellIndex);
-	for(int i=0;i<dimension;++i)
-		cellIndex[i]=grids[numGrids-1].numCells[i]-1;
-	lastCell=Cell(this,numGrids-1,cellIndex);
-	++lastCell;
-	}
-
-template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 template <class ScalarExtractorParam>
 inline
 typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Vector
@@ -545,6 +569,8 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::calcVertexG
 	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Index& vertexIndex,
 	const ScalarExtractorParam& extractor) const
 	{
+	typedef Geometry::Matrix<Scalar,dimension,dimension> Matrix;
+	
 	const Grid& grid=grids[gridIndex];
 	
 	/* Calculate the (transposed) Jacobian matrix of the grid transformation function and the gradient of the grid function at the vertex: */
@@ -657,6 +683,7 @@ inline
 SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::SlicedMultiCurvilinear(
 	void)
 	:numGrids(0),grids(0),
+	 totalNumVertices(0),totalNumCells(0),
 	 numSlices(0),slices(0),
 	 gridConnectors(0),
 	 domainBox(Box::empty),
@@ -669,11 +696,15 @@ inline
 SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::SlicedMultiCurvilinear(
 	int sNumGrids)
 	:numGrids(sNumGrids),grids(new Grid[numGrids]),
+	 totalNumVertices(0),totalNumCells(0),
 	 numSlices(0),slices(0),
 	 gridConnectors(0),
 	 domainBox(Box::empty),
 	 locatorEpsilon(Scalar(1.0e-4))
 	{
+	/* Initialize the grids: */
+	for(int gridIndex=0;gridIndex<numGrids;++gridIndex)
+		grids[gridIndex].gridBaseLinearIndex=0;
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
@@ -683,15 +714,15 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::SlicedMulti
 	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Index sNumGridVertices[],
 	int sNumSlices)
 	:numGrids(sNumGrids),grids(new Grid[numGrids]),
+	 totalNumVertices(0),totalNumCells(0),
 	 numSlices(sNumSlices),slices(new ValueScalar*[numSlices]),
 	 gridConnectors(0),
 	 domainBox(Box::empty),
 	 locatorEpsilon(Scalar(1.0e-4))
 	{
-	/* Initialize grid sizes and the data set structure: */
+	/* Initialize all grids: */
 	for(int gridIndex=0;gridIndex<numGrids;++gridIndex)
-		grids[gridIndex].setNumVertices(sNumGridVertices[gridIndex]);
-	initStructure();
+		setGrid(gridIndex,sNumGridVertices[gridIndex]);
 	
 	/* Initialize the grid value slices: */
 	for(int i=0;i<numSlices;++i)
@@ -729,6 +760,17 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::setNumGrids
 		/* Allocate the new grids: */
 		numGrids=sNumGrids;
 		grids=new Grid[numGrids];
+		
+		/* Initialize the grid structures: */
+		totalNumVertices=0;
+		totalNumCells=0;
+		
+		/* Resize all value slices: */
+		for(int sliceIndex=0;sliceIndex<numSlices;++sliceIndex)
+			{
+			delete[] slices[sliceIndex];
+			slices[sliceIndex]=0;
+			}
 		}
 	}
 
@@ -740,16 +782,97 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::setGrid(
 	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Index& sNumVertices,
 	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Point* sVertexPositions)
 	{
-	/* Initialize grid structures: */
-	grids[gridIndex].setGrid(sNumVertices,sVertexPositions);
+	/* Calculate the size change of the given grid: */
+	int oldGridNumVertices=grids[gridIndex].numVertices.calcIncrement(-1);
+	int newGridNumVertices=sNumVertices.calcIncrement(-1);
+	totalNumVertices=totalNumVertices+newGridNumVertices-oldGridNumVertices;
 	
-	/* Initialize grid structures: */
-	initStructure();
+	if(oldGridNumVertices!=newGridNumVertices&&numSlices>0)
+		{
+		/* Calculate the cumulative sizes of grids before and after the changed grid: */
+		int preSize=0;
+		for(int gi=0;gi<gridIndex;++gi)
+			preSize+=grids[gi].numVertices.calcIncrement(-1);
+		int postSize=0;
+		for(int gi=gridIndex+1;gi<numGrids;++gi)
+			postSize+=grids[gi].numVertices.calcIncrement(-1);
+		
+		/* Resize all existing value slices: */
+		for(int sliceIndex=0;sliceIndex<numSlices;++sliceIndex)
+			{
+			/* Allocate the new slice: */
+			ValueScalar* newSlice=totalNumVertices>0?new ValueScalar[totalNumVertices]:0;
+			
+			/* Copy values from the old slice: */
+			ValueScalar* nPtr=newSlice;
+			ValueScalar* oPtr=slices[sliceIndex];
+			for(int i=0;i<preSize;++i,++nPtr,++oPtr)
+				*nPtr=*oPtr;
+			
+			/* Skip the changed grid: */
+			oPtr+=oldGridNumVertices;
+			nPtr+=newGridNumVertices;
+			
+			for(int i=0;i<postSize;++i,++nPtr,++oPtr)
+				*nPtr=*oPtr;
+			
+			/* Install the new slice: */
+			delete[] slices[sliceIndex];
+			slices[sliceIndex]=newSlice;
+			}
+		}
+	
+	/* Initialize the changed grid: */
+	int oldGridNumCells=grids[gridIndex].numCells.calcIncrement(-1);
+	grids[gridIndex].setGrid(sNumVertices,sVertexPositions);
+	int newGridNumCells=grids[gridIndex].numCells.calcIncrement(-1);
+	totalNumCells=totalNumCells+newGridNumCells-oldGridNumCells;
+	
+	/* Update the grid structures: */
+	int linearIndex=0;
+	for(int gi=0;gi<numGrids;++gi)
+		{
+		grids[gi].gridBaseLinearIndex=linearIndex;
+		linearIndex+=grids[gi].numVertices.calcIncrement(-1);
+		}
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-void
+int
+SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::addGrid(
+	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Index& sNumVertices,
+	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Point* sVertexPositions)
+	{
+	/* Increase the number of grids and copy the existing grids: */
+	Grid* newGrids=new Grid[numGrids+1];
+	for(int gridIndex=0;gridIndex<numGrids;++gridIndex)
+		{
+		Grid& ng=newGrids[gridIndex];
+		Grid& g=grids[gridIndex];
+		ng.numVertices=g.numVertices;
+		ng.grid.ownArray(g.grid.getSize(),g.grid.getArray());
+		g.grid.disownArray();
+		ng.gridBaseLinearIndex=g.gridBaseLinearIndex;
+		for(int i=0;i<dimension;++i)
+			ng.vertexStrides[i]=g.vertexStrides[i];
+		ng.numCells=g.numCells;
+		for(int i=0;i<CellTopology::numVertices;++i)
+			ng.vertexOffsets[i]=g.vertexOffsets[i];
+		}
+	delete[] grids;
+	++numGrids;
+	grids=newGrids;
+	
+	/* Initialize the new grid: */
+	setGrid(numGrids-1,sNumVertices,sVertexPositions);
+	
+	return numGrids-1;
+	}
+
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+inline
+int
 SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::addSlice(
 	const typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::ValueScalar* sSliceValues)
 	{
@@ -757,12 +880,21 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::addSlice(
 	ValueScalar** newSlices=new ValueScalar*[numSlices+1];
 	for(int sliceIndex=0;sliceIndex<numSlices;++sliceIndex)
 		newSlices[sliceIndex]=slices[sliceIndex];
-	newSlices[numSlices]=new ValueScalar[totalNumVertices];
+	ValueScalar* newSlice=newSlices[numSlices]=totalNumVertices>0?new ValueScalar[totalNumVertices]:0;
+	
+	if(sSliceValues!=0)
+		{
+		/* Copy the given slice values: */
+		for(size_t i=0;i<totalNumVertices;++i)
+			newSlice[i]=sSliceValues[i];
+		}
 	
 	/* Install the new slice array: */
 	delete[] slices;
 	++numSlices;
 	slices=newSlices;
+	
+	return numSlices-1;
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
@@ -771,8 +903,18 @@ void
 SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::finalizeGrid(
 	void)
 	{
-	/* Initialize grid structures: */
-	initStructure();
+	/* Initialize vertex list bounds: */
+	Index vertexIndex(0);
+	firstVertex=Vertex(this,0,vertexIndex);
+	lastVertex=Vertex(this,numGrids,vertexIndex);
+	
+	/* Initialize cell list bounds: */
+	Index cellIndex(0);
+	firstCell=Cell(this,0,cellIndex);
+	for(int i=0;i<dimension;++i)
+		cellIndex[i]=grids[numGrids-1].numCells[i]-1;
+	lastCell=Cell(this,numGrids-1,cellIndex);
+	++lastCell;
 	
 	/* Calculate bounding box of all grid vertices: */
 	domainBox=Box::empty;
@@ -824,7 +966,7 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::finalizeGri
 	avgCellRadius=Scalar(cellRadiusSum/double(totalNumCells));
 	
 	/* Calculate the initial locator epsilon based on the minimal cell size: */
-	locatorEpsilon=Math::sqrt(minCellRadius2)*Scalar(2.0e-4);
+	setLocatorEpsilon(Math::sqrt(minCellRadius2)*Scalar(1.0e-4));
 	
 	/* Create the array of grid connectors: */
 	gridConnectors=new CellID*[numGrids*dimension*2];
@@ -887,10 +1029,10 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::finalizeGri
 				}
 			}
 		}
-	bfct.releasePoints();
+	bfct.releasePoints(4);
 	
 	/* Go through all grid boundary cells again and try stitching them with opposite cells: */
-	typename BoundaryFaceCenterTree::ClosePointSet cfcs(3,Math::sqrt(minCellRadius2)*Scalar(2.0e-3));
+	typename BoundaryFaceCenterTree::ClosePointSet cfcs(3,minCellRadius2*Scalar(1.0e-2));
 	for(int gridIndex=0;gridIndex<numGrids;++gridIndex)
 		{
 		/* Iterate through all cells in this grid: */
@@ -946,6 +1088,20 @@ void
 SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::setLocatorEpsilon(
 	typename SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Scalar newLocatorEpsilon)
 	{
+	/* Check the desired locator epsilon against the minimal achievable, given Scalar's limited accuracy: */
+	Scalar maxAbsCoordinate=Scalar(0);
+	for(int i=0;i<dimension;++i)
+		{
+		if(maxAbsCoordinate<Math::abs(domainBox.min[i]))
+			maxAbsCoordinate=Math::abs(domainBox.min[i]);
+		if(maxAbsCoordinate<Math::abs(domainBox.max[i]))
+			maxAbsCoordinate=Math::abs(domainBox.max[i]);
+		}
+	Scalar minLocatorEpsilon=maxAbsCoordinate*Scalar(4)*Math::Constants<Scalar>::epsilon;
+	if(newLocatorEpsilon<minLocatorEpsilon)
+		newLocatorEpsilon=minLocatorEpsilon;
+	
+	/* Set the locator epsilon: */
 	locatorEpsilon=newLocatorEpsilon;
 	}
 

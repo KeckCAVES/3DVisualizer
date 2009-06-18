@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include "ExtractorLocator.h"
+
 #include <Geometry/OrthogonalTransformation.h>
 #include <GLMotif/WidgetManager.h>
 #include <GLMotif/PopupWindow.h>
@@ -35,8 +37,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #endif
 
 #include "Visualizer.h"
-
-#include "ExtractorLocator.h"
+#include "ElementList.h"
 
 /*********************************
 Methods of class ExtractorLocator:
@@ -88,13 +89,10 @@ ExtractorLocator::~ExtractorLocator(void)
 	/* Delete the locator: */
 	delete locator;
 	
-	/* Hide and delete the busy dialog: */
-	Vrui::popdownPrimaryWidget(busyDialog);
+	/* Delete the busy dialog: */
 	delete busyDialog;
 	
-	/* Hide the algorithm's settings dialog if it has one: */
-	if(settingsDialog!=0)
-		Vrui::popdownPrimaryWidget(settingsDialog);
+	/* Delete the algorithm's settings dialog: */
 	delete settingsDialog;
 	}
 
@@ -135,7 +133,7 @@ void ExtractorLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbD
 	if(newElement!=0)
 		{
 		/* Add the new element to visualizer's element list: */
-		application->addElement(newElement.getPointer(),extractor->getName());
+		application->elementList->addElement(newElement.getPointer(),extractor->getName());
 		
 		/* Pop down the busy dialog: */
 		if(!(extractor->hasSeededCreator()&&extractor->hasIncrementalCreator())&&busyDialog!=0)

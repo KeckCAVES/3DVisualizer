@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include "Visualizer.h"
+
 #include <ctype.h>
 #include <string.h>
 #include <stdexcept>
@@ -37,21 +39,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLColorTemplates.h>
 #include <GL/GLVertexTemplates.h>
 #include <GL/GLGeometryWrappers.h>
+#include <GLMotif/WidgetManager.h>
 #include <GLMotif/StyleSheet.h>
 #include <GLMotif/Popup.h>
 #include <GLMotif/PopupMenu.h>
 #include <GLMotif/PopupWindow.h>
-#include <GLMotif/Menu.h>
+#include <GLMotif/RowColumn.h>
 #include <GLMotif/SubMenu.h>
+#include <GLMotif/Separator.h>
 #include <GLMotif/Label.h>
 #include <GLMotif/TextField.h>
 #include <GLMotif/Button.h>
 #include <GLMotif/CascadeButton.h>
-#include <GLMotif/RowColumn.h>
-#include <GLMotif/WidgetManager.h>
 #include <Vrui/Vrui.h>
 #ifdef VISUALIZER_USE_COLLABORATION
 #include <Collaboration/CollaborationClient.h>
+#include <Collaboration/AgoraClient.h>
 #ifdef VISUALIZER_USE_EMINEO
 #include <Collaboration/EmineoClient.h>
 #endif
@@ -73,8 +76,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include "ScalarEvaluationLocator.h"
 #include "VectorEvaluationLocator.h"
 #include "ExtractorLocator.h"
-
-#include "Visualizer.h"
+#include "ElementList.h"
 
 namespace {
 
@@ -231,6 +233,32 @@ GLMotif::Popup* Visualizer::createAlgorithmsMenu(void)
 	return algorithmsMenuPopup;
 	}
 
+GLMotif::Popup* Visualizer::createElementsMenu(void)
+	{
+	GLMotif::Popup* elementsMenuPopup=new GLMotif::Popup("ElementsMenuPopup",Vrui::getWidgetManager());
+	
+	/* Create the elements menu: */
+	GLMotif::SubMenu* elementsMenu=new GLMotif::SubMenu("ElementsMenu",elementsMenuPopup,false);
+	
+	showElementListToggle=new GLMotif::ToggleButton("ShowElementListToggle",elementsMenu,"Show Element List");
+	showElementListToggle->getValueChangedCallbacks().add(this,&Visualizer::showElementListCallback);
+	
+	GLMotif::Button* loadElementsButton=new GLMotif::Button("LoadElementsButton",elementsMenu,"Load Visualization Elements");
+	loadElementsButton->getSelectCallbacks().add(this,&Visualizer::loadElementsCallback);
+	
+	GLMotif::Button* saveElementsButton=new GLMotif::Button("SaveElementsButton",elementsMenu,"Save Visualization Elements");
+	saveElementsButton->getSelectCallbacks().add(this,&Visualizer::saveElementsCallback);
+	
+	new GLMotif::Separator("ClearElementsSeparator",elementsMenu,GLMotif::Separator::HORIZONTAL,0.0f,GLMotif::Separator::LOWERED);
+	
+	GLMotif::Button* clearElementsButton=new GLMotif::Button("ClearElementsButton",elementsMenu,"Clear Visualization Elements");
+	clearElementsButton->getSelectCallbacks().add(this,&Visualizer::clearElementsCallback);
+	
+	elementsMenu->manageChild();
+	
+	return elementsMenuPopup;
+	}
+
 GLMotif::Popup* Visualizer::createStandardLuminancePalettesMenu(void)
 	{
 	GLMotif::Popup* standardLuminancePalettesMenuPopup=new GLMotif::Popup("StandardLuminancePalettesMenuPopup",Vrui::getWidgetManager());
@@ -327,20 +355,11 @@ GLMotif::PopupMenu* Visualizer::createMainMenu(void)
 	GLMotif::CascadeButton* algorithmsCascade=new GLMotif::CascadeButton("AlgorithmsCascade",mainMenu,"Algorithms");
 	algorithmsCascade->setPopup(createAlgorithmsMenu());
 	
+	GLMotif::CascadeButton* elementsCascade=new GLMotif::CascadeButton("ElementsCascade",mainMenu,"Elements");
+	elementsCascade->setPopup(createElementsMenu());
+	
 	GLMotif::CascadeButton* colorCascade=new GLMotif::CascadeButton("ColorCascade",mainMenu,"Color Maps");
 	colorCascade->setPopup(createColorMenu());
-	
-	showElementListToggle=new GLMotif::ToggleButton("ShowElementListToggle",mainMenu,"Show Element List");
-	showElementListToggle->getValueChangedCallbacks().add(this,&Visualizer::showElementListCallback);
-	
-	GLMotif::Button* loadElementsButton=new GLMotif::Button("LoadElementsButton",mainMenu,"Load Visualization Elements");
-	loadElementsButton->getSelectCallbacks().add(this,&Visualizer::loadElementsCallback);
-	
-	GLMotif::Button* saveElementsButton=new GLMotif::Button("SaveElementsButton",mainMenu,"Save Visualization Elements");
-	saveElementsButton->getSelectCallbacks().add(this,&Visualizer::saveElementsCallback);
-	
-	GLMotif::Button* clearElementsButton=new GLMotif::Button("ClearElementsButton",mainMenu,"Clear Visualization Elements");
-	clearElementsButton->getSelectCallbacks().add(this,&Visualizer::clearElementsCallback);
 	
 	GLMotif::Button* centerDisplayButton=new GLMotif::Button("CenterDisplayButton",mainMenu,"Center Display");
 	centerDisplayButton->getSelectCallbacks().add(this,&Visualizer::centerDisplayCallback);
@@ -348,47 +367,6 @@ GLMotif::PopupMenu* Visualizer::createMainMenu(void)
 	mainMenu->manageChild();
 	
 	return mainMenuPopup;
-	}
-
-GLMotif::PopupWindow* Visualizer::createElementListDialog(void)
-	{
-	/* Create the settings dialog window: */
-	GLMotif::PopupWindow* elementListDialogPopup=new GLMotif::PopupWindow("ElementListDialogPopup",Vrui::getWidgetManager(),"Visualization Element List");
-	elementListDialogPopup->setResizableFlags(false,false);
-	
-	elementListDialog=new GLMotif::RowColumn("ElementListDialog",elementListDialogPopup,false);
-	elementListDialog->setNumMinorWidgets(3);
-	
-	elementListDialog->manageChild();
-	
-	return elementListDialogPopup;
-	}
-
-
-void Visualizer::addElement(Visualizer::Element* newElement,const char* algorithmName)
-	{
-	/* Create the element's list structure: */
-	ListElement le;
-	le.element=newElement;
-	le.name=algorithmName;
-	le.settingsDialog=newElement->createSettingsDialog(Vrui::getWidgetManager());
-	le.settingsDialogVisible=false;
-	le.show=true;
-	
-	/* Add the element to the list: */
-	elements.push_back(le);
-	
-	/* Create an entry in the element list dialog: */
-	GLMotif::TextField* elementName=new GLMotif::TextField("ElementName",elementListDialog,20);
-	elementName->setHAlignment(GLFont::Left);
-	elementName->setLabel(le.name.c_str());
-	
-	GLMotif::ToggleButton* showSettingsDialogToggle=new GLMotif::ToggleButton("ShowSettingsDialogToggle",elementListDialog,"Show Dialog");
-	showSettingsDialogToggle->getValueChangedCallbacks().add(this,&Visualizer::showElementSettingsDialogCallback);
-	
-	GLMotif::ToggleButton* showElementToggle=new GLMotif::ToggleButton("ShowElementToggle",elementListDialog,"Show");
-	showElementToggle->setToggle(le.show);
-	showElementToggle->getValueChangedCallbacks().add(this,&Visualizer::showElementCallback);
 	}
 
 void Visualizer::loadElements(const char* elementFileName,bool ascii)
@@ -489,7 +467,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 				Element* element=algorithm->createElement(parameters);
 				
 				/* Store the element: */
-				addElement(element,name);
+				elementList->addElement(element,name);
 				
 				/* Destroy the extractor: */
 				delete algorithm;
@@ -533,7 +511,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 				algorithm->continueSlaveElement();
 				
 				/* Store the element: */
-				addElement(element,name);
+				elementList->addElement(element,name);
 				
 				/* Destroy the extractor: */
 				delete algorithm;
@@ -548,49 +526,6 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 		}
 	}
 
-void Visualizer::saveElements(const char* elementFileName,bool ascii)
-	{
-	if(Vrui::isMaster())
-		{
-		if(ascii)
-			{
-			/* Create the ASCII element file: */
-			Misc::File elementFile(elementFileName,"w",Misc::File::DontCare);
-			
-			/* Save all visible visualization elements: */
-			for(ElementList::iterator veIt=elements.begin();veIt!=elements.end();++veIt)
-				if(veIt->show)
-					{
-					/* Write the element's name: */
-					fprintf(elementFile.getFilePtr(),"%s\n",veIt->name.c_str());
-					
-					/* Write the element's parameters: */
-					veIt->element->getParameters()->write(elementFile,true,variableManager);
-					}
-			}
-		else
-			{
-			/* Create the binary element file: */
-			Misc::File elementFile(elementFileName,"wb",Misc::File::LittleEndian);
-			
-			/* Save all visible visualization elements: */
-			for(ElementList::iterator veIt=elements.begin();veIt!=elements.end();++veIt)
-				if(veIt->show)
-					{
-					/* Write the element's name: */
-					elementFile.write<int>(int(veIt->name.length()));
-					elementFile.write<char>(veIt->name.c_str(),veIt->name.length());
-					
-					/* Write the element's parameters: */
-					veIt->element->getParameters()->write(elementFile,false,variableManager);
-					}
-			
-			/* Finish the file: */
-			elementFile.write<int>(0);
-			}
-		}
-	}
-
 Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	:Vrui::Application(argc,argv,appDefaults),
 	 moduleManager(VISUALIZER_MODULENAMETEMPLATE),
@@ -601,10 +536,10 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	 collaborationClient(0),sharedVisualizationClient(0),
 	 #endif
 	 numCuttingPlanes(0),cuttingPlanes(0),
+	 elementList(0),
 	 algorithm(0),
 	 mainMenu(0),
 	 showElementListToggle(0),
-	 elementListDialogPopup(0),elementListDialog(0),
 	 inLoadPalette(false),inLoadElements(false)
 	{
 	/* Parse the command line: */
@@ -658,8 +593,9 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 						{
 						/* Connect to the specified shared Visualizer server: */
 						collaborationClient=new Collaboration::CollaborationClient(argv[i+1],atoi(argv[i+2]));
-						collaborationClient->setFixGlyphScaling(true);
-						collaborationClient->setRenderRemoteEnvironments(false);
+						
+						/* Register the Agora protocol: */
+						collaborationClient->registerProtocol(new Collaboration::AgoraClient);
 						
 						#ifdef VISUALIZER_USE_EMINEO
 						/* Register the Emineo protocol: */
@@ -796,8 +732,8 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	mainMenu=createMainMenu();
 	Vrui::setMainMenu(mainMenu);
 	
-	/* Create the element list dialog: */
-	elementListDialogPopup=createElementListDialog();
+	/* Create the element list: */
+	elementList=new ElementList(Vrui::getWidgetManager());
 	
 	/* Load all element files listed on the command line: */
 	for(std::vector<const char*>::const_iterator lfnIt=loadFileNames.begin();lfnIt!=loadFileNames.end();++lfnIt)
@@ -822,15 +758,9 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 Visualizer::~Visualizer(void)
 	{
 	delete mainMenu;
-	delete elementListDialogPopup;
 	
 	/* Delete all finished visualization elements: */
-	for(ElementList::iterator veIt=elements.begin();veIt!=elements.end();++veIt)
-		{
-		if(veIt->settingsDialogVisible)
-			Vrui::popdownPrimaryWidget(veIt->settingsDialog);
-		delete veIt->settingsDialog;
-		}
+	delete elementList;
 	
 	/* Delete all locators: */
 	for(BaseLocatorList::iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
@@ -962,16 +892,12 @@ void Visualizer::display(GLContextData& contextData) const
 			}
 	
 	/* Render all opaque visualization elements: */
-	for(ElementList::const_iterator veIt=elements.begin();veIt!=elements.end();++veIt)
-		if(veIt->show&&!veIt->element->usesTransparency())
-			veIt->element->glRenderAction(contextData);
+	elementList->renderElements(contextData,false);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->glRenderAction(contextData);
 
 	/* Render all transparent visualization elements: */
-	for(ElementList::const_iterator veIt=elements.begin();veIt!=elements.end();++veIt)
-		if(veIt->show&&veIt->element->usesTransparency())
-			veIt->element->glRenderAction(contextData);
+	elementList->renderElements(contextData,true);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->glRenderActionTransparent(contextData);
 	
@@ -1089,54 +1015,9 @@ void Visualizer::showElementListCallback(GLMotif::ToggleButton::ValueChangedCall
 	{
 	/* Hide or show element list based on toggle button state: */
 	if(cbData->set)
-		{
-		if(elements.size()>0)
-			{
-			/* Pop up the element list at the same position as the main menu: */
-			Vrui::getWidgetManager()->popupPrimaryWidget(elementListDialogPopup,Vrui::getWidgetManager()->calcWidgetTransformation(mainMenu));
-			}
-		else
-			cbData->toggle->setToggle(false);
-		}
+		elementList->showElementList(Vrui::getWidgetManager()->calcWidgetTransformation(mainMenu));
 	else
-		Vrui::popdownPrimaryWidget(elementListDialogPopup);
-	}
-
-void Visualizer::showElementSettingsDialogCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
-	{
-	int rowIndex=elementListDialog->getChildIndex(cbData->toggle)/3;
-	if(rowIndex>=0&&rowIndex<int(elements.size()))
-		{
-		if(cbData->set)
-			{
-			if(elements[rowIndex].settingsDialog!=0&&!elements[rowIndex].settingsDialogVisible)
-				{
-				Vrui::getWidgetManager()->popupPrimaryWidget(elements[rowIndex].settingsDialog,Vrui::getWidgetManager()->calcWidgetTransformation(cbData->toggle));
-				elements[rowIndex].settingsDialogVisible=true;
-				}
-			else
-				cbData->toggle->setToggle(false);
-			}
-		else
-			{
-			if(elements[rowIndex].settingsDialog!=0&&elements[rowIndex].settingsDialogVisible)
-				{
-				Vrui::popdownPrimaryWidget(elements[rowIndex].settingsDialog);
-				elements[rowIndex].settingsDialogVisible=false;
-				}
-			}
-		}
-	else
-		cbData->toggle->setToggle(false);
-	}
-
-void Visualizer::showElementCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
-	{
-	int rowIndex=elementListDialog->getChildIndex(cbData->toggle)/3;
-	if(rowIndex>=0&&rowIndex<int(elements.size()))
-		elements[rowIndex].show=cbData->set;
-	else
-		cbData->toggle->setToggle(false);
+		elementList->hideElementList();
 	}
 
 void Visualizer::loadElementsCallback(Misc::CallbackData*)
@@ -1187,39 +1068,30 @@ void Visualizer::loadElementsCancelCallback(GLMotif::FileSelectionDialog::Cancel
 
 void Visualizer::saveElementsCallback(Misc::CallbackData*)
 	{
-	#if 1
-	/* Create the ASCII element file: */
-	char elementFileNameBuffer[256];
-	Misc::createNumberedFileName("SavedElements.asciielem",4,elementFileNameBuffer);
-	
-	/* Save the visible elements to a binary file: */
-	saveElements(elementFileNameBuffer,true);
-	#else
-	/* Create the binary element file: */
-	char elementFileNameBuffer[256];
-	Misc::createNumberedFileName("SavedElements.binelem",4,elementFileNameBuffer);
-	
-	/* Save the visible elements to a binary file: */
-	saveElements(elementFileNameBuffer,false);
-	#endif
+	if(Vrui::isMaster())
+		{
+		#if 1
+		/* Create the ASCII element file: */
+		char elementFileNameBuffer[256];
+		Misc::createNumberedFileName("SavedElements.asciielem",4,elementFileNameBuffer);
+		
+		/* Save the visible elements to a binary file: */
+		elementList->saveElements(elementFileNameBuffer,true,variableManager);
+		#else
+		/* Create the binary element file: */
+		char elementFileNameBuffer[256];
+		Misc::createNumberedFileName("SavedElements.binelem",4,elementFileNameBuffer);
+		
+		/* Save the visible elements to a binary file: */
+		elementList->saveElements(elementFileNameBuffer,false,variableManager);
+		#endif
+		}
 	}
 
 void Visualizer::clearElementsCallback(Misc::CallbackData*)
 	{
 	/* Delete all finished visualization elements: */
-	for(ElementList::iterator veIt=elements.begin();veIt!=elements.end();++veIt)
-		{
-		if(veIt->settingsDialogVisible)
-			Vrui::popdownPrimaryWidget(veIt->settingsDialog);
-		delete veIt->settingsDialog;
-		}
-	elements.clear();
-	
-	/* Reset the element list dialog: */
-	Vrui::popdownPrimaryWidget(elementListDialogPopup);
-	showElementListToggle->setToggle(false);
-	delete elementListDialogPopup;
-	elementListDialogPopup=createElementListDialog();
+	elementList->clear();
 	}
 
 void Visualizer::centerDisplayCallback(Misc::CallbackData*)

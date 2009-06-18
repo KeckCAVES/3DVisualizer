@@ -2,7 +2,7 @@
 SlicedCurvilinear - Base class for vertex-centered curvilinear data sets
 containing arbitrary numbers of independent scalar fields, combined into
 vector and/or tensor fields using special value extractors.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -29,7 +29,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Geometry/Point.h>
 #include <Geometry/Vector.h>
 #include <Geometry/Box.h>
-#include <Geometry/Matrix.h>
 #include <Geometry/ValuedPoint.h>
 #include <Geometry/ArrayKdTree.h>
 
@@ -55,11 +54,7 @@ class SlicedCurvilinear
 	typedef Geometry::Vector<Scalar,dimensionParam> Vector; // Type for vectors in data set's domain
 	typedef Geometry::Box<Scalar,dimensionParam> Box; // Type for axis-aligned boxes in data set's domain
 	
-	private:
-	typedef Geometry::Matrix<Scalar,dimensionParam,dimensionParam> Matrix; // Type for Jacobian matrix of point transformation
-	
 	/* Definition of the data set's cell topology: */
-	public:
 	typedef Tesseract<dimensionParam> CellTopology; // Policy class to select appropriate cell algorithms
 	
 	/* Definition of the data set's value space: */
@@ -230,10 +225,10 @@ class SlicedCurvilinear
 		using Cell::baseVertexIndex;
 		CellPosition cellPos; // Local coordinates of last located point inside its cell
 		Scalar epsilon,epsilon2; // Accuracy threshold of point location algorithm
+		bool cantTrace; // Flag if the locator cannot trace on the next locatePoint call
 		
 		/* Private methods: */
-		Point transformCellPosition(const CellPosition& cellPos) const; // Transforms local coordinates in current cell to domain coordinates
-		Matrix calcTransformDerivative(const CellPosition& cellPos) const; // Calculates Jacobian matrix of coordinate transformation
+		bool newtonRaphsonStep(const Point& position); // Performs one Newton-Raphson step while tracing the given position
 		
 		/* Constructors and destructors: */
 		public:
@@ -293,7 +288,7 @@ class SlicedCurvilinear
 	
 	/* Data set construction methods: */
 	void setGrid(const Index& sNumVertices,const Point* sVertexPositions =0); // Creates a data set with the given number of vertices; copies vertex positions if pointer is not null
-	void addSlice(const ValueScalar* sSliceValues =0); // Adds another slice to the data set; copies slice values from given array if pointer is not null
+	int addSlice(const ValueScalar* sSliceValues =0); // Adds another slice to the data set; copies slice values from given array if pointer is not null; returns index of new slice
 	
 	/* Low-level data access methods: */
 	const Index& getNumVertices(void) const // Returns number of vertices in the data set

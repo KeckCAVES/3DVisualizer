@@ -3,7 +3,7 @@ SlicedMultiCurvilinear - Base class for vertex-centered multi-block
 curvilinear data sets containing arbitrary numbers of independent scalar
 fields, combined into vector and/or tensor fields using special value
 extractors.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -30,7 +30,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Geometry/Point.h>
 #include <Geometry/Vector.h>
 #include <Geometry/Box.h>
-#include <Geometry/Matrix.h>
 #include <Geometry/ValuedPoint.h>
 #include <Geometry/ArrayKdTree.h>
 
@@ -56,11 +55,7 @@ class SlicedMultiCurvilinear
 	typedef Geometry::Vector<Scalar,dimensionParam> Vector; // Type for vectors in data set's domain
 	typedef Geometry::Box<Scalar,dimensionParam> Box; // Type for axis-aligned boxes in data set's domain
 	
-	private:
-	typedef Geometry::Matrix<Scalar,dimensionParam,dimensionParam> Matrix; // Type for Jacobian matrix of point transformation
-	
 	/* Definition of the data set's cell topology: */
-	public:
 	typedef Tesseract<dimensionParam> CellTopology; // Policy class to select appropriate cell algorithms
 	
 	/* Definition of the data set's value space: */
@@ -135,9 +130,12 @@ class SlicedMultiCurvilinear
 	/* Data set interface classes: */
 	typedef LinearIndexID VertexID;
 	
+	class Cell;
+	
 	class Vertex // Class to represent and iterate through vertices
 		{
 		friend class SlicedMultiCurvilinear;
+		friend class Cell;
 		
 		/* Elements: */
 		private:
@@ -310,10 +308,10 @@ class SlicedMultiCurvilinear
 		using Cell::baseVertexIndex;
 		CellPosition cellPos; // Local coordinates of last located point inside its cell
 		Scalar epsilon,epsilon2; // Accuracy threshold of point location algorithm
+		bool cantTrace; // Flag if the locator cannot trace on the next locatePoint call
 		
 		/* Private methods: */
-		Point transformCellPosition(const CellPosition& cellPos) const; // Transforms local coordinates in current cell to domain coordinates
-		Matrix calcTransformDerivative(const CellPosition& cellPos) const; // Calculates Jacobian matrix of coordinate transformation
+		bool newtonRaphsonStep(const Point& position); // Performs one Newton-Raphson step while tracing the given position
 		
 		/* Constructors and destructors: */
 		public:
@@ -347,10 +345,10 @@ class SlicedMultiCurvilinear
 	private:
 	int numGrids; // Number of grids defining the data set
 	Grid* grids; // Array of grids
-	int numSlices; // Number of scalar value slices in data set
-	ValueScalar** slices; // Array of 1D arrays defining data set's value slices
 	size_t totalNumVertices; // Total number of vertices in all grids
 	size_t totalNumCells; // Total number of cells in all grids
+	int numSlices; // Number of scalar value slices in data set
+	ValueScalar** slices; // Array of 1D arrays defining data set's value slices
 	CellCenterTree cellCenterTree; // Kd-tree containing cell centers of all grids
 	CellID** gridConnectors; // Arrays mapping outer faces of all grids to stitched grid cells
 	VertexIterator firstVertex,lastVertex; // Bounds of vertex list
@@ -361,7 +359,6 @@ class SlicedMultiCurvilinear
 	Scalar locatorEpsilon; // Default accuracy threshold for locators working on this data set
 	
 	/* Private methods: */
-	void initStructure(void);
 	template <class ScalarExtractorParam>
 	Vector calcVertexGradient(int gridIndex,const Index& vertexIndex,const ScalarExtractorParam& extractor) const; // Returns gradient at a vertex based on the given scalar extractor
 	void storeGridConnector(const Cell& cell,int faceIndex,const CellID& otherCell); // Stores a connection between a cell face and another cell during grid finalization
@@ -377,7 +374,8 @@ class SlicedMultiCurvilinear
 	/* Data set construction methods: */
 	void setNumGrids(int sNumGrids); // Creates a data set with the given number of grids
 	void setGrid(int gridIndex,const Index& sNumVertices,const Point* sVertexPositions =0); // Creates a grid with the given number of vertices; copies vertex positions if pointer is not null
-	void addSlice(const ValueScalar* sSliceValues =0); // Adds another slice to the data set; copies slice values for all points in all grids from given array if pointer is not null
+	int addGrid(const Index& sNumVertices,const Point* sVertexPositions =0); // Adds another grid with the given number of vertices; copies vertex positions if pointer is not null; returns index of new grid
+	int addSlice(const ValueScalar* sSliceValues =0); // Adds another slice to the data set; copies slice values for all points in all grids from given array if pointer is not null; returns index of new slice
 	
 	/* Low-level data access methods: */
 	const int getNumGrids(void) const // Returns number of grids in the data set

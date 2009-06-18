@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include "ColorBar.h"
+
 #include <string.h>
 #include <stdio.h>
 #include <GL/gl.h>
@@ -31,8 +33,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLColorMap.h>
 #include <GLMotif/StyleSheet.h>
 #include <GLMotif/Container.h>
-
-#include "ColorBar.h"
 
 namespace GLMotif {
 
@@ -51,6 +51,7 @@ ColorBar::DataItem::DataItem(int sNumTickMarks)
 ColorBar::DataItem::~DataItem(void)
 	{
 	glDeleteTextures(numTickMarks,textureObjectIds);
+	delete[] textureObjectIds;
 	}
 
 /*************************

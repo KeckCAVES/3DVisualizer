@@ -61,7 +61,7 @@ class StreamlineExtractor
 	Streamline* streamline; // Pointer to the streamline representation
 	
 	/* Private methods: */
-	Vector cashKarpStep(const Vector& vfp1,Scalar trialStepSize,Vector& error); // Computes a trial step vector with Cash-Karp coefficients
+	bool cashKarpStep(const Vector& vfp1,Scalar trialStepSize,Vector& step,Vector& error); // Computes a trial step vector with Cash-Karp coefficients; returns false if any evaluation point was outside the domain
 	bool stepStreamline(void); // Advances the current streamline position by one step
 	
 	/* Constructors and destructors: */

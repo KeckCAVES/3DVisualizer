@@ -1,7 +1,7 @@
 ########################################################################
 # Makefile for 3D Visualizer, a generic visualization program for 3D
 # multivariate gridded data.
-# Copyright (c) 1999-2008 Oliver Kreylos
+# Copyright (c) 1999-2009 Oliver Kreylos
 #
 # This file is part of the WhyTools Build Environment.
 # 
@@ -25,7 +25,7 @@
 # same setting in Vrui's makefile. By default the directories match; if
 # the installation directory was adjusted during Vrui's installation, it
 # must be adjusted here as well.
-VRUIDIR = /usr/local/Vrui-1.0-057
+VRUIDIR = $(HOME)/Vrui-1.0
 
 # Base installation directory for 3D Visualizer and its module
 # plug-ins. The module plug-ins cannot be moved from this location
@@ -34,7 +34,9 @@ VRUIDIR = /usr/local/Vrui-1.0-057
 # installed to be run. 3D Visualizer's executable, plug-ins, and
 # resources will be installed in the bin, lib (or lib64), and share
 # directories underneath the given base directory, respectively.
-INSTALLDIR = /usr/local/VruiApplications
+# Important note: Do not use ~ as an abbreviation for the user's home
+# directory here; use $(HOME) instead.
+INSTALLDIR = $(shell pwd)
 
 # List of default visualization modules:
 MODULE_NAMES = SphericalASCIIFile \
@@ -82,7 +84,7 @@ USE_EMINEO = 0
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.3
+VERSION = 1.4
 
 # Set up destination directories for compilation products:
 OBJDIRBASE = o
@@ -154,7 +156,8 @@ all: $(ALL)
 
 # Rule to remove build results:
 clean:
-	-rm -f $(OBJDIR)/*.o
+	-rm -f $(OBJDIR)/*.o $(OBJDIR)/Abstract/*.o $(OBJDIR)/Wrappers/*.o $(OBJDIR)/Concrete/*.o
+	-rmdir $(OBJDIR)/Abstract $(OBJDIR)/Wrappers $(OBJDIR)/Concrete
 	-rm -f $(ALL)
 
 # Rule to clean the source directory for packaging:
@@ -203,6 +206,7 @@ VISUALIZER_SOURCES = $(ABSTRACT_SOURCES) \
                      VectorEvaluationLocator.cpp \
                      Extractor.cpp \
                      ExtractorLocator.cpp \
+                     ElementList.cpp \
                      ColorBar.cpp \
                      ColorMap.cpp \
                      PaletteEditor.cpp \

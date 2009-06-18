@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include "EvaluationLocator.h"
+
 #include <GL/gl.h>
 #include <GL/GLVertexTemplates.h>
 #include <GL/GLColorTemplates.h>
@@ -37,8 +39,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/CoordinateTransformer.h>
 
 #include "Visualizer.h"
-
-#include "EvaluationLocator.h"
 
 /**********************************************
 Methods of class Visualizer::EvaluationLocator:
@@ -89,9 +89,6 @@ EvaluationLocator::EvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer*
 
 EvaluationLocator::~EvaluationLocator(void)
 	{
-	/* Pop down the evaluation dialog: */
-	Vrui::popdownPrimaryWidget(evaluationDialogPopup);
-	
 	/* Destroy the evaluation dialog: */
 	delete evaluationDialogPopup;
 	

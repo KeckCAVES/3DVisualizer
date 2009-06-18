@@ -38,3 +38,18 @@
 - Added ability to save and load extracted visualization elements.
 - Added collaboration infrastructure to create spatially distributed
   shared data exploration environments.
+
+3D Visualizer 1.4:
+- Added note about not using ~ when setting INSTALLDIR to README and
+  makefile.
+- Changed make clean to really remove everything.
+- Changed visualization element list to use a proper list box.
+- Can now delete individual visualization elements.
+- Significantly improved locator class for curvilinear grids, improving
+  accuracy, reliability, and performance.
+- Added safeguard against too small convergence thresholds in locator
+  class for curvilinear grids; caused lock-ups on large grids with very
+  small grid cells before.
+- Adapted 3D Visualizer to Vrui release 1.0-062 and bumped required Vrui
+  version to same.
+- Fixed a minor memory leak.

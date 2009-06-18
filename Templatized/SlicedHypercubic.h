@@ -1,7 +1,8 @@
 /***********************************************************************
-Curvilinear - Base class for vertex-centered curvilinear data sets
-containing arbitrary value types (scalars, vectors, tensors, etc.).
-Copyright (c) 2004-2009 Oliver Kreylos
+SlicedHypercubic - Base class for vertex-centered unstructured
+hypercubic data sets containing multiple scalar-valued slices.
+etc.).
+Copyright (c) 2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,10 +21,13 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#ifndef VISUALIZATION_TEMPLATIZED_CURVILINEAR_INCLUDED
-#define VISUALIZATION_TEMPLATIZED_CURVILINEAR_INCLUDED
+#ifndef VISUALIZATION_TEMPLATIZED_SLICEDHYPERCUBIC_INCLUDED
+#define VISUALIZATION_TEMPLATIZED_SLICEDHYPERCUBIC_INCLUDED
 
-#include <Misc/Array.h>
+#include <utility>
+#include <vector>
+#include <Misc/UnorderedTuple.h>
+#include <Misc/HashTable.h>
 #include <Geometry/ComponentArray.h>
 #include <Geometry/Point.h>
 #include <Geometry/Vector.h>
@@ -31,6 +35,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Geometry/ValuedPoint.h>
 #include <Geometry/ArrayKdTree.h>
 
+#include <Templatized/SlicedDataValue.h>
 #include <Templatized/Tesseract.h>
 #include <Templatized/LinearIndexID.h>
 #include <Templatized/IteratorWrapper.h>
@@ -39,8 +44,8 @@ namespace Visualization {
 
 namespace Templatized {
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
-class Curvilinear
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+class SlicedHypercubic
 	{
 	/* Embedded classes: */
 	public:
@@ -56,49 +61,58 @@ class Curvilinear
 	typedef Tesseract<dimensionParam> CellTopology; // Policy class to select appropriate cell algorithms
 	
 	/* Definition of the data set's value space: */
-	typedef ValueParam Value; // Data set's value type
+	typedef ValueScalarParam ValueScalar; // Data set's value type
+	typedef SlicedDataValue<ValueScalar> Value; // Data set's compound value type
+	
+	/* First batch of data set interface classes: */
+	typedef LinearIndexID VertexID; // ID type for vertices
+	typedef VertexID::Index VertexIndex; // Index type for vertices
+	typedef Misc::UnorderedTuple<VertexIndex,2> EdgeID; // ID type for cell edges
+	typedef LinearIndexID CellID; // ID type for cells
+	typedef CellID::Index CellIndex; // Index type for cells
 	
 	/* Low-level definitions of data set storage: */
-	struct GridVertex // Structure for valued grid vertices
+	private:
+	typedef Point GridVertex; // Grid vertices are just points
+	typedef std::vector<GridVertex> GridVertexList; // Type to store the list of grid vertices
+	
+	struct GridCell // Structure for grid cells
 		{
 		/* Elements: */
 		public:
-		Point pos; // Position of grid vertex in data set's domain
-		Value value; // Grid vertex' value
+		VertexIndex vertices[CellTopology::numVertices]; // Array of indices of cell's vertices
+		CellIndex neighbours[CellTopology::numFaces]; // Array of indices of cell's neighbouring cells
 		
 		/* Constructors and destructors: */
-		GridVertex(void) // Dummy constructor
-			{
-			}
-		GridVertex(const Point& sPos,const Value& sValue) // Elementwise constructor
-			:pos(sPos),value(sValue)
-			{
-			}
+		GridCell(void); // Creates a nonconnected grid cell with uninitialized vertex indices
 		};
 	
-	typedef Misc::Array<GridVertex,dimensionParam> Array; // Array type for data set storage
-	typedef typename Array::Index Index; // Index type for data set storage
+	typedef std::vector<GridCell> GridCellList; // Type to store the list of grid cells
+	typedef Misc::UnorderedTuple<VertexIndex,CellTopology::numFaceVertices> GridFace; // Type to identify faces of grid cells
+	typedef Misc::HashTable<GridFace,std::pair<CellIndex,int>,GridFace> GridFaceHasher; // Data type from grid faces to grid cell and cell face indices; used during data set construction
 	
 	/* Data set interface classes: */
-	typedef LinearIndexID VertexID;
+	public:
+	class Cell;
 	
 	class Vertex // Class to represent and iterate through vertices
 		{
-		friend class Curvilinear;
+		friend class SlicedHypercubic;
+		friend class Cell;
 		
 		/* Elements: */
 		private:
-		const Curvilinear* ds; // Pointer to data set containing the vertex
-		Index index; // Array index of vertex in data set storage
+		const SlicedHypercubic* ds; // Pointer to data set containing the vertex
+		VertexIndex index; // Index of vertex in vertex list
 		
 		/* Constructors and destructors: */
 		public:
 		Vertex(void) // Creates an invalid vertex
-			:ds(0)
+			:ds(0),index(~VertexIndex(0))
 			{
 			}
 		private:
-		Vertex(const Curvilinear* sDs,const Index& sIndex)
+		Vertex(const SlicedHypercubic* sDs,VertexIndex sIndex)
 			:ds(sDs),index(sIndex)
 			{
 			}
@@ -107,21 +121,16 @@ class Curvilinear
 		public:
 		const Point& getPosition(void) const // Returns vertex' position in domain
 			{
-			return ds->vertices(index).pos;
+			return ds->gridVertices[index];
 			}
 		template <class ValueExtractorParam>
 		typename ValueExtractorParam::DestValue getValue(const ValueExtractorParam& extractor) const // Returns vertex' value based on given extractor
 			{
-			return extractor.getValue(ds->vertices(index).value);
-			}
-		template <class ScalarExtractorParam>
-		Vector calcGradient(const ScalarExtractorParam& extractor) const // Returns gradient at the vertex, based on given scalar extractor
-			{
-			return ds->calcVertexGradient(index,extractor);
+			return extractor.getValue(index);
 			}
 		VertexID getID(void) const // Returns vertex' ID
 			{
-			return VertexID(VertexID::Index(ds->vertices.calcLinearIndex(index)));
+			return VertexID(index);
 			}
 		
 		/* Iterator methods: */
@@ -135,43 +144,38 @@ class Curvilinear
 			}
 		Vertex& operator++(void) // Pre-increment operator
 			{
-			index.preInc(ds->numVertices);
+			++index;
 			return *this;
 			}
 		};
 	
 	typedef IteratorWrapper<Vertex> VertexIterator; // Class to iterate through vertices
-	
-	typedef LinearIndexID EdgeID; // Class to identify cell edges
-	
-	typedef LinearIndexID CellID; // Class to identify cells
-	
 	class Locator;
 	
 	class Cell // Class to represent and iterate through cells
 		{
-		friend class Curvilinear;
+		friend class SlicedHypercubic;
 		friend class Locator;
 		
 		/* Elements: */
 		private:
-		const Curvilinear* ds; // Pointer to the data set containing the cell
-		Index index; // Array index of cell's base vertex in data set storage
-		const GridVertex* baseVertex; // Pointer to cell's base vertex in data set storage
+		const SlicedHypercubic* ds; // Pointer to data set containing the cell
+		CellIndex index; // Index of cell in cell list
+		const GridCell* cell; // Direct pointer to cell
 		
 		/* Constructors and destructors: */
 		public:
 		Cell(void) // Creates an invalid cell
-			:ds(0),baseVertex(0)
+			:ds(0),index(~CellIndex(0)),cell(0)
 			{
 			}
 		private:
-		Cell(const Curvilinear* sDs)
-			:ds(sDs),baseVertex(0)
+		Cell(const SlicedHypercubic* sDs) // Creates an invalid cell for the given data set
+			:ds(sDs),index(~CellIndex(0)),cell(0)
 			{
 			}
-		Cell(const Curvilinear* sDs,const Index& sIndex)
-			:ds(sDs),index(sIndex),baseVertex(ds->vertices.getAddress(index))
+		Cell(const SlicedHypercubic* sDs,CellIndex sIndex) // Elementwise constructor
+			:ds(sDs),index(sIndex),cell(index!=(~CellIndex(0))?&ds->gridCells[index]:0)
 			{
 			}
 		
@@ -179,47 +183,54 @@ class Curvilinear
 		public:
 		bool isValid(void) const // Returns true if the cell is valid
 			{
-			return baseVertex!=0;
+			return cell!=0;
 			}
-		VertexID getVertexID(int vertexIndex) const; // Returns ID of given vertex of the cell
-		Vertex getVertex(int vertexIndex) const; // Returns given vertex of the cell
+		VertexID getVertexID(int vertexIndex) const // Returns ID of given vertex of the cell
+			{
+			return VertexID(cell->vertices[vertexIndex]);
+			}
+		Vertex getVertex(int vertexIndex) const // Returns given vertex of the cell
+			{
+			return Vertex(ds,cell->vertices[vertexIndex]);
+			}
 		const Point& getVertexPosition(int vertexIndex) const // Returns position of given vertex of the cell
 			{
-			return baseVertex[ds->vertexOffsets[vertexIndex]].pos;
+			return ds->gridVertices[cell->vertices[vertexIndex]];
 			}
 		template <class ValueExtractorParam>
 		typename ValueExtractorParam::DestValue getVertexValue(int vertexIndex,const ValueExtractorParam& extractor) const // Returns value of given vertex of the cell, based on given extractor
 			{
-			return extractor.getValue(baseVertex[ds->vertexOffsets[vertexIndex]].value);
+			return extractor.getValue(cell->vertices[vertexIndex]);
 			}
 		template <class ScalarExtractorParam>
 		Vector calcVertexGradient(int vertexIndex,const ScalarExtractorParam& extractor) const; // Returns gradient at given vertex of the cell, based on given scalar extractor
-		EdgeID getEdgeID(int edgeIndex) const; // Returns ID of given edge of the cell
+		EdgeID getEdgeID(int edgeIndex) const // Returns ID of given edge of the cell
+			{
+			return EdgeID(cell->vertices[CellTopology::edgeVertexIndices[edgeIndex][0]],cell->vertices[CellTopology::edgeVertexIndices[edgeIndex][1]]);
+			}
 		Point calcEdgePosition(int edgeIndex,Scalar weight) const; // Returns an interpolated point along the given edge
 		CellID getID(void) const // Returns cell's ID
 			{
-			// TODO: Try which version is faster
-			#if 0
-			return CellID(CellID::Index(baseVertex-ds->vertices.getArray()));
-			#else
-			return CellID(CellID::Index(ds->vertices.calcLinearIndex(index)));
-			#endif
+			return CellID(index);
 			}
-		CellID getNeighbourID(int neighbourIndex) const; // Returns ID of neighbour across the given face of the cell
+		CellID getNeighbourID(int neighbourIndex) const // Returns ID of neighbour across the given face of the cell
+			{
+			return CellID(cell->neighbours[neighbourIndex]);
+			}
 		
 		/* Iterator methods: */
-		friend bool operator==(const Cell& cell1,const Cell& cell2)
+		friend bool operator==(const Cell& cell1,const Cell& cell2) // Compares two cells for equality
 			{
-			return cell1.baseVertex==cell2.baseVertex;
+			return cell1.cell==cell2.cell;
 			}
-		friend bool operator!=(const Cell& cell1,const Cell& cell2)
+		friend bool operator!=(const Cell& cell1,const Cell& cell2) // Compares two cells for inequality
 			{
-			return cell1.baseVertex!=cell2.baseVertex;
+			return cell1.cell!=cell2.cell;
 			}
 		Cell& operator++(void) // Pre-increment operator
 			{
-			index.preInc(ds->numCells);
-			baseVertex=ds->vertices.getAddress(index);
+			++index;
+			++cell;
 			return *this;
 			}
 		};
@@ -228,7 +239,7 @@ class Curvilinear
 	
 	class Locator:private Cell // Class responsible for evaluating a data set at a given position
 		{
-		friend class Curvilinear;
+		friend class SlicedHypercubic;
 		
 		/* Embedded classes: */
 		private:
@@ -237,10 +248,10 @@ class Curvilinear
 		/* Elements: */
 		using Cell::ds;
 		using Cell::index;
-		using Cell::baseVertex;
+		using Cell::cell;
 		CellPosition cellPos; // Local coordinates of last located point inside its cell
 		Scalar epsilon,epsilon2; // Accuracy threshold of point location algorithm
-		bool cantTrace; // Flag if the locator cannot trace on the next locatePoint call
+		bool cantTrace; // Flag if the locator cannot trace from the current state
 		
 		/* Private methods: */
 		bool newtonRaphsonStep(const Point& position); // Performs one Newton-Raphson step while tracing the given position
@@ -249,7 +260,7 @@ class Curvilinear
 		public:
 		Locator(void); // Creates invalid locator
 		private:
-		Locator(const Curvilinear* sDs,Scalar sEpsilon); // Creates non-localized locator associated with given data set
+		Locator(const SlicedHypercubic* sDs,Scalar sEpsilon); // Creates non-localized locator associated with given data set
 		
 		/* Methods: */
 		public:
@@ -275,11 +286,11 @@ class Curvilinear
 	
 	/* Elements: */
 	private:
-	Index numVertices; // Number of vertices in data set in each dimension
-	Array vertices; // Array of vertices defining data set
-	int vertexStrides[dimension]; // Array of pointer stride values in the vertex array
-	Index numCells; // Number of cells in data set in each dimension
-	int vertexOffsets[CellTopology::numVertices]; // Array of pointer offsets from a cell's base vertex to all cell vertices
+	GridVertexList gridVertices; // List of all grid vertices
+	GridCellList gridCells; // List of all grid cells
+	int numSlices; // Number of scalar value slices in data set
+	size_t allocatedSliceSize; // Allocated size of all slice arrays
+	ValueScalar** slices; // Array of 1D arrays defining data set's value slices
 	CellCenterTree cellCenterTree; // Kd-tree containing cell centers
 	VertexIterator firstVertex,lastVertex; // Bounds of vertex list
 	CellIterator firstCell,lastCell; // Bounds of cell list
@@ -287,64 +298,49 @@ class Curvilinear
 	Scalar avgCellRadius; // Average "radius" of all cells
 	Scalar maxCellRadius2; // Squared maximum "radius" of any cell (used as trivial reject threshold during point location)
 	Scalar locatorEpsilon; // Default accuracy threshold for locators working on this data set
+	GridFaceHasher* gridFaces; // Pointer to grid face hasher used during data set construction to connect grid cells
 	
 	/* Private methods: */
-	void initStructure(void);
-	template <class ScalarExtractorParam>
-	Vector calcVertexGradient(const Index& vertexIndex,const ScalarExtractorParam& extractor) const; // Returns gradient at a vertex based on the given scalar extractor
+	void resizeSlices(size_t newAllocatedSize); // Resizes all existing value slices
 	
 	/* Constructors and destructors: */
 	public:
-	Curvilinear(void); // Creates an "empty" data set
-	Curvilinear(const Index& sNumVertices,const Point* sVertexPositions =0,const Value* sVertexValues =0); // Creates a data set with the given number of vertices; copies vertex positions and values if pointers are not null
-	Curvilinear(const Index& sNumVertices,const GridVertex* sVertices); // Creates a data set with the given number of vertices and vertices
-	~Curvilinear(void);
+	SlicedHypercubic(void); // Creates an "empty" hypercubic data set
+	~SlicedHypercubic(void); // Destroys the data set
 	
 	/* Data set construction methods: */
-	void setData(const Index& sNumVertices,const Point* sVertexPositions =0,const Value* sVertexValues =0); // Creates a data set with the given number of vertices; copies vertex positions and values if pointers are not null
-	void setData(const Index& sNumVertices,const GridVertex* sVertices); // Creates a data set with the given number of vertices and vertices
+	void reserveVertices(size_t numVertices); // Prepares the data set for subsequent addition of the given number of grid vertices (optional performance boost)
+	void reserveCells(size_t numCells); // Prepares the data set for subsequent addition of the given number of grid cells (optional performance boost)
+	VertexID addVertex(const Point& vertexPosition); // Adds a vertex to the grid; returns vertex' ID
+	CellID addCell(const VertexID cellVertices[CellTopology::numVertices]); // Adds a cell to the grid; returns cell's ID
+	int addSlice(const ValueScalar* sSliceValues =0); // Adds another slice to the data set; copies slice values for all points in all grids from given array if pointer is not null; returns index of new slice
 	
 	/* Low-level data access methods: */
-	const Index& getNumVertices(void) const // Returns number of vertices in the data set
+	const Point& getVertexPosition(VertexIndex vertexIndex) const // Returns position of a vertex
 		{
-		return numVertices;
+		return gridVertices[vertexIndex];
 		}
-	const Array& getVertices(void) const // Returns the vertices defining the data set
+	Point& getVertexPosition(VertexIndex vertexIndex) // Ditto
 		{
-		return vertices;
+		return gridVertices[vertexIndex];
 		}
-	Array& getVertices(void) // Ditto
+	int getNumSlices(void) const // Returns the number of value slices in the data set
 		{
-		return vertices;
+		return numSlices;
 		}
-	const GridVertex& getVertex(const Index& vertexIndex) const // Returns a grid vertex
+	const ValueScalar* getSliceArray(int sliceIndex) const // Returns one of the data set's value slices
 		{
-		return vertices(vertexIndex);
+		return slices[sliceIndex];
 		}
-	GridVertex& getVertex(const Index& vertexIndex) // Ditto
+	ValueScalar* getSliceArray(int sliceIndex) // Ditto
 		{
-		return vertices(vertexIndex);
+		return slices[sliceIndex];
 		}
-	const Point& getVertexPosition(const Index& vertexIndex) const // Returns a vertex' position
+	ValueScalar getVertexValue(int sliceIndex,VertexIndex vertexIndex) const // Returns a vertex' data value from one slice
 		{
-		return vertices(vertexIndex).pos;
+		return slices[sliceIndex][vertexIndex];
 		}
-	Point& getVertexPosition(const Index& vertexIndex) // Ditto
-		{
-		return vertices(vertexIndex).pos;
-		}
-	const Value& getVertexValue(const Index& vertexIndex) const // Returns a vertex' data value
-		{
-		return vertices(vertexIndex).value;
-		}
-	Value& getVertexValue(const Index& vertexIndex) // Ditto
-		{
-		return vertices(vertexIndex).value;
-		}
-	const Index& getNumCells(void) const // Returns number of cells in grid
-		{
-		return numCells;
-		}
+	void setVertexValue(int sliceIndex,VertexIndex vertexIndex,ValueScalar newValue); // Sets the given vertex' value in the given slice
 	void finalizeGrid(void); // Recalculates derived grid information after grid structure change
 	Scalar getLocatorEpsilon(void) const // Returns the current default accuracy threshold for locators working on this data set
 		{
@@ -355,11 +351,11 @@ class Curvilinear
 	/* Methods implementing the data set interface: */
 	size_t getTotalNumVertices(void) const // Returns total number of vertices in the data set
 		{
-		return numVertices.calcIncrement(-1);
+		return gridVertices.size();
 		}
 	Vertex getVertex(const VertexID& vertexID) const // Returns vertex of given valid ID
 		{
-		return Vertex(this,vertices.calcIndex(vertexID.getIndex()));
+		return Vertex(this,vertexID.getIndex());
 		}
 	const VertexIterator& beginVertices(void) const // Returns iterator to first vertex in the data set
 		{
@@ -371,11 +367,11 @@ class Curvilinear
 		}
 	size_t getTotalNumCells(void) const // Returns total number of cells in the data set
 		{
-		return numCells.calcIncrement(-1);
+		return gridCells.size();
 		}
 	Cell getCell(const CellID& cellID) const // Return cell of given valid ID
 		{
-		return Cell(this,vertices.calcIndex(cellID.getIndex()));
+		return Cell(this,cellID.getIndex());
 		}
 	const CellIterator& beginCells(void) const // Returns iterator to first cell in the data set
 		{
@@ -403,8 +399,8 @@ class Curvilinear
 
 }
 
-#ifndef VISUALIZATION_TEMPLATIZED_CURVILINEAR_IMPLEMENTATION
-#include <Templatized/Curvilinear.cpp>
+#ifndef VISUALIZATION_TEMPLATIZED_SLICEDHYPERCUBIC_IMPLEMENTATION
+#include <Templatized/SlicedHypercubic.cpp>
 #endif
 
 #endif

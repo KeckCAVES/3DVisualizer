@@ -2,7 +2,7 @@
 SlicedCurvilinear - Base class for vertex-centered curvilinear data sets
 containing arbitrary numbers of independent scalar fields, combined into
 vector and/or tensor fields using special value extractors.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Math/Math.h>
 #include <Math/Constants.h>
 #include <Geometry/AffineCombiner.h>
+#include <Geometry/Matrix.h>
 
 #include <Templatized/LinearInterpolator.h>
 #include <Templatized/FindClosestPointFunctor.h>
@@ -126,17 +127,22 @@ Methods of class SlicedCurvilinear::Locator:
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-typename SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Point
-SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::transformCellPosition(
-	const typename SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::CellPosition& cellPos) const
+bool
+SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::newtonRaphsonStep(
+	const typename SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Point& position)
 	{
+	typedef Geometry::Matrix<Scalar,dimension,dimension> Matrix;
+	
+	/* Transform the current cell position to domain space: */
+	const Point* baseVertex=ds->grid.getArray()+baseVertexIndex;
+	
 	/* Perform multilinear interpolation: */
 	Point p[CellTopology::numVertices>>1]; // Array of intermediate interpolation points
 	int interpolationDimension=dimension-1;
 	int numSteps=CellTopology::numVertices>>1;
 	for(int pi=0;pi<numSteps;++pi)
 		{
-		const Point* vPtr=&ds->grid.getArray()[baseVertexIndex+ds->vertexOffsets[pi]];
+		const Point* vPtr=baseVertex+ds->vertexOffsets[pi];
 		p[pi]=Geometry::affineCombination(vPtr[0],vPtr[1],cellPos[interpolationDimension]);
 		}
 	for(int i=1;i<dimension;++i)
@@ -147,19 +153,15 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::transfo
 			p[pi]=Geometry::affineCombination(p[pi],p[pi+numSteps],cellPos[interpolationDimension]);
 		}
 	
-	/* Return final result: */
-	return p[0];
-	}
-
-template <class ScalarParam,int dimensionParam,class ValueScalarParam>
-inline
-typename SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Matrix
-SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::calcTransformDerivative(
-	const typename SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::CellPosition& cellPos) const
-	{
-	Matrix result=Matrix::zero;
+	/* Calculate f(x_i): */
+	Vector fi=p[0]-position;
 	
-	/* Calculate columns of Jacobian matrix: */
+	/* Check for convergence: */
+	if(fi.sqr()<epsilon2)
+		return true;
+	
+	/* Calculate f'(x_i): */
+	Matrix fpi=Matrix::zero;
 	for(int i=0;i<dimension;++i)
 		{
 		/* Calculate cell's edge vectors for current dimension: */
@@ -168,8 +170,8 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::calcTra
 			if((v0&iMask)==0)
 				{
 				/* Calculate edge vector and convex combination weight: */
-				int v1=v0|iMask;
-				Vector d=Cell::getVertexPosition(v1)-Cell::getVertexPosition(v0);
+				const Point* vPtr=baseVertex+ds->vertexOffsets[v0];
+				Vector d=vPtr[ds->vertexStrides[i]]-vPtr[0];
 				Scalar weight=Scalar(1);
 				for(int j=0;j<dimension;++j)
 					if(j!=i)
@@ -183,17 +185,25 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::calcTra
 				
 				/* Add weighted vector to Jacobian matrix: */
 				for(int j=0;j<dimension;++j)
-					result(j,i)+=d[j]*weight;
+					fpi(j,i)+=d[j]*weight;
 				}
 		}
 	
-	return result;
+	/* Calculate the step vector as f(x_i) / f'(x_i): */
+	CellPosition stepi=fi/fpi;
+	
+	/* Adjust the cell position: */
+	for(int i=0;i<dimension;++i)
+		cellPos[i]-=stepi[i];
+	
+	return false;
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
 SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::Locator(
 	void)
+	:cantTrace(true)
 	{
 	}
 
@@ -203,7 +213,8 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::Locator
 	const SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>* sDs,
 	typename SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Scalar sEpsilon)
 	:Cell(sDs),
-	 epsilon(sEpsilon),epsilon2(Math::sqr(epsilon))
+	 epsilon(sEpsilon),epsilon2(Math::sqr(epsilon)),
+	 cantTrace(true)
 	{
 	}
 
@@ -225,7 +236,7 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::locateP
 	bool traceHint)
 	{
 	/* If traceHint parameter is false or locator is invalid, start searching from scratch: */
-	if(!traceHint||baseVertexIndex==-1)
+	if(!traceHint||cantTrace)
 		{
 		/* Start searching from cell whose cell center is closest to query position: */
 		FindClosestPointFunctor<CellCenter> f(position,ds->maxCellRadius2);
@@ -239,50 +250,137 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::locateP
 		/* Initialize local cell position: */
 		for(int i=0;i<dimension;++i)
 			cellPos[i]=Scalar(0.5);
+		
+		/* Now we can trace: */
+		cantTrace=false;
 		}
-	
+
 	/* Perform Newton-Raphson iteration until it converges and the current cell contains the query point: */
-	for(int i=0;i<10;++i)
+	Scalar maxOut;
+	CellID previousCellID; // Cell ID to detect "thrashing" between cells
+	CellID currentCellID=getCellID(); // Ditto
+	Scalar previousMaxMove=Scalar(0); // Reason we went into the current cell
+	int iteration=0;
+	for(iteration=0;iteration<10;++iteration)
 		{
-		/* Calculate f(x_i): */
-		Vector fi=transformCellPosition(cellPos)-position;
+		/* Perform Newton-Raphson iteration in the current cell until it converges, or goes really bad: */
+		while(true)
+			{
+			/* Do one step: */
+			bool converged=newtonRaphsonStep(position);
+			
+			/* Check for signs of convergence failure: */
+			maxOut=Scalar(0);
+			for(int i=0;i<dimension;++i)
+				{
+				if(maxOut<-cellPos[i])
+					maxOut=-cellPos[i];
+				else if(maxOut<cellPos[i]-Scalar(1))
+					maxOut=cellPos[i]-Scalar(1);
+				}
+			if(converged||maxOut>Scalar(1)) // Tolerate at most one cell size out (this is somewhat ad-hoc)
+				break;
+			}
 		
-		/* Stop iteration if f(x_i) is small enough: */
-		if(Geometry::sqr(fi)<epsilon2)
-			break;
+		/* Check if the current cell contains the query position: */
+		if(maxOut==Scalar(0))
+			return true;
 		
-		/* Calculate f'(x_i): */
-		Matrix fpi=calcTransformDerivative(cellPos);
+		/* Check if this was the first step, and we're way off: */
+		if(iteration==0&&maxOut>Scalar(5))
+			{
+			/* We had a tracing failure; just start searching from scratch: */
+			FindClosestPointFunctor<CellCenter> f(position,ds->maxCellRadius2);
+			ds->cellCenterTree.traverseTreeDirected(f);
+			if(f.getClosestPoint()==0) // Bail out if no cell is close enough
+				{
+				/* At this point, the locator is borked. Better not trace next time: */
+				cantTrace=true;
+				
+				/* And we're outside the grid, too: */
+				return false;
+				}
+			
+			/* Go to the found cell: */
+			Cell::operator=(ds->getCell(f.getClosestPoint()->value));
+			previousCellID=currentCellID;
+			currentCellID=f.getClosestPoint()->value;
+			previousMaxMove=maxOut;
+			
+			/* Initialize the local cell position: */
+			for(int i=0;i<dimension;++i)
+				cellPos[i]=Scalar(0.5);
+			
+			/* Start over: */
+			continue;
+			}
 		
-		/* Calculate x_{i+1}: */
-		CellPosition step=fi/fpi;
-		for(int i=0;i<dimension;++i)
-			cellPos[i]-=step[i];
-		
-		/* Move to the cell containing x_{i+1}: */
+		/* Otherwise, try moving to a different cell: */
+		Scalar maxMove=Scalar(0);
+		int moveDim=0;
+		int moveDir=0;
 		for(int i=0;i<dimension;++i)
 			{
-			while(index[i]>0&&cellPos[i]<Scalar(0))
+			if(maxMove<-cellPos[i])
 				{
-				cellPos[i]+=Scalar(1);
-				--index[i];
-				baseVertexIndex-=ds->vertexStrides[i];
+				/* Check if we can actually move in this direction: */
+				if(index[i]>0)
+					{
+					maxMove=-cellPos[i];
+					moveDim=i;
+					moveDir=-1;
+					}
 				}
-			while(index[i]<ds->numCells[i]-1&&cellPos[i]>Scalar(1))
+			else if(maxMove<cellPos[i]-Scalar(1))
 				{
-				cellPos[i]-=Scalar(1);
-				++index[i];
-				baseVertexIndex+=ds->vertexStrides[i];
+				/* Check if we can actually move in this direction: */
+				if(index[i]<ds->numCells[moveDim]-1)
+					{
+					maxMove=cellPos[i]-Scalar(1);
+					moveDim=i;
+					moveDir=1;
+					}
 				}
 			}
+		
+		/* If we can move somewhere, do it: */
+		if(moveDir==-1)
+			{
+			cellPos[moveDim]+=Scalar(1);
+			--index[moveDim];
+			baseVertexIndex-=ds->vertexStrides[moveDim];
+			}
+		else if(moveDir==1)
+			{
+			cellPos[moveDim]-=Scalar(1);
+			++index[moveDim];
+			baseVertexIndex+=ds->vertexStrides[moveDim];
+			}
+		else
+			{
+			/* At this point, the locator is borked. Better not trace next time: */
+			cantTrace=true;
+			
+			/* We're not in the current cell, and can't move anywhere else -- we're outside the grid: */
+			return false;
+			}
+		
+		/* Check if we've just moved back into the cell we just came from: */
+		CellID nextCellID=getCellID();
+		if(nextCellID==previousCellID&&maxMove<=previousMaxMove)
+			return true;
+		
+		/* Check for thrashing on the next iteration step: */
+		previousCellID=currentCellID;
+		currentCellID=nextCellID;
+		previousMaxMove=maxMove;
 		}
 	
-	/* Check if the final cell contains the query position: */
-	bool result=true;
-	for(int i=0;i<dimension;++i)
-		if(cellPos[i]<Scalar(0)||cellPos[i]>Scalar(1))
-			result=false;
-	return result;
+	/* Just to be safe, don't trace on the next step: */
+	cantTrace=true;
+	
+	/* Return true if the final cell contains the query position, with some fudge: */
+	return maxOut<Scalar(1.0e-4);
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
@@ -409,6 +507,8 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::calcVertexGradie
 	const typename SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Index& vertexIndex,
 	const ScalarExtractorParam& extractor) const
 	{
+	typedef Geometry::Matrix<Scalar,dimension,dimension> Matrix;
+	
 	/* Calculate the (transposed) Jacobian matrix of the grid transformation function and the gradient of the grid function at the vertex: */
 	Matrix gridJacobian;
 	Vector valueGradient;
@@ -559,7 +659,7 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::setGrid(
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-void
+int
 SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::addSlice(
 	const typename SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::ValueScalar* sSliceValues)
 	{
@@ -573,10 +673,21 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::addSlice(
 		}
 	newSlices[numSlices].resize(numVertices);
 	
+	if(sSliceValues!=0)
+		{
+		/* Copy the given slice values: */
+		size_t numValues=numVertices.calcIncrement(-1);
+		ValueScalar* slicePtr=newSlices[numSlices].getArray();
+		for(size_t i=0;i<numValues;++i,++slicePtr,++sSliceValues)
+			*slicePtr=*sSliceValues;
+		}
+	
 	/* Install the new slice array: */
 	delete[] slices;
 	++numSlices;
 	slices=newSlices;
+	
+	return numSlices-1;
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
@@ -596,7 +707,7 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::finalizeGrid(
 	CellCenter* ccPtr=cellCenterTree.createTree(numCells.calcIncrement(-1));
 	
 	/* Calculate all cell centers: */
-	Scalar minCellRadius2=Math::Constants<Scalar>::max;
+	Scalar minCellRadius2(Math::Constants<Scalar>::max);
 	double cellRadiusSum=0.0;
 	maxCellRadius2=Scalar(0);
 	for(CellIterator cIt=beginCells();cIt!=endCells();++cIt,++ccPtr)
@@ -632,7 +743,7 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::finalizeGrid(
 	avgCellRadius=Scalar(cellRadiusSum/double(numCells.calcIncrement(-1)));
 	
 	/* Calculate the initial locator epsilon based on the minimal cell size: */
-	locatorEpsilon=Math::sqrt(minCellRadius2)*Scalar(2.0e-4);
+	setLocatorEpsilon(Math::sqrt(minCellRadius2)*Scalar(1.0e-4));
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
@@ -641,6 +752,20 @@ void
 SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::setLocatorEpsilon(
 	typename SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Scalar newLocatorEpsilon)
 	{
+	/* Check the desired locator epsilon against the minimal achievable, given Scalar's limited accuracy: */
+	Scalar maxAbsCoordinate=Scalar(0);
+	for(int i=0;i<dimension;++i)
+		{
+		if(maxAbsCoordinate<Math::abs(domainBox.min[i]))
+			maxAbsCoordinate=Math::abs(domainBox.min[i]);
+		if(maxAbsCoordinate<Math::abs(domainBox.max[i]))
+			maxAbsCoordinate=Math::abs(domainBox.max[i]);
+		}
+	Scalar minLocatorEpsilon=maxAbsCoordinate*Scalar(4)*Math::Constants<Scalar>::epsilon;
+	if(newLocatorEpsilon<minLocatorEpsilon)
+		newLocatorEpsilon=minLocatorEpsilon;
+	
+	/* Set the locator epsilon: */
 	locatorEpsilon=newLocatorEpsilon;
 	}
 

@@ -1,7 +1,7 @@
 /***********************************************************************
 SphericalASCIIFile - Class to read multivariate scalar data in spherical
 coordinates from simple ASCII files.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

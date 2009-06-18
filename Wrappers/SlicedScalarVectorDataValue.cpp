@@ -94,7 +94,7 @@ void SlicedScalarVectorDataValueBase::setScalarVariableName(int scalarVariableIn
 	strcpy(scalarVariableNames[scalarVariableIndex],newScalarVariableName);
 	}
 
-void SlicedScalarVectorDataValueBase::addScalarVariable(const char* newScalarVariableName)
+int SlicedScalarVectorDataValueBase::addScalarVariable(const char* newScalarVariableName)
 	{
 	/* Make room in the scalar variable array and copy the old variable names and create the new one: */
 	char** newScalarVariableNames=new char*[numScalarVariables+1];
@@ -107,6 +107,8 @@ void SlicedScalarVectorDataValueBase::addScalarVariable(const char* newScalarVar
 	delete[] scalarVariableNames;
 	++numScalarVariables;
 	scalarVariableNames=newScalarVariableNames;
+	
+	return numScalarVariables-1;
 	}
 
 void SlicedScalarVectorDataValueBase::setVectorVariableName(int vectorVariableIndex,const char* newVectorVariableName)
@@ -116,7 +118,7 @@ void SlicedScalarVectorDataValueBase::setVectorVariableName(int vectorVariableIn
 	strcpy(vectorVariableNames[vectorVariableIndex],newVectorVariableName);
 	}
 
-void SlicedScalarVectorDataValueBase::addVectorVariable(const char* newVectorVariableName)
+int SlicedScalarVectorDataValueBase::addVectorVariable(const char* newVectorVariableName)
 	{
 	/* Make room in the vector variable array and copy the old variable names and create the new one: */
 	char** newVectorVariableNames=new char*[numVectorVariables+1];
@@ -138,6 +140,8 @@ void SlicedScalarVectorDataValueBase::addVectorVariable(const char* newVectorVar
 	++numVectorVariables;
 	vectorVariableNames=newVectorVariableNames;
 	vectorVariableScalarIndices=newVectorVariableScalarIndices;
+	
+	return numVectorVariables-1;
 	}
 
 void SlicedScalarVectorDataValueBase::setVectorVariableScalarIndex(int vectorVariableIndex,int componentIndex,int scalarVariableIndex)

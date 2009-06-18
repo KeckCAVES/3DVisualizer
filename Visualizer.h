@@ -23,9 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZER_INCLUDED
 #define VISUALIZER_INCLUDED
 
-#include <string>
 #include <vector>
-#include <Misc/Autopointer.h>
 #include <Plugins/FactoryManager.h>
 #include <GL/GLColor.h>
 #include <GLMotif/Menu.h>
@@ -71,6 +69,7 @@ class SharedVisualizationClient;
 }
 #endif
 class BaseLocator;
+class ElementList;
 
 class Visualizer:public Vrui::Application
 	{
@@ -82,23 +81,9 @@ class Visualizer:public Vrui::Application
 	typedef Visualization::Abstract::Parameters Parameters;
 	typedef Visualization::Abstract::Algorithm Algorithm;
 	typedef Visualization::Abstract::Element Element;
-	typedef Misc::Autopointer<Element> ElementPointer;
 	typedef Visualization::Abstract::CoordinateTransformer CoordinateTransformer;
 	typedef Visualization::Abstract::Module Module;
 	typedef Plugins::FactoryManager<Module> ModuleManager;
-	
-	struct ListElement // Structure storing information relating to a visualization element
-		{
-		/* Elements: */
-		public:
-		ElementPointer element; // Pointer to the element itself
-		std::string name; // Name of algorithm used to create the element
-		GLMotif::Widget* settingsDialog; // Pointer to the element's settings dialog (or NULL)
-		bool settingsDialogVisible; // Flag if the element's settings dialog is currently popped up
-		bool show; // Flag if the element is being rendered
-		};
-	
-	typedef std::vector<ListElement> ElementList;
 	
 	typedef std::vector<BaseLocator*> BaseLocatorList;
 	
@@ -130,12 +115,10 @@ class Visualizer:public Vrui::Application
 	size_t numCuttingPlanes; // Maximum number of cutting planes supported
 	CuttingPlane* cuttingPlanes; // Array of available cutting planes
 	BaseLocatorList baseLocators; // List of active locators
-	ElementList elements; // List of previously extracted visualization elements
+	ElementList* elementList; // List of previously extracted visualization elements
 	int algorithm; // The currently selected algorithm
 	GLMotif::PopupMenu* mainMenu; // The main menu widget
 	GLMotif::ToggleButton* showElementListToggle; // Toggle button to show the element list dialog
-	GLMotif::PopupWindow* elementListDialogPopup; // Dialog listing visualization elements
-	GLMotif::RowColumn* elementListDialog; // Widget containing the rows for all visualization elements
 	
 	/* Lock flags for modal dialogs: */
 	bool inLoadPalette; // Flag whether the user is currently selecting a palette to load
@@ -146,14 +129,12 @@ class Visualizer:public Vrui::Application
 	GLMotif::Popup* createScalarVariablesMenu(void);
 	GLMotif::Popup* createVectorVariablesMenu(void);
 	GLMotif::Popup* createAlgorithmsMenu(void);
+	GLMotif::Popup* createElementsMenu(void);
 	GLMotif::Popup* createStandardLuminancePalettesMenu(void);
 	GLMotif::Popup* createStandardSaturationPalettesMenu(void);
 	GLMotif::Popup* createColorMenu(void);
 	GLMotif::PopupMenu* createMainMenu(void);
-	GLMotif::PopupWindow* createElementListDialog(void);
-	void addElement(Element* newElement,const char* algorithmName); // Adds a new visualization element to the list
 	void loadElements(const char* elementFileName,bool ascii); // Loads all visualization elements defined in the given file
-	void saveElements(const char* elementFileName,bool ascii); // Saves all visible visualization elements to the given file
 	
 	/* Constructors and destructors: */
 	public:
@@ -179,8 +160,6 @@ class Visualizer:public Vrui::Application
 	void createStandardLuminancePaletteCallback(GLMotif::Menu::EntrySelectCallbackData* cbData);
 	void createStandardSaturationPaletteCallback(GLMotif::Menu::EntrySelectCallbackData* cbData);
 	void showElementListCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
-	void showElementSettingsDialogCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
-	void showElementCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
 	void loadElementsCallback(Misc::CallbackData* cbData);
 	void loadElementsOKCallback(GLMotif::FileSelectionDialog::OKCallbackData* cbData);
 	void loadElementsCancelCallback(GLMotif::FileSelectionDialog::CancelCallbackData* cbData);

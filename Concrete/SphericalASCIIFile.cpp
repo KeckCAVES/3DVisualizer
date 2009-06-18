@@ -1,7 +1,7 @@
 /***********************************************************************
 SphericalASCIIFile - Class to read multivariate scalar data in spherical
 coordinates from simple ASCII files.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -29,8 +29,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iomanip>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
-#include <Misc/File.h>
 #include <Plugins/FactoryManager.h>
+#include <Threads/ASCIIFileReader.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
 
@@ -203,12 +203,11 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 		Misc::throwStdErr("SphericalASCIIFile::load: No scalar or vector data values specified");
 	
 	/* Open the data file: */
-	Misc::File dataFile(dataFileName,"rt");
+	Threads::ASCIIFileReader reader(dataFileName);
 	
 	/* Skip the data file header: */
-	char line[512];
 	for(int i=0;i<numHeaderLines;++i)
-		dataFile.gets(line,sizeof(line));
+		reader.skipLine();
 	
 	/* Create and initialize the result data set: */
 	Misc::SelfDestructPointer<EarthDataSet<DataSet> > result(new EarthDataSet<DataSet>(args));
@@ -282,19 +281,9 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 		for(index[nodeCountOrder[1]]=0;index[nodeCountOrder[1]]<numVertices[nodeCountOrder[1]];++index[nodeCountOrder[1]])
 			for(index[nodeCountOrder[2]]=0;index[nodeCountOrder[2]]<numVertices[nodeCountOrder[2]];++index[nodeCountOrder[2]])
 				{
-				/* Read the next line: */
-				dataFile.gets(line,sizeof(line));
-				
-				/* Read all relevant columns from the line: */
-				char* linePtr=line;
-				for(int i=0;i<=maxColumnIndex;++i)
-					{
-					char* endPtr;
-					columns[i]=strtod(linePtr,&endPtr);
-					if(*endPtr==',')
-						++endPtr;
-					linePtr=endPtr;
-					}
+				/* Read all relevant columns from the next line: */
+				reader.readDoubles(maxColumnIndex+1,columns);
+				reader.skipLine();
 				
 				/* Get the vertex' linear index: */
 				int linearIndex=grid.calcLinearIndex(index);

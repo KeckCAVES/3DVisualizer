@@ -163,6 +163,9 @@ VariableManager::~VariableManager(void)
 			delete vectorExtractors[i];
 		delete[] vectorExtractors;
 		}
+	
+	delete colorBarDialogPopup;
+	delete paletteEditor;
 	}
 
 const DataSet* VariableManager::getDataSetByScalarVariable(int scalarVariableIndex) const

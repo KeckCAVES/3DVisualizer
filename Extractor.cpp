@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include "Extractor.h"
+
 #include <Misc/Time.h>
 #include <Realtime/AlarmTimer.h>
 #include <Comm/MulticastPipe.h>
@@ -28,8 +30,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/Parameters.h>
 #include <Abstract/Algorithm.h>
 #include <Abstract/Element.h>
-
-#include "Extractor.h"
 
 /**************************
 Methods of class Extractor:

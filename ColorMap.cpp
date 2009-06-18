@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include "ColorMap.h"
+
 #include <stdio.h>
 #include <Misc/ThrowStdErr.h>
 #include <Misc/File.h>
@@ -30,8 +32,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLColorMap.h>
 #include <GLMotif/Event.h>
 #include <GLMotif/Container.h>
-
-#include "ColorMap.h"
 
 namespace GLMotif {
 

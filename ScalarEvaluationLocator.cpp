@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include "ScalarEvaluationLocator.h"
+
 #include <Geometry/OrthogonalTransformation.h>
 #include <GLMotif/Blind.h>
 #include <GLMotif/Margin.h>
@@ -33,8 +35,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/VariableManager.h>
 
 #include "Visualizer.h"
-
-#include "ScalarEvaluationLocator.h"
 
 /****************************************
 Methods of class ScalarEvaluationLocator:

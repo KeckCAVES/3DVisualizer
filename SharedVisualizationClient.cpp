@@ -21,7 +21,9 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#define VERBOSE 0
+#define VERBOSE 1
+
+#include "SharedVisualizationClient.h"
 
 #include <string>
 #include <iostream>
@@ -36,8 +38,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include "Visualizer.h"
 #include "ExtractorLocator.h"
-
-#include "SharedVisualizationClient.h"
+#include "ElementList.h"
 
 namespace Collaboration {
 
@@ -385,7 +386,7 @@ void SharedVisualizationClient::frame(ProtocolClient::RemoteClientState* rcs)
 		{
 		Extractor::ElementPointer newElement=lIt->getDest()->checkUpdates();
 		if(newElement!=0)
-			application->addElement(newElement.getPointer(),lIt->getDest()->getExtractor()->getName());
+			application->elementList->addElement(newElement.getPointer(),lIt->getDest()->getExtractor()->getName());
 		}
 	}
 	}

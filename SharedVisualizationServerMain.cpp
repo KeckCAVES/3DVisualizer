@@ -20,15 +20,16 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include "SharedVisualizationServer.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <iostream>
 #include <Misc/Time.h>
 #include <Collaboration/CollaborationServer.h>
+#include <Collaboration/AgoraServer.h>
 #include <Collaboration/EmineoServer.h>
-
-#include "SharedVisualizationServer.h"
 
 volatile bool runServerLoop=true;
 
@@ -75,6 +76,9 @@ int main(int argc,char* argv[])
 	/* Create the collaboration server object: */
 	Collaboration::CollaborationServer server(listenPortId);
 	std::cout<<"SharedVisualizationServerMain: Started server on port "<<server.getListenPortId()<<std::endl;
+	
+	/* Add an Agora protocol object: */
+	server.registerProtocol(new Collaboration::AgoraServer);
 	
 	/* Add an Emineo protocol object: */
 	server.registerProtocol(new Collaboration::EmineoServer);

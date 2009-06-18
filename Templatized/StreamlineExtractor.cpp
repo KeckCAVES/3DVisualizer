@@ -34,10 +34,11 @@ Methods of class StreamlineExtractor:
 
 template <class DataSetParam,class VectorExtractorParam,class ScalarExtractorParam,class StreamlineParam>
 inline
-typename StreamlineExtractor<DataSetParam,VectorExtractorParam,ScalarExtractorParam,StreamlineParam>::Vector
+bool
 StreamlineExtractor<DataSetParam,VectorExtractorParam,ScalarExtractorParam,StreamlineParam>::cashKarpStep(
 	const typename StreamlineExtractor<DataSetParam,VectorExtractorParam,ScalarExtractorParam,StreamlineParam>::Vector& vfp1,
 	typename StreamlineExtractor<DataSetParam,VectorExtractorParam,ScalarExtractorParam,StreamlineParam>::Scalar trialStepSize,
+	typename StreamlineExtractor<DataSetParam,VectorExtractorParam,ScalarExtractorParam,StreamlineParam>::Vector& step,
 	typename StreamlineExtractor<DataSetParam,VectorExtractorParam,ScalarExtractorParam,StreamlineParam>::Vector& error)
 	{
 	/* Define coefficients for the Cash-Karp step: */
@@ -56,34 +57,43 @@ StreamlineExtractor<DataSetParam,VectorExtractorParam,ScalarExtractorParam,Strea
 	pTemp=p1+vfp1*(b21*trialStepSize);
 	
 	/* Second step: */
-	locator.locatePoint(pTemp,true);
+	if(!locator.locatePoint(pTemp,true))
+		return false;
 	Vector vfp2=Vector(locator.calcValue(vectorExtractor));
 	pTemp=p1+(vfp1*b31+vfp2*b32)*trialStepSize;
 	
 	/* Third step: */
-	locator.locatePoint(pTemp,true);
+	if(!locator.locatePoint(pTemp,true))
+		return false;
 	Vector vfp3=Vector(locator.calcValue(vectorExtractor));
 	pTemp=p1+(vfp1*b41+vfp2*b42+vfp3*b43)*trialStepSize;
 	
 	/* Fourth step: */
-	locator.locatePoint(pTemp,true);
+	if(!locator.locatePoint(pTemp,true))
+		return false;
 	Vector vfp4=Vector(locator.calcValue(vectorExtractor));
 	pTemp=p1+(vfp1*b51+vfp2*b52+vfp3*b53+vfp4*b54)*trialStepSize;
 	
 	/* Fifth step: */
-	locator.locatePoint(pTemp,true);
+	if(!locator.locatePoint(pTemp,true))
+		return false;
 	Vector vfp5=Vector(locator.calcValue(vectorExtractor));
 	pTemp=p1+(vfp1*b61+vfp2*b62+vfp3*b63+vfp4*b64+vfp5*b65)*trialStepSize;
 	
 	/* Sixth step: */
-	locator.locatePoint(pTemp,true);
+	if(!locator.locatePoint(pTemp,true))
+		return false;
 	Vector vfp6=Vector(locator.calcValue(vectorExtractor));
 	
 	/* Compute the error vector: */
-	error=(vfp1*dc1+vfp3*dc3+vfp4*dc4+vfp5*dc5+vfp6*dc6)*trialStepSize;
+	for(int i=0;i<dimension;++i)
+		error[i]=(vfp1[i]*dc1+vfp3[i]*dc3+vfp4[i]*dc4+vfp5[i]*dc5+vfp6[i]*dc6)*trialStepSize;
 	
-	/* Return the result step vector: */
-	return (vfp1*c1+vfp3*c3+vfp4*c4+vfp6*c6)*trialStepSize;
+	/* Compute the result step vector: */
+	for(int i=0;i<dimension;++i)
+		step[i]=(vfp1[i]*c1+vfp3[i]*c3+vfp4[i]*c4+vfp6[i]*c6)*trialStepSize;
+	
+	return true;
 	}
 
 template <class DataSetParam,class VectorExtractorParam,class ScalarExtractorParam,class StreamlineParam>
@@ -128,8 +138,19 @@ StreamlineExtractor<DataSetParam,VectorExtractorParam,ScalarExtractorParam,Strea
 	while(true)
 		{
 		/* Perform a trial step: */
-		Vector error;
-		Vector step=cashKarpStep(vfp1,trialStepSize,error);
+		Vector step,error;
+		if(!cashKarpStep(vfp1,trialStepSize,step,error)) // Trial step left the domain!
+			{
+			/* Try a few more times, and reduce the trial step size each time: */
+			trialStepSize*=Scalar(0.5);
+			int i;
+			for(i=0;i<10&&!cashKarpStep(vfp1,trialStepSize,step,error);++i)
+				trialStepSize*=Scalar(0.5);
+			
+			/* Bail out if the trial step still leaves the domain: */
+			if(i>=10)
+				return false;
+			}
 		
 		/* Evaluate accuracy: */
 		Scalar errorMax(0);

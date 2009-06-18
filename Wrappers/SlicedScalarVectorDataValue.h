@@ -51,9 +51,9 @@ class SlicedScalarVectorDataValueBase // Base class managing variable naming and
 	/* Methods: */
 	void initialize(int sNumScalarVariables,int sNumVectorComponents,int sNumVectorVariables); // Prepares data value for the given number of scalar and vector variables
 	void setScalarVariableName(int scalarVariableIndex,const char* newScalarVariableName); // Sets the given scalar variable's name
-	void addScalarVariable(const char* newScalarVariableName); // Adds another scalar variable
+	int addScalarVariable(const char* newScalarVariableName); // Adds another scalar variable
 	void setVectorVariableName(int vectorVariableIndex,const char* newVectorVariableName); // Sets the given vector variable's name
-	void addVectorVariable(const char* newVectorVariableName); // Adds another vector variable
+	int addVectorVariable(const char* newVectorVariableName); // Adds another vector variable
 	void setVectorVariableScalarIndex(int vectorVariableIndex,int componentIndex,int scalarVariableIndex); // Sets the index-th component of the given vector variable to the given scalar variable
 	int getNumScalarVariables(void) const
 		{

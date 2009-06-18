@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Math/Math.h>
 #include <Math/Constants.h>
 #include <Geometry/AffineCombiner.h>
+#include <Geometry/Matrix.h>
 
 #include <Templatized/LinearInterpolator.h>
 #include <Templatized/FindClosestPointFunctor.h>
@@ -219,10 +220,13 @@ Methods of class MultiCurvilinear::Locator:
 
 template <class ScalarParam,int dimensionParam,class ValueParam>
 inline
-typename MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Point
-MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::transformCellPosition(
-	const typename MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::CellPosition& cellPos) const
+bool
+MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::newtonRaphsonStep(
+	const typename MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Point& position)
 	{
+	typedef Geometry::Matrix<Scalar,dimension,dimension> Matrix;
+	
+	/* Transform the current cell position to domain space: */
 	const Grid& grid=ds->grids[gridIndex];
 	
 	/* Perform multilinear interpolation: */
@@ -242,19 +246,15 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::transformCellP
 			p[pi]=Geometry::affineCombination(p[pi],p[pi+numSteps],cellPos[interpolationDimension]);
 		}
 	
-	/* Return final result: */
-	return p[0];
-	}
-
-template <class ScalarParam,int dimensionParam,class ValueParam>
-inline
-typename MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Matrix
-MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::calcTransformDerivative(
-	const typename MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::CellPosition& cellPos) const
-	{
-	Matrix result=Matrix::zero;
+	/* Calculate f(x_i): */
+	Vector fi=p[0]-position;
 	
-	/* Calculate columns of Jacobian matrix: */
+	/* Check for convergence: */
+	if(fi.sqr()<epsilon2)
+		return true;
+	
+	/* Calculate f'(x_i): */
+	Matrix fpi=Matrix::zero;
 	for(int i=0;i<dimension;++i)
 		{
 		/* Calculate cell's edge vectors for current dimension: */
@@ -263,8 +263,8 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::calcTransformD
 			if((v0&iMask)==0)
 				{
 				/* Calculate edge vector and convex combination weight: */
-				int v1=v0|iMask;
-				Vector d=Cell::getVertexPosition(v1)-Cell::getVertexPosition(v0);
+				const GridVertex* vPtr=baseVertex+grid.vertexOffsets[v0];
+				Vector d=vPtr[grid.vertexStrides[i]].pos-vPtr[0].pos;
 				Scalar weight=Scalar(1);
 				for(int j=0;j<dimension;++j)
 					if(j!=i)
@@ -278,17 +278,25 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::calcTransformD
 				
 				/* Add weighted vector to Jacobian matrix: */
 				for(int j=0;j<dimension;++j)
-					result(j,i)+=d[j]*weight;
+					fpi(j,i)+=d[j]*weight;
 				}
 		}
 	
-	return result;
+	/* Calculate the step vector as f(x_i) / f'(x_i): */
+	CellPosition stepi=fi/fpi;
+	
+	/* Adjust the cell position: */
+	for(int i=0;i<dimension;++i)
+		cellPos[i]-=stepi[i];
+	
+	return false;
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueParam>
 inline
 MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::Locator(
 	void)
+	:cantTrace(true)
 	{
 	}
 
@@ -298,7 +306,8 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::Locator(
 	const MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>* sDs,
 	typename MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Scalar sEpsilon)
 	:Cell(sDs),
-	 epsilon(sEpsilon),epsilon2(Math::sqr(epsilon))
+	 epsilon(sEpsilon),epsilon2(Math::sqr(epsilon)),
+	 cantTrace(true)
 	{
 	}
 
@@ -320,7 +329,7 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::locatePoint(
 	bool traceHint)
 	{
 	/* If traceHint parameter is false or locator is invalid, start searching from scratch: */
-	if(true) // !traceHint||baseVertex==0)
+	if(!traceHint||cantTrace)
 		{
 		/* Start searching from cell whose cell center is closest to query position: */
 		FindClosestPointFunctor<CellCenter> f(position,ds->maxCellRadius2);
@@ -334,97 +343,149 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::locatePoint(
 		/* Initialize local cell position: */
 		for(int i=0;i<dimension;++i)
 			cellPos[i]=Scalar(0.5);
+		
+		/* Now we can trace: */
+		cantTrace=false;
 		}
 	
 	/* Perform Newton-Raphson iteration until it converges and the current cell contains the query point: */
-	for(int i=0;i<10;++i)
+	Scalar maxOut;
+	CellID previousCellID; // Cell ID to detect "thrashing" between cells
+	CellID currentCellID=getCellID(); // Ditto
+	Scalar previousMaxMove=Scalar(0); // Reason we went into the current cell
+	int iteration=0;
+	for(iteration=0;iteration<10;++iteration)
 		{
-		/* Calculate f(x_i): */
-		Vector fi=transformCellPosition(cellPos)-position;
-		
-		/* Stop iteration if f(x_i) is small enough: */
-		if(Geometry::sqr(fi)<epsilon2)
-			break;
-		
-		/* Calculate f'(x_i): */
-		Matrix fpi=calcTransformDerivative(cellPos);
-		
-		/* Calculate x_{i+1}: */
-		CellPosition step=fi/fpi;
-		for(int i=0;i<dimension;++i)
-			cellPos[i]-=step[i];
-		
-		/* Move one step towards the cell containing x_{i+1}: */
-		Scalar maxOut(0);
-		int moveDim=0; // Redundant initialization; just to make compiler happy
-		int moveDir=0;
-		for(int i=0;i<dimension;++i)
+		/* Perform Newton-Raphson iteration in the current cell until it converges, or goes really bad: */
+		while(true)
 			{
-			if(cellPos[i]<Scalar(0))
+			/* Do one step: */
+			bool converged=newtonRaphsonStep(position);
+			
+			/* Check for signs of convergence failure: */
+			maxOut=Scalar(0);
+			for(int i=0;i<dimension;++i)
 				{
 				if(maxOut<-cellPos[i])
-					{
 					maxOut=-cellPos[i];
+				else if(maxOut<cellPos[i]-Scalar(1))
+					maxOut=cellPos[i]-Scalar(1);
+				}
+			if(converged||maxOut>Scalar(1)) // Tolerate at most one cell size out (this is somewhat ad-hoc)
+				break;
+			}
+		
+		/* Check if the current cell contains the query position: */
+		if(maxOut==Scalar(0))
+			return true;
+		
+		/* Check if this was the first step, and we're way off: */
+		if(iteration==0&&maxOut>Scalar(5))
+			{
+			/* We had a tracing failure; just start searching from scratch: */
+			FindClosestPointFunctor<CellCenter> f(position,ds->maxCellRadius2);
+			ds->cellCenterTree.traverseTreeDirected(f);
+			if(f.getClosestPoint()==0) // Bail out if no cell is close enough
+				{
+				/* At this point, the locator is borked. Better not trace next time: */
+				cantTrace=true;
+				
+				/* And we're outside the grid, too: */
+				return false;
+				}
+			
+			/* Go to the found cell: */
+			Cell::operator=(ds->getCell(f.getClosestPoint()->value));
+			previousCellID=currentCellID;
+			currentCellID=f.getClosestPoint()->value;
+			previousMaxMove=maxOut;
+			
+			/* Initialize the local cell position: */
+			for(int i=0;i<dimension;++i)
+				cellPos[i]=Scalar(0.5);
+			
+			/* Start over: */
+			continue;
+			}
+		
+		/* Otherwise, try moving to a different cell: */
+		Scalar maxMove=Scalar(0);
+		int moveDim=0;
+		int moveDir=0;
+		CellID moveCellID; // Cleverly keep track of this ID to reduce work later!
+		for(int i=0;i<dimension;++i)
+			{
+			if(maxMove<-cellPos[i])
+				{
+				/* Check if we can actually move in this direction: */
+				moveCellID=CellID();
+				if(index[i]>0||(moveCellID=ds->retrieveGridConnector(*this,i*2+0)).isValid())
+					{
+					maxMove=-cellPos[i];
 					moveDim=i;
 					moveDir=-1;
 					}
 				}
-			else if(cellPos[i]>Scalar(1))
+			else if(maxMove<cellPos[i]-Scalar(1))
 				{
-				if(maxOut<cellPos[i]-Scalar(1))
+				/* Check if we can actually move in this direction: */
+				moveCellID=CellID();
+				if(index[i]<ds->grids[gridIndex].numCells[moveDim]-1||(moveCellID=ds->retrieveGridConnector(*this,i*2+1)).isValid())
 					{
-					maxOut=cellPos[i]-Scalar(1);
+					maxMove=cellPos[i]-Scalar(1);
 					moveDim=i;
 					moveDir=1;
 					}
 				}
 			}
-		if(moveDir==-1)
+		
+		/* If we can move somewhere, do it: */
+		if(moveCellID.isValid())
 			{
-			if(index[moveDim]>0)
-				{
-				cellPos[moveDim]+=Scalar(1);
-				--index[moveDim];
-				baseVertex-=ds->grids[gridIndex].vertexStrides[moveDim];
-				}
-			else
-				{
-				CellID neighbourID=ds->retrieveGridConnector(*this,moveDim*2+0);
-				if(neighbourID.isValid())
-					{
-					Cell::operator=(ds->getCell(neighbourID));
-					for(int i=0;i<dimension;++i)
-						cellPos[i]=Scalar(0.5);
-					}
-				}
+			/* Move to another grid: */
+			Cell::operator=(ds->getCell(moveCellID));
+			for(int i=0;i<dimension;++i)
+				cellPos[i]=Scalar(0.5);
+			}
+		else if(moveDir==-1)
+			{
+			/* Move in the same grid: */
+			cellPos[moveDim]+=Scalar(1);
+			--index[moveDim];
+			baseVertex-=ds->grids[gridIndex].vertexStrides[moveDim];
 			}
 		else if(moveDir==1)
 			{
-			if(index[moveDim]<ds->grids[gridIndex].numCells[moveDim]-1)
-				{
-				cellPos[moveDim]-=Scalar(1);
-				++index[moveDim];
-				baseVertex+=ds->grids[gridIndex].vertexStrides[moveDim];
-				}
-			else
-				{
-				CellID neighbourID=ds->retrieveGridConnector(*this,moveDim*2+1);
-				if(neighbourID.isValid())
-					{
-					Cell::operator=(ds->getCell(neighbourID));
-					for(int i=0;i<dimension;++i)
-						cellPos[i]=Scalar(0.5);
-					}
-				}
+			/* Move in the same grid: */
+			cellPos[moveDim]-=Scalar(1);
+			++index[moveDim];
+			baseVertex+=ds->grids[gridIndex].vertexStrides[moveDim];
 			}
+		else
+			{
+			/* At this point, the locator is borked. Better not trace next time: */
+			cantTrace=true;
+			
+			/* We're not in the current cell, and can't move anywhere else -- we're outside the grid: */
+			return false;
+			}
+		
+		/* Check if we've just moved back into the cell we just came from: */
+		CellID nextCellID=getCellID();
+		if(nextCellID==previousCellID&&maxMove<=previousMaxMove)
+			return true;
+		
+		/* Check for thrashing on the next iteration step: */
+		previousCellID=currentCellID;
+		currentCellID=nextCellID;
+		previousMaxMove=maxMove;
 		}
 	
-	/* Check if the final cell contains the query position: */
-	bool result=true;
-	for(int i=0;i<dimension;++i)
-		if(cellPos[i]<Scalar(0)||cellPos[i]>Scalar(1))
-			result=false;
-	return result;
+	/* Just to be safe, don't trace on the next step: */
+	cantTrace=true;
+	
+	/* Return true if the final cell contains the query position, with some fudge: */
+	return maxOut<Scalar(1.0e-4);
 	}
 
 template <class ScalarParam,int dimensionParam,class ValueParam>
@@ -559,6 +620,8 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::calcVertexGradient(
 	const typename MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Index& vertexIndex,
 	const ScalarExtractorParam& extractor) const
 	{
+	typedef Geometry::Matrix<Scalar,dimension,dimension> Matrix;
+	
 	const Grid& grid=grids[gridIndex];
 	
 	/* Calculate the (transposed) Jacobian matrix of the grid transformation function and the gradient of the grid function at the vertex: */
@@ -870,7 +933,7 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::finalizeGrid(
 	avgCellRadius=Scalar(cellRadiusSum/double(totalNumCells));
 	
 	/* Calculate the initial locator epsilon based on the minimal cell size: */
-	locatorEpsilon=Math::sqrt(minCellRadius2)*Scalar(2.0e-4);
+	setLocatorEpsilon(Math::sqrt(minCellRadius2)*Scalar(1.0e-4));
 	
 	/* Create the array of grid connectors: */
 	gridConnectors=new CellID*[numGrids*dimension*2];
@@ -933,10 +996,10 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::finalizeGrid(
 				}
 			}
 		}
-	bfct.releasePoints();
+	bfct.releasePoints(4);
 	
 	/* Go through all grid boundary cells again and try stitching them with opposite cells: */
-	typename BoundaryFaceCenterTree::ClosePointSet cfcs(3,Math::sqrt(minCellRadius2)*Scalar(2.0e-3));
+	typename BoundaryFaceCenterTree::ClosePointSet cfcs(3,minCellRadius2*Scalar(1.0e-2));
 	for(int gridIndex=0;gridIndex<numGrids;++gridIndex)
 		{
 		/* Iterate through all cells in this grid: */
@@ -992,6 +1055,20 @@ void
 MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::setLocatorEpsilon(
 	typename MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Scalar newLocatorEpsilon)
 	{
+	/* Check the desired locator epsilon against the minimal achievable, given Scalar's limited accuracy: */
+	Scalar maxAbsCoordinate=Scalar(0);
+	for(int i=0;i<dimension;++i)
+		{
+		if(maxAbsCoordinate<Math::abs(domainBox.min[i]))
+			maxAbsCoordinate=Math::abs(domainBox.min[i]);
+		if(maxAbsCoordinate<Math::abs(domainBox.max[i]))
+			maxAbsCoordinate=Math::abs(domainBox.max[i]);
+		}
+	Scalar minLocatorEpsilon=maxAbsCoordinate*Scalar(4)*Math::Constants<Scalar>::epsilon;
+	if(newLocatorEpsilon<minLocatorEpsilon)
+		newLocatorEpsilon=minLocatorEpsilon;
+	
+	/* Set the locator epsilon: */
 	locatorEpsilon=newLocatorEpsilon;
 	}
 

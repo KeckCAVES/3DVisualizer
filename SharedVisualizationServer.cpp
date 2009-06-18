@@ -21,15 +21,14 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#define VERBOSE 0
+#define VERBOSE 1
+
+#include "SharedVisualizationServer.h"
 
 #if VERBOSE
 #include <iostream>
 #endif
 #include <Misc/ThrowStdErr.h>
-#include <Collaboration/CollaborationPipe.h>
-
-#include "SharedVisualizationServer.h"
 
 namespace Collaboration {
 
