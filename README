@@ -1,5 +1,5 @@
 ========================================================================
-README for 3D Visualizer version 1.4
+README for 3D Visualizer version 1.5
 Copyright (c) 2005-2009 Oliver Kreylos
 ========================================================================
 
@@ -26,7 +26,7 @@ http://www.keckcaves.org), and the W.M Keck Foundation.
 Requirements
 ============
 
-3D Visualizer requires Vrui version 1.0 build 062 or newer.
+3D Visualizer requires Vrui version 1.0 build 063 or newer.
 To read images in PNG format, libpng has to be installed, and Vrui has
 to be configured with support for PNG images (see Vrui README file).
 

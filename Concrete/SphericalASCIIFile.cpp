@@ -29,8 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iomanip>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
+#include <Misc/ValueSource.h>
+#include <Threads/GzippedFileCharacterSource.h>
 #include <Plugins/FactoryManager.h>
-#include <Threads/ASCIIFileReader.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
 
@@ -203,7 +204,8 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 		Misc::throwStdErr("SphericalASCIIFile::load: No scalar or vector data values specified");
 	
 	/* Open the data file: */
-	Threads::ASCIIFileReader reader(dataFileName);
+	Threads::GzippedFileCharacterSource dataFile(dataFileName);
+	Misc::ValueSource reader(dataFile);
 	
 	/* Skip the data file header: */
 	for(int i=0;i<numHeaderLines;++i)
@@ -282,7 +284,8 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 			for(index[nodeCountOrder[2]]=0;index[nodeCountOrder[2]]<numVertices[nodeCountOrder[2]];++index[nodeCountOrder[2]])
 				{
 				/* Read all relevant columns from the next line: */
-				reader.readDoubles(maxColumnIndex+1,columns);
+				for(int i=0;i<=maxColumnIndex;++i)
+					columns[i]=reader.readNumber();
 				reader.skipLine();
 				
 				/* Get the vertex' linear index: */

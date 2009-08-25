@@ -49,6 +49,8 @@ MODULE_NAMES = SphericalASCIIFile \
                CitcomtFile \
                MultiCitcomtFile \
                CitcomtVectorFile \
+               StructuredHexahedralTecplotASCIIFile \
+               UnstructuredHexahedralTecplotASCIIFile \
                ImageStack
 
 # List of other available modules:
@@ -84,7 +86,7 @@ USE_EMINEO = 0
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.4
+VERSION = 1.5
 
 # Set up destination directories for compilation products:
 OBJDIRBASE = o
@@ -246,6 +248,12 @@ $(call PLUGINNAME,CitcomSRegionalASCIIFile): $(OBJDIR)/Concrete/CitcomSRegionalA
 
 $(call PLUGINNAME,CitcomSGlobalASCIIFile): $(OBJDIR)/Concrete/CitcomSGlobalASCIIFile.o \
                                            $(OBJDIR)/Concrete/CitcomSCfgFileParser.o
+
+$(call PLUGINNAME,StructuredHexahedralTecplotASCIIFile): $(OBJDIR)/Concrete/TecplotASCIIFileHeaderParser.o \
+                                                         $(OBJDIR)/Concrete/StructuredHexahedralTecplotASCIIFile.o
+
+$(call PLUGINNAME,UnstructuredHexahedralTecplotASCIIFile): $(OBJDIR)/Concrete/TecplotASCIIFileHeaderParser.o \
+                                                           $(OBJDIR)/Concrete/UnstructuredHexahedralTecplotASCIIFile.o
 
 $(call PLUGINNAME,DicomImageStack): $(OBJDIR)/Concrete/DicomImageStack.o \
                                     $(OBJDIR)/Concrete/DicomImageFile.o

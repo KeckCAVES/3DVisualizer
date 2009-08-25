@@ -58,6 +58,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifdef VISUALIZER_USE_EMINEO
 #include <Collaboration/EmineoClient.h>
 #endif
+#include <Collaboration/GrapheinClient.h>
 #endif
 
 #include <Abstract/DataSetRenderer.h>
@@ -601,6 +602,9 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 						/* Register the Emineo protocol: */
 						collaborationClient->registerProtocol(new Collaboration::EmineoClient);
 						#endif
+						
+						/* Register the Graphein protocol: */
+						collaborationClient->registerProtocol(new Collaboration::GrapheinClient);
 						
 						/* Register a shared Visualizer plug-in: */
 						sharedVisualizationClient=new Collaboration::SharedVisualizationClient(this);

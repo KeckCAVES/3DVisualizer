@@ -25,13 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <string>
 #include <vector>
-#include <Threads/ASCIIFileReader.h>
+#include <Misc/ValueSource.h>
 
 namespace Visualization {
 
 namespace Concrete {
 
-class TecplotASCIIFileHeaderParser:public Threads::ASCIIFileReader
+class TecplotASCIIFileHeaderParser:public Misc::ValueSource
 	{
 	/* Embedded classes: */
 	public:
@@ -71,7 +71,7 @@ class TecplotASCIIFileHeaderParser:public Threads::ASCIIFileReader
 	
 	/* Constructors and destructors: */
 	public:
-	TecplotASCIIFileHeaderParser(const char* inputFileName); // Creates a parser for the given input file
+	TecplotASCIIFileHeaderParser(Misc::CharacterSource& source); // Creates a parser for the given character source
 	
 	/* Methods: */
 	std::string getTitle(void) const // Returns the file's title

@@ -36,15 +36,10 @@ Methods of class TecplotASCIIFileHeaderParser:
 
 bool TecplotASCIIFileHeaderParser::readEqual(void)
 	{
-	skipWs();
-	
 	/* Check for the equal sign: */
-	if(lastChar!='=')
+	if(peekc()!='=')
 		return false;
-	readNextChar();
-	
-	skipWs();
-	
+	skipString();
 	return true;
 	}
 
@@ -61,8 +56,7 @@ void TecplotASCIIFileHeaderParser::parseZone(void)
 	zoneNumElements=-1;
 	
 	/* Read tag/value pairs until end of line: */
-	skipWsLine();
-	while(lastChar>=0&&lastChar!='\n')
+	while(!eof()&&peekc()!='\n')
 		{
 		/* Read the tag: */
 		std::string tag=readString();
@@ -128,16 +122,14 @@ void TecplotASCIIFileHeaderParser::parseZone(void)
 				}
 			}
 		
-		skipWsLine();
-		if(lastChar==',')
+		if(peekc()==',')
 			{
 			/* Skip comma and whitespace, including newlines: */
-			readNextChar();
-			skipWs();
+			skipString();
+			while(peekc()=='\n')
+				skipString();
 			}
 		}
-	if(lastChar=='\n')
-		readNextChar();
 	
 	/* Check if the zone header is complete: */
 	if(zoneType==STRUCTURED)
@@ -154,28 +146,29 @@ void TecplotASCIIFileHeaderParser::parseZone(void)
 		}
 	}
 
-TecplotASCIIFileHeaderParser::TecplotASCIIFileHeaderParser(const char* inputFileName)
-	:Threads::ASCIIFileReader(inputFileName)
+TecplotASCIIFileHeaderParser::TecplotASCIIFileHeaderParser(Misc::CharacterSource& source)
+	:Misc::ValueSource(source)
 	{
 	/* Set the punctuation characters: */
-	setPunctuation(",=");
+	setPunctuation("#,=");
+	setQuotes("\"");
 	
 	/* Read the first zone header: */
+	skipWs();
 	if(!readNextZoneHeader())
-		Misc::throwStdErr("TecplotASCIIFileHeaderParser::TecplotASCIIFileHeaderParser: Malformed header in file %s",inputFileName);
+		Misc::throwStdErr("TecplotASCIIFileHeaderParser::TecplotASCIIFileHeaderParser: Malformed header in input file");
 	}
 
 bool TecplotASCIIFileHeaderParser::readNextZoneHeader(void)
 	{
+	/* Temporarily mark newlines as punctuation: */
+	setPunctuation('\n',true);
+	
 	/* Read lines from the file until the next ZONE keyword is encountered: */
-	while(true)
+	while(!eof())
 		{
-		skipWs();
-		if(lastChar<0)
-			break;
-		
-		/* Check for comment lines: */
-		if(lastChar!='#')
+		/* Check for comment or empty lines: */
+		if(peekc()!='#'&&peekc()!='\n')
 			{
 			/* Read a keyword: */
 			std::string keyword=readString();
@@ -197,12 +190,12 @@ bool TecplotASCIIFileHeaderParser::readNextZoneHeader(void)
 				/* Read all variables: */
 				variables.clear();
 				variables.push_back(readString());
-				skipWs();
-				while(lastChar==',')
+				while(peekc()==',')
 					{
-					/* Skip the comma and whitespace: */
-					readNextChar();
-					skipWs();
+					/* Skip the comma and whitespace including newlines: */
+					skipString();
+					while(peekc()=='\n')
+						skipString();
 					
 					/* Read the next variable name: */
 					variables.push_back(readString());
@@ -217,39 +210,29 @@ bool TecplotASCIIFileHeaderParser::readNextZoneHeader(void)
 			}
 		
 		skipLine();
+		skipWs();
 		}
 	
-	return lastChar>=0;
+	/* Mark newlines as whitespace again: */
+	setWhitespace('\n',true);
+	skipWs();
+	
+	return !eof();
 	}
 
 void TecplotASCIIFileHeaderParser::readDoubles(int numValues,const bool ignoreFlags[],double values[])
 	{
-	char valueBuffer[64];
 	for(int i=0;i<numValues;++i)
 		{
-		while(cc[lastChar]&WHITESPACE) // Breaks on non-space or EOF
-			readNextChar();
-		if(lastChar<0)
-			Misc::throwStdErr("Unexpected end of file");
-		
 		if(ignoreFlags[i])
 			{
 			/* Skip the value: */
-			while(cc[lastChar]&FLOATINGPOINT)
-				readNextChar();
+			skipString();
 			}
 		else
 			{
 			/* Read, parse, and store the value: */
-			char* valuePtr=valueBuffer;
-			while(cc[lastChar]&FLOATINGPOINT)
-				{
-				*valuePtr=lastChar;
-				++valuePtr;
-				readNextChar();
-				}
-			*valuePtr='\0';
-			values[i]=atof(valueBuffer);
+			values[i]=readNumber();
 			}
 		}
 	}

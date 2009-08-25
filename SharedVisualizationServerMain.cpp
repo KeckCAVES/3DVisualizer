@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Collaboration/CollaborationServer.h>
 #include <Collaboration/AgoraServer.h>
 #include <Collaboration/EmineoServer.h>
+#include <Collaboration/GrapheinServer.h>
 
 volatile bool runServerLoop=true;
 
@@ -82,6 +83,9 @@ int main(int argc,char* argv[])
 	
 	/* Add an Emineo protocol object: */
 	server.registerProtocol(new Collaboration::EmineoServer);
+	
+	/* Add a Graphein protocol object: */
+	server.registerProtocol(new Collaboration::GrapheinServer);
 	
 	/* Add a shared Visualizer protocol object: */
 	server.registerProtocol(new Collaboration::SharedVisualizationServer);
