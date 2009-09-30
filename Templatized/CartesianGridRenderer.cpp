@@ -1,7 +1,6 @@
 /***********************************************************************
-CartesianRenderer - Class to render cartesian data sets. Implemented
-as a specialization of the generic DataSetRenderer class.
-Copyright (c) 2005-2007 Oliver Kreylos
+CartesianGridRenderer - Helper class to render Cartesian grids.
+Copyright (c) 2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,35 +19,37 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#define VISUALIZATION_TEMPLATIZED_CARTESIANRENDERER_IMPLEMENTATION
+#define VISUALIZATION_TEMPLATIZED_CARTESIANGRIDRENDERER_IMPLEMENTATION
+
+#include <Templatized/CartesianGridRenderer.h>
 
 #include <Misc/ThrowStdErr.h>
+#include <GL/gl.h>
 #include <GL/GLGeometryWrappers.h>
-
-#include <Templatized/CartesianRenderer.h>
 
 namespace Visualization {
 
 namespace Templatized {
 
-namespace CartesianRendererImplementation {
+namespace CartesianGridRendererImplementation {
 
 /***********************************************************************
-Internal helper class to render cartesian grids of different dimensions:
+Internal helper class to render Cartesian grids of different dimensions:
 ***********************************************************************/
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <int dimensionParam,class DataSetParam>
 class GridRenderer
 	{
 	/* Dummy class; only dimension-specializations make sense */
 	};
 
-template <class ScalarParam,class ValueParam>
-class GridRenderer<ScalarParam,2,ValueParam>
+template <class DataSetParam>
+class GridRenderer<2,DataSetParam>
 	{
 	/* Embedded classes: */
 	public:
-	typedef Cartesian<ScalarParam,2,ValueParam> DataSet;
+	typedef DataSetParam DataSet;
+	typedef typename DataSet::Scalar Scalar;
 	typedef typename DataSet::Point Point;
 	typedef typename DataSet::Size Size;
 	typedef typename DataSet::Index Index;
@@ -60,7 +61,7 @@ class GridRenderer<ScalarParam,2,ValueParam>
 		/* Calculate total grid size: */
 		Size gridSize;
 		for(int i=0;i<2;++i)
-			gridSize[i]=cellSize[i]*ScalarParam(numCells[i]);
+			gridSize[i]=cellSize[i]*Scalar(numCells[i]);
 		
 		glBegin(GL_LINE_LOOP);
 		Point p=Point::origin;
@@ -96,21 +97,21 @@ class GridRenderer<ScalarParam,2,ValueParam>
 		glBegin(GL_LINES);
 		
 		/* Render grid lines along x direction: */
-		ScalarParam x0=ScalarParam(0);
-		ScalarParam x1=ScalarParam(numCells[0])*cellSize[0];
+		Scalar x0=Scalar(0);
+		Scalar x1=Scalar(numCells[0])*cellSize[0];
 		for(int y=0;y<=numCells[1];++y)
 			{
-			ScalarParam y0=ScalarParam(y)*cellSize[1];
+			Scalar y0=Scalar(y)*cellSize[1];
 			glVertex(x0,y0);
 			glVertex(x1,y0);
 			}
 		
 		/* Render grid lines along y direction: */
-		ScalarParam y0=ScalarParam(0);
-		ScalarParam y1=ScalarParam(numCells[1])*cellSize[1];
+		Scalar y0=Scalar(0);
+		Scalar y1=Scalar(numCells[1])*cellSize[1];
 		for(int x=0;x<=numCells[0];++x)
 			{
-			ScalarParam x0=ScalarParam(x)*cellSize[0];
+			Scalar x0=Scalar(x)*cellSize[0];
 			glVertex(x0,y0);
 			glVertex(x0,y1);
 			}
@@ -128,12 +129,13 @@ class GridRenderer<ScalarParam,2,ValueParam>
 		}
 	};
 
-template <class ScalarParam,class ValueParam>
-class GridRenderer<ScalarParam,3,ValueParam>
+template <class DataSetParam>
+class GridRenderer<3,DataSetParam>
 	{
 	/* Embedded classes: */
 	public:
-	typedef Cartesian<ScalarParam,3,ValueParam> DataSet;
+	typedef DataSetParam DataSet;
+	typedef typename DataSet::Scalar Scalar;
 	typedef typename DataSet::Point Point;
 	typedef typename DataSet::Size Size;
 	typedef typename DataSet::Index Index;
@@ -145,7 +147,7 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		/* Calculate total grid size: */
 		Size gridSize;
 		for(int i=0;i<3;++i)
-			gridSize[i]=cellSize[i]*ScalarParam(numCells[i]);
+			gridSize[i]=cellSize[i]*Scalar(numCells[i]);
 		
 		glBegin(GL_LINE_STRIP);
 		Point p=Point::origin;
@@ -189,7 +191,7 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		/* Calculate total grid size: */
 		Size gridSize;
 		for(int i=0;i<3;++i)
-			gridSize[i]=cellSize[i]*ScalarParam(numCells[i]);
+			gridSize[i]=cellSize[i]*Scalar(numCells[i]);
 		
 		/* Render grid outline first: */
 		renderGridOutline(cellSize,numCells);
@@ -198,7 +200,7 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		for(int z=1;z<numCells[2];++z)
 			{
 			glBegin(GL_LINE_LOOP);
-			Point p(ScalarParam(0),ScalarParam(0),cellSize[2]*ScalarParam(z));
+			Point p(Scalar(0),Scalar(0),cellSize[2]*Scalar(z));
 			glVertex(p);
 			p[0]+=gridSize[0];
 			glVertex(p);
@@ -213,7 +215,7 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		for(int y=1;y<numCells[1];++y)
 			{
 			glBegin(GL_LINE_LOOP);
-			Point p(ScalarParam(0),cellSize[1]*ScalarParam(y),ScalarParam(0));
+			Point p(Scalar(0),cellSize[1]*Scalar(y),Scalar(0));
 			glVertex(p);
 			p[0]+=gridSize[0];
 			glVertex(p);
@@ -228,7 +230,7 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		for(int x=1;x<numCells[0];++x)
 			{
 			glBegin(GL_LINE_LOOP);
-			Point p(cellSize[0]*ScalarParam(x),ScalarParam(0),ScalarParam(0));
+			Point p(cellSize[0]*Scalar(x),Scalar(0),Scalar(0));
 			glVertex(p);
 			p[1]+=gridSize[1];
 			glVertex(p);
@@ -244,7 +246,7 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		/* Calculate total grid size: */
 		Size gridSize;
 		for(int i=0;i<3;++i)
-			gridSize[i]=cellSize[i]*ScalarParam(numCells[i]);
+			gridSize[i]=cellSize[i]*Scalar(numCells[i]);
 		
 		glBegin(GL_LINES);
 		
@@ -252,7 +254,7 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		for(int y=0;y<=numCells[1];++y)
 			for(int z=0;z<=numCells[2];++z)
 				{
-				Point p(ScalarParam(0),cellSize[1]*ScalarParam(y),cellSize[2]*ScalarParam(z));
+				Point p(Scalar(0),cellSize[1]*Scalar(y),cellSize[2]*Scalar(z));
 				glVertex(p);
 				p[0]+=gridSize[0];
 				glVertex(p);
@@ -262,7 +264,7 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		for(int x=0;x<=numCells[0];++x)
 			for(int z=0;z<=numCells[2];++z)
 				{
-				Point p(cellSize[0]*ScalarParam(x),ScalarParam(0),cellSize[2]*ScalarParam(z));
+				Point p(cellSize[0]*Scalar(x),Scalar(0),cellSize[2]*Scalar(z));
 				glVertex(p);
 				p[1]+=gridSize[1];
 				glVertex(p);
@@ -272,7 +274,7 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		for(int x=0;x<=numCells[0];++x)
 			for(int y=0;y<=numCells[1];++y)
 				{
-				Point p(cellSize[0]*ScalarParam(x),cellSize[1]*ScalarParam(y),ScalarParam(0));
+				Point p(cellSize[0]*Scalar(x),cellSize[1]*Scalar(y),Scalar(0));
 				glVertex(p);
 				p[2]+=gridSize[2];
 				glVertex(p);
@@ -307,44 +309,36 @@ class GridRenderer<ScalarParam,3,ValueParam>
 
 }
 
-/*******************************************
-Methods of class DataSetRenderer<Cartesian>:
-*******************************************/
+/**************************************
+Methods of class CartesianGridRenderer:
+**************************************/
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
-DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::DataSetRenderer(
-	const typename DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::DataSet* sDataSet)
+CartesianGridRenderer<DataSetParam>::CartesianGridRenderer(
+	const typename CartesianGridRenderer<DataSetParam>::DataSet* sDataSet)
 	:dataSet(sDataSet),
 	 renderingModeIndex(0)
 	{
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
-inline
-DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::~DataSetRenderer(
-	void)
-	{
-	/* Nothing to do yet... */
-	}
-
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 int
-DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::getNumRenderingModes(
+CartesianGridRenderer<DataSetParam>::getNumRenderingModes(
 	void)
 	{
 	return 3;
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 const char*
-DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::getRenderingModeName(
+CartesianGridRenderer<DataSetParam>::getRenderingModeName(
 	int renderingModeIndex)
 	{
 	if(renderingModeIndex<0||renderingModeIndex>=3)
-		Misc::throwStdErr("DataSetRenderer::getRenderingModeName: invalid rendering mode index %d",renderingModeIndex);
+		Misc::throwStdErr("CartesianGridRenderer::getRenderingModeName: invalid rendering mode index %d",renderingModeIndex);
 	
 	static const char* renderingModeNames[3]=
 		{
@@ -354,52 +348,52 @@ DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::getRendering
 	return renderingModeNames[renderingModeIndex];
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 void
-DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::setRenderingMode(
+CartesianGridRenderer<DataSetParam>::setRenderingMode(
 	int newRenderingModeIndex)
 	{
-	if(renderingModeIndex<0||renderingModeIndex>=3)
-		Misc::throwStdErr("DataSetRenderer::setRenderingMode: invalid rendering mode index %d",newRenderingModeIndex);
+	if(newRenderingModeIndex<0||newRenderingModeIndex>=3)
+		Misc::throwStdErr("CartesianGridRenderer::setRenderingMode: invalid rendering mode index %d",newRenderingModeIndex);
 	
 	renderingModeIndex=newRenderingModeIndex;
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 void
-DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::glRenderAction(
+CartesianGridRenderer<DataSetParam>::glRenderAction(
 	GLContextData& contextData) const
 	{
 	switch(renderingModeIndex)
 		{
 		case 0:
 			/* Render the grid's outline: */
-			CartesianRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::renderGridOutline(dataSet->getCellSize(),dataSet->getNumCells());
+			CartesianGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::renderGridOutline(dataSet->getCellSize(),dataSet->getNumCells());
 			break;
 		
 		case 1:
 			/* Render the grid's faces: */
-			CartesianRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::renderGridFaces(dataSet->getCellSize(),dataSet->getNumCells());
+			CartesianGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::renderGridFaces(dataSet->getCellSize(),dataSet->getNumCells());
 			break;
 		
 		case 2:
 			/* Render the grid's cells: */
-			CartesianRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::renderGridCells(dataSet->getCellSize(),dataSet->getNumCells());
+			CartesianGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::renderGridCells(dataSet->getCellSize(),dataSet->getNumCells());
 			break;
 		}
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 void
-DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::renderCell(
-	const typename DataSetRenderer<Cartesian<ScalarParam,dimensionParam,ValueParam> >::CellID& cellID,
+CartesianGridRenderer<DataSetParam>::renderCell(
+	const typename CartesianGridRenderer<DataSetParam>::CellID& cellID,
 	GLContextData& contextData) const
 	{
 	/* Highlight the cell: */
-	CartesianRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::highlightCell(dataSet->getCell(cellID));
+	CartesianGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::highlightCell(dataSet->getCell(cellID));
 	}
 
 }

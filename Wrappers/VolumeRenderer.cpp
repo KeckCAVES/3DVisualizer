@@ -24,11 +24,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_WRAPPERS_VOLUMERENDERER_IMPLEMENTATION
 
-#include <Geometry/Vector.h>
+#include <Wrappers/VolumeRenderer.h>
+
+#include <Misc/ThrowStdErr.h>
+#ifndef VISUALIZATION_USE_SHADERS
 #include <Geometry/HVector.h>
 #include <Geometry/ProjectiveTransformation.h>
 #include <GL/gl.h>
 #include <GL/GLTransformationWrappers.h>
+#endif
 #include <GLMotif/StyleSheet.h>
 #include <GLMotif/WidgetManager.h>
 #include <GLMotif/PopupWindow.h>
@@ -36,9 +40,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/Label.h>
 #include <GLMotif/TextField.h>
 
+#include <Templatized/VolumeRenderingSampler.h>
 #include <Wrappers/VolumeRendererExtractor.h>
 
-#include <Wrappers/VolumeRenderer.h>
+#ifdef VISUALIZATION_USE_SHADERS
+#include <SingleChannelRaycaster.h>
+#else
+#include <PaletteRenderer.h>
+#endif
 
 namespace Visualization {
 
@@ -51,22 +60,91 @@ Methods of class VolumeRenderer:
 template <class DataSetWrapperParam>
 inline
 VolumeRenderer<DataSetWrapperParam>::VolumeRenderer(
-	Visualization::Abstract::Parameters* sParameters,
-	typename VolumeRenderer<DataSetWrapperParam>::Scalar sSliceFactor,
-	float sTransparencyGamma,
-	const typename VolumeRenderer<DataSetWrapperParam>::DS* sDs,
-	const typename VolumeRenderer<DataSetWrapperParam>::SE& sSe,
-	const GLColorMap* sColorMap,
-	Comm::MulticastPipe* pipe)
+	Visualization::Abstract::Algorithm* algorithm,
+	Visualization::Abstract::Parameters* sParameters)
 	:Visualization::Abstract::Element(sParameters),
-	 sliceFactor(sSliceFactor),transparencyGamma(sTransparencyGamma),
-	 svr(sDs,sSe,sColorMap,pipe),
-	 sliceFactorValue(0),sliceFactorSlider(0),
-	 transparencyGammaValue(0),transparencyGammaSlider(0)
+	 #ifndef VISUALIZATION_USE_SHADERS
+	 colorMap(0),
+	 #endif
+	 renderer(0),
+	 sliceFactorValue(0),sliceFactorSlider(0),transparencyGammaValue(0),transparencyGammaSlider(0)
 	{
-	/* Set the templatized volume renderer's parameters: */
-	svr.setSliceFactor(sliceFactor);
-	svr.setTransparencyGamma(transparencyGamma);
+	/* Get proper pointers to the algorithm and parameter objects: */
+	typedef VolumeRendererExtractor<DataSetWrapper> MyAlgorithm;
+	typedef typename MyAlgorithm::Parameters MyParameters;
+	MyAlgorithm* myAlgorithm=dynamic_cast<MyAlgorithm*>(algorithm);
+	if(myAlgorithm==0)
+		Misc::throwStdErr("VolumeRenderer: Mismatching algorithm object type");
+	MyParameters* myParameters=dynamic_cast<MyParameters*>(getParameters());
+	if(myParameters==0)
+		Misc::throwStdErr("VolumeRenderer: Mismatching parameter object type");
+	
+	/* Get a reference to the templatized data set: */
+	Visualization::Abstract::VariableManager* variableManager=algorithm->getVariableManager();
+	const Visualization::Abstract::DataSet* dataSet=variableManager->getDataSetByScalarVariable(myParameters->scalarVariableIndex);
+	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(dataSet);
+	if(myDataSet==0)
+		Misc::throwStdErr("VolumeRenderer: Mismatching data set type");
+	const DS& ds=myDataSet->getDs();
+	
+	/* Get a scalar extractor for the scalar variable: */
+	int svi=myParameters->scalarVariableIndex;
+	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(variableManager->getScalarExtractor(svi));
+	if(myScalarExtractor==0)
+		Misc::throwStdErr("VolumeRenderer: Mismatching scalar extractor type");
+	const SE& se=myScalarExtractor->getSe();
+
+	/* Create a volume rendering sampler: */
+	Visualization::Templatized::VolumeRenderingSampler<DS> sampler(ds);
+	
+	#ifdef VISUALIZATION_USE_SHADERS
+	
+	/* Initialize the raycaster: */
+	renderer=new SingleChannelRaycaster(sampler.getSamplerSize(),ds.getDomainBox());
+	
+	/* Sample the scalar variable: */
+	sampler.sample(se,renderer->getData(),renderer->getDataStrides(),algorithm->getPipe(),100.0f,0.0f,algorithm);
+	
+	renderer->updateData();
+	
+	/* Set the raycaster's parameters: */
+	renderer->setColorMap(variableManager->getColorMap(svi));
+	renderer->setTransparencyGamma(myParameters->transparencyGamma);
+	renderer->setStepSize(myParameters->sliceFactor);
+	
+	#else
+	
+	/* Initialize the slice-based volume renderer: */
+	renderer=new PaletteRenderer;
+	
+	/* Create a voxel block: */
+	int samplerSize[3];
+	for(int i=0;i<3;++i)
+		samplerSize[i]=int(sampler.getSamplerSize()[i]);
+	PaletteRenderer::Voxel* voxels;
+	int increments[3];
+	voxels=renderer->createVoxelBlock(samplerSize,0,PaletteRenderer::VERTEX_CENTERED,increments);
+	
+	/* Upload the data set's scalar values into the raycaster: */
+	ptrdiff_t dataStrides[3];
+	for(int i=0;i<3;++i)
+		dataStrides[i]=increments[i];
+	sampler.sample(se,voxels,dataStrides,algorithm->getPipe(),100.0f,0.0f,algorithm);
+	renderer->finishVoxelBlock();
+	
+	/* Set the renderer's model space position and size: */
+	renderer->setPosition(ds.getDomainBox().getOrigin(),ds.getDomainBox().getSize());
+	
+	/* Initialize volume renderer settings: */
+	// renderer->setUseNPOTDTextures(true);
+	renderer->setRenderingMode(PaletteRenderer::VIEW_PERPENDICULAR);
+	renderer->setInterpolationMode(PaletteRenderer::LINEAR);
+	renderer->setTextureFunction(PaletteRenderer::REPLACE);
+	renderer->setSliceFactor(myParameters->sliceFactor);
+	renderer->setAutosaveGLState(true);
+	renderer->setTextureCaching(true);
+	renderer->setSharePalette(false);
+	#endif
 	}
 
 template <class DataSetWrapperParam>
@@ -74,6 +152,36 @@ inline
 VolumeRenderer<DataSetWrapperParam>::~VolumeRenderer(
 	void)
 	{
+	/* Destroy the volume renderer: */
+	delete renderer;
+	}
+
+template <class DataSetWrapperParam>
+inline
+std::string
+VolumeRenderer<DataSetWrapperParam>::getName(
+	void) const
+	{
+	return "Volume Renderer";
+	}
+
+template <class DataSetWrapperParam>
+inline
+size_t
+VolumeRenderer<DataSetWrapperParam>::getSize(
+	void) const
+	{
+	#ifdef VISUALIZATION_USE_SHADERS
+	
+	/* Return the number of cells in the raycaster: */
+	return size_t(renderer->getDataSize(0)-1)*size_t(renderer->getDataSize(1)-1)*size_t(renderer->getDataSize(2)-1);
+	
+	#else
+	
+	/* Return number of cells in volume renderer: */
+	return size_t(renderer->getNumCells(0))*size_t(renderer->getNumCells(1))*size_t(renderer->getNumCells(2));
+	
+	#endif
 	}
 
 template <class DataSetWrapperParam>
@@ -95,27 +203,37 @@ VolumeRenderer<DataSetWrapperParam>::createSettingsDialog(
 	/* Create a slider/textfield combo to change the slice factor: */
 	new GLMotif::Label("SliceFactorLabel",settingsDialog,"Slice Factor");
 	
+	#ifdef VISUALIZATION_USE_SHADERS
+	double sliceFactor=renderer->getStepSize();
+	#else
+	double sliceFactor=renderer->getSliceFactor();
+	#endif
+	
 	sliceFactorValue=new GLMotif::TextField("SliceFactorValue",settingsDialog,5);
 	sliceFactorValue->setPrecision(3);
 	sliceFactorValue->setFloatFormat(GLMotif::TextField::FIXED);
-	sliceFactorValue->setValue(double(sliceFactor));
+	sliceFactorValue->setValue(sliceFactor);
 	
 	sliceFactorSlider=new GLMotif::Slider("SliceFactorSlider",settingsDialog,GLMotif::Slider::HORIZONTAL,ss->fontHeight*10.0f);
 	sliceFactorSlider->setValueRange(0.25,4.0,0.05);
-	sliceFactorSlider->setValue(double(sliceFactor));
+	sliceFactorSlider->setValue(sliceFactor);
 	sliceFactorSlider->getValueChangedCallbacks().add(this,&VolumeRenderer::sliderValueChangedCallback);
 	
 	/* Create a slider/textfield combo to change the transparency gamma factor: */
 	new GLMotif::Label("TransparencyGammaLabel",settingsDialog,"Transparency Gamma");
 	
+	#ifdef VISUALIZATION_USE_SHADERS
+	float transparencyGamma=renderer->getTransparencyGamma();
+	#endif
+	
 	transparencyGammaValue=new GLMotif::TextField("TransparencyGammaValue",settingsDialog,5);
 	transparencyGammaValue->setPrecision(3);
 	transparencyGammaValue->setFloatFormat(GLMotif::TextField::FIXED);
-	transparencyGammaValue->setValue(double(transparencyGamma));
+	transparencyGammaValue->setValue(transparencyGamma);
 	
 	transparencyGammaSlider=new GLMotif::Slider("TransparencyGammaSlider",settingsDialog,GLMotif::Slider::HORIZONTAL,ss->fontHeight*10.0f);
 	transparencyGammaSlider->setValueRange(0.125,8.0,0.025);
-	transparencyGammaSlider->setValue(double(transparencyGamma));
+	transparencyGammaSlider->setValue(transparencyGamma);
 	transparencyGammaSlider->getValueChangedCallbacks().add(this,&VolumeRenderer::sliderValueChangedCallback);
 	
 	settingsDialog->manageChild();
@@ -125,43 +243,51 @@ VolumeRenderer<DataSetWrapperParam>::createSettingsDialog(
 
 template <class DataSetWrapperParam>
 inline
-std::string
-VolumeRenderer<DataSetWrapperParam>::getName(
-	void) const
-	{
-	return "Volume Renderer";
-	}
-
-template <class DataSetWrapperParam>
-inline
-size_t
-VolumeRenderer<DataSetWrapperParam>::getSize(
-	void) const
-	{
-	return svr.getSize();
-	}
-
-template <class DataSetWrapperParam>
-inline
 void
 VolumeRenderer<DataSetWrapperParam>::glRenderAction(
 	GLContextData& contextData) const
 	{
+	#ifdef VISUALIZATION_USE_SHADERS
+	
+	/* Render the raycaster: */
+	renderer->glRenderAction(contextData);
+	
+	#else
+	
 	/* Calculate the view direction: */
-	typedef typename SVR::Scalar Scalar;
-	typedef Geometry::ProjectiveTransformation<Scalar,3> PTransform;
-	typedef Geometry::HVector<Scalar,3> HVector;
+	typedef typename PaletteRenderer::Scalar PRScalar;
+	typedef Geometry::ProjectiveTransformation<PRScalar,3> PTransform;
+	typedef Geometry::HVector<PRScalar,3> HVector;
 	
 	/* Retrieve the viewing direction in model coordinates: */
-	PTransform pmv=glGetMatrix<Scalar>(GLMatrixEnums::PROJECTION);
-	pmv*=glGetMatrix<Scalar>(GLMatrixEnums::MODELVIEW);
+	PTransform pmv=glGetMatrix<PRScalar>(GLMatrixEnums::PROJECTION);
+	pmv*=glGetMatrix<PRScalar>(GLMatrixEnums::MODELVIEW);
 	HVector x=pmv.inverseTransform(HVector(1,0,0,0));
 	HVector y=pmv.inverseTransform(HVector(0,1,0,0));
-	typename SVR::Vector viewDirection=Geometry::cross(y.toVector(),x.toVector());
+	typename PaletteRenderer::Vector viewDirection=Geometry::cross(y.toVector(),x.toVector());
 	viewDirection.normalize();
 	
+	/* Set up OpenGL state: */
+	GLboolean alphaTestEnabled=glIsEnabled(GL_ALPHA_TEST);
+	if(!alphaTestEnabled)
+		glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER,0.0f);
+	
+	/* Process the color map: */
+	GLColorMap privateColorMap(*colorMap);
+	privateColorMap.changeTransparency(float(renderer->getSliceFactor())*transparencyGamma);
+	privateColorMap.premultiplyAlpha();
+	
 	/* Render the volume: */
-	svr.renderVolume(SVR::Point::origin,viewDirection,contextData);
+	renderer->setSliceCenter(PaletteRenderer::Point::origin);
+	renderer->setColorMap(&privateColorMap);
+	renderer->renderBlock(contextData,viewDirection);
+	
+	/* Reset OpenGL state: */
+	if(!alphaTestEnabled)
+		glDisable(GL_ALPHA_TEST);
+	
+	#endif
 	}
 
 template <class DataSetWrapperParam>
@@ -178,22 +304,28 @@ VolumeRenderer<DataSetWrapperParam>::sliderValueChangedCallback(
 	if(cbData->slider==sliceFactorSlider)
 		{
 		/* Change the slice factor: */
-		sliceFactor=Scalar(cbData->value);
-		myParameters->sliceFactor=sliceFactor;
-		svr.setSliceFactor(sliceFactor);
+		myParameters->sliceFactor=Scalar(cbData->value);
+		#ifdef VISUALIZATION_USE_SHADERS
+		renderer->setStepSize(Raycaster::Scalar(cbData->value));
+		#else
+		renderer->setSliceFactor(PaletteRenderer::Scalar(cbData->value));
+		#endif
 		
 		/* Update the slice factor value text field: */
-		sliceFactorValue->setValue(double(sliceFactor));
+		sliceFactorValue->setValue(cbData->value);
 		}
 	else if(cbData->slider==transparencyGammaSlider)
 		{
 		/* Change the transparency gamma factor: */
+		myParameters->transparencyGamma=float(cbData->value);
+		#ifdef VISUALIZATION_USE_SHADERS
+		renderer->setTransparencyGamma(float(cbData->value));
+		#else
 		transparencyGamma=float(cbData->value);
-		myParameters->transparencyGamma=transparencyGamma;
-		svr.setTransparencyGamma(transparencyGamma);
+		#endif
 		
 		/* Update the transparency gamma value label: */
-		transparencyGammaValue->setValue(double(transparencyGamma));
+		transparencyGammaValue->setValue(cbData->value);
 		}
 	}
 

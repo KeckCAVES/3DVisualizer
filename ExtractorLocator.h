@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 namespace GLMotif {
 class Widget;
 class PopupWindow;
+class Label;
 }
 
 class ExtractorLocator:public BaseLocator,public Extractor
@@ -45,12 +46,14 @@ class ExtractorLocator:public BaseLocator,public Extractor
 	private:
 	GLMotif::Widget* settingsDialog; // The element extractor's settings dialog
 	GLMotif::PopupWindow* busyDialog; // Dialog window to show while a non-incremental extractor is busy
+	GLMotif::Label* percentageLabel; // Label to display completion percentage in the busy dialog
 	Locator* locator; // A locator for the visualization algorithm
 	bool dragging; // Flag if the tool's button is currently pressed
 	unsigned int lastSeedRequestID; // ID used to identify the last issued seed request
 	
 	/* Private methods: */
 	GLMotif::PopupWindow* createBusyDialog(const char* algorithmName); // Creates the busy dialog
+	void busyFunction(float completionPercentage); // Called during long-running operations
 	
 	/* Constructors and destructors: */
 	public:

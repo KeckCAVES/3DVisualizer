@@ -23,7 +23,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_SLICEDVECTOREXTRACTOR_INCLUDED
 #define VISUALIZATION_SLICEDVECTOREXTRACTOR_INCLUDED
 
+#include <stddef.h>
 #include <Geometry/Vector.h>
+
+#include <Templatized/SlicedDataValue.h>
 
 /* Forward declarations: */
 namespace Visualization {
@@ -62,7 +65,7 @@ class VectorExtractor<VectorParam,SlicedDataValue<SourceValueScalarParam> >
 		{
 		valueArrays[sliceIndex]=sValueArray;
 		}
-	DestValue getValue(int linearIndex) const // Extracts vector from given linear index in all slice value arrays
+	DestValue getValue(ptrdiff_t linearIndex) const // Extracts vector from given linear index in all slice value arrays
 		{
 		DestValue result;
 		for(int i=0;i<dimension;++i)

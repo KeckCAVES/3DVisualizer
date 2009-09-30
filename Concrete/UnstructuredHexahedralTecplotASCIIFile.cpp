@@ -253,7 +253,7 @@ Visualization::Abstract::DataSet* UnstructuredHexahedralTecplotASCIIFile::load(c
 		for(int i=0;i<parser.getZoneNumElements();++i)
 			{
 			/* Parse the line: */
-			int indexBuffer[8];
+			int indexBuffer[8]={-1,-1,-1,-1,-1,-1,-1,-1};
 			try
 				{
 				for(int i=0;i<8;++i)

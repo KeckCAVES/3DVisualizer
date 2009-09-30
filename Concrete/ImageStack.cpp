@@ -20,7 +20,10 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/ImageStack.h>
+
 #include <ctype.h>
+#include <string.h>
 #include <stdio.h>
 #include <iostream>
 #include <iomanip>
@@ -31,8 +34,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Math/Math.h>
 #include <Images/RGBImage.h>
 #include <Images/ReadImageFile.h>
-
-#include <Concrete/ImageStack.h>
 
 namespace Visualization {
 

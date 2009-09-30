@@ -99,7 +99,7 @@ class SlicedCurvilinear
 		template <class ValueExtractorParam>
 		typename ValueExtractorParam::DestValue getValue(const ValueExtractorParam& extractor) const // Returns vertex' value based on given extractor
 			{
-			return extractor.getValue(ds->grid.calcLinearIndex(index));
+			return extractor.getValue(ds->numVertices.calcOffset(index));
 			}
 		template <class ScalarExtractorParam>
 		Vector calcGradient(const ScalarExtractorParam& extractor) const // Returns gradient at the vertex, based on given scalar extractor
@@ -108,7 +108,7 @@ class SlicedCurvilinear
 			}
 		VertexID getID(void) const // Returns vertex' ID
 			{
-			return VertexID(VertexID::Index(ds->grid.calcLinearIndex(index)));
+			return VertexID(VertexID::Index(ds->numVertices.calcOffset(index)));
 			}
 		
 		/* Iterator methods: */
@@ -144,7 +144,7 @@ class SlicedCurvilinear
 		private:
 		const SlicedCurvilinear* ds; // Pointer to the data set containing the cell
 		Index index; // Array index of cell's base vertex in data set storage
-		int baseVertexIndex; // Linear index of cell's base vertex in data set storage (grid and value slices)
+		ptrdiff_t baseVertexIndex; // Linear index of cell's base vertex in data set storage (grid and value slices)
 		
 		/* Constructors and destructors: */
 		public:
@@ -158,7 +158,7 @@ class SlicedCurvilinear
 			{
 			}
 		Cell(const SlicedCurvilinear* sDs,const Index& sIndex)
-			:ds(sDs),index(sIndex),baseVertexIndex(ds->grid.calcLinearIndex(index))
+			:ds(sDs),index(sIndex),baseVertexIndex(ds->numVertices.calcOffset(index))
 			{
 			}
 		
@@ -357,7 +357,7 @@ class SlicedCurvilinear
 		}
 	Vertex getVertex(const VertexID& vertexID) const // Returns vertex of given valid ID
 		{
-		return Vertex(this,grid.calcIndex(vertexID.getIndex()));
+		return Vertex(this,numVertices.calcIndex(vertexID.getIndex()));
 		}
 	const VertexIterator& beginVertices(void) const // Returns iterator to first vertex in the data set
 		{
@@ -373,7 +373,7 @@ class SlicedCurvilinear
 		}
 	Cell getCell(const CellID& cellID) const // Return cell of given valid ID
 		{
-		return Cell(this,grid.calcIndex(cellID.getIndex()));
+		return Cell(this,numVertices.calcIndex(cellID.getIndex()));
 		}
 	const CellIterator& beginCells(void) const // Returns iterator to first cell in the data set
 		{

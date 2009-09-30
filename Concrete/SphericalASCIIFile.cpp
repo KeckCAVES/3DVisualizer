@@ -206,10 +206,12 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 	/* Open the data file: */
 	Threads::GzippedFileCharacterSource dataFile(dataFileName);
 	Misc::ValueSource reader(dataFile);
+	reader.setPunctuation('\n',true);
 	
 	/* Skip the data file header: */
 	for(int i=0;i<numHeaderLines;++i)
 		reader.skipLine();
+	reader.skipWs();
 	
 	/* Create and initialize the result data set: */
 	Misc::SelfDestructPointer<EarthDataSet<DataSet> > result(new EarthDataSet<DataSet>(args));
@@ -287,6 +289,7 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 				for(int i=0;i<=maxColumnIndex;++i)
 					columns[i]=reader.readNumber();
 				reader.skipLine();
+				reader.skipWs();
 				
 				/* Get the vertex' linear index: */
 				int linearIndex=grid.calcLinearIndex(index);

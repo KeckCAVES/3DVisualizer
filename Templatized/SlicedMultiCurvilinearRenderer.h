@@ -28,56 +28,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Templatized/DataSetRenderer.h>
 #include <Templatized/SlicedMultiCurvilinear.h>
-
-/* Forward declarations: */
-class GLContextData;
+#include <Templatized/MultiCurvilinearGridRenderer.h>
 
 namespace Visualization {
 
 namespace Templatized {
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
-class DataSetRenderer<SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> >
+class DataSetRenderer<SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> >:public MultiCurvilinearGridRenderer<SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> >
 	{
-	/* Embedded classes: */
-	public:
-	typedef SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> DataSet; // Type of rendered data set
-	typedef typename DataSet::Scalar Scalar; // Scalar type of data set's domain
-	static const int dimension=dimensionParam; // Dimension of data set's domain
-	typedef typename DataSet::Point Point; // Type for points in data set's domain
-	typedef typename DataSet::Vector Vector; // Type for vectors in data set's domain
-	typedef typename DataSet::Box Box; // Type for axis-aligned boxes in data set's domain
-	typedef typename DataSet::CellID CellID; // Type for cell IDs in data set
-	typedef typename DataSet::Cell Cell; // Type for cells in data set
-	
-	/* Elements: */
-	private:
-	const DataSet* dataSet; // Pointer to the data set to be rendered
-	int renderingModeIndex; // Index of currently selected rendering mode
-	
 	/* Constructors and destructors: */
 	public:
-	DataSetRenderer(const DataSet* sDataSet); // Creates a renderer for the given data set
-	~DataSetRenderer(void);
-	
-	/* Methods: */
-	static int getNumRenderingModes(void); // Returns the number of supported rendering modes
-	static const char* getRenderingModeName(int renderingModeIndex); // Returns name of given rendering mode
-	int getRenderingMode(void) const // Returns the current rendering mode
+	DataSetRenderer(const SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>* sDataSet) // Creates a renderer for the given data set
+		:MultiCurvilinearGridRenderer<SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> >(sDataSet)
 		{
-		return renderingModeIndex;
 		}
-	void setRenderingMode(int newRenderingModeIndex); // Sets a new rendering mode
-	void glRenderAction(GLContextData& contextData) const; // Renders the data set
-	void renderCell(const CellID& cellID,GLContextData& contextData) const; // Highlights the given cell
 	};
 
 }
 
 }
-
-#ifndef VISUALIZATION_TEMPLATIZED_SLICEDMULTICURVILINEARRENDERER_IMPLEMENTATION
-#include <Templatized/SlicedMultiCurvilinearRenderer.cpp>
-#endif
 
 #endif

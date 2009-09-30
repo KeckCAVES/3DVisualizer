@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_ABSTRACT_ALGORITHM_INCLUDED
 #define VISUALIZATION_ABSTRACT_ALGORITHM_INCLUDED
 
+#include <Misc/FunctionCalls.h>
+
 #include <Abstract/DataSet.h>
 
 /* Forward declarations: */
@@ -52,11 +54,16 @@ namespace Abstract {
 
 class Algorithm
 	{
+	/* Embedded classes: */
+	public:
+	typedef Misc::FunctionCall<float> BusyFunction; // Type for functions called during long-running operations
+	
 	/* Elements: */
 	private:
 	VariableManager* variableManager; // Pointer to the variable manager containing the source data set and variables for this algorithm
 	Comm::MulticastPipe* pipe; // Multicast pipe to synchronize element extraction in a cluster-based environment; created externally but owned by Algorithm object
 	bool master; // Flag if this instance of the algorithm runs on the master node of a visualization cluster
+	BusyFunction* busyFunction; // Function called at regular intervals during a long-running operation
 	
 	/* Constructors and destructors: */
 	public:
@@ -79,6 +86,12 @@ class Algorithm
 	bool isMaster(void) const // Returns the master flag
 		{
 		return master;
+		}
+	void setBusyFunction(BusyFunction* newBusyFunction); // Sets the busy function; object inherits function call object
+	void callBusyFunction(float completionPercentage) // Calls the busy function with a new percentage value
+		{
+		if(busyFunction!=0)
+			(*busyFunction)(completionPercentage);
 		}
 	virtual const char* getName(void) const =0; // Returns the algorithm's name
 	virtual bool hasGlobalCreator(void) const; // Returns true if the algorithm has a global creation method

@@ -1,8 +1,7 @@
 /***********************************************************************
-MultiCurvilinearRenderer - Class to render multi-grid curvilinear data
-sets. Implemented as a specialization of the generic DataSetRenderer
-class.
-Copyright (c) 2007 Oliver Kreylos
+MultiCurvilinearGridRenderer - Helper class to render multi-curvilinear
+grids.
+Copyright (c) 2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -21,39 +20,41 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#define VISUALIZATION_TEMPLATIZED_MULTICURVILINEARRENDERER_IMPLEMENTATION
+#define VISUALIZATION_TEMPLATIZED_MULTICURVILINEARGRIDRENDERER_IMPLEMENTATION
+
+#include <Templatized/MultiCurvilinearGridRenderer.h>
 
 #include <Misc/ThrowStdErr.h>
-#include <GL/GLContextData.h>
+#include <GL/gl.h>
 #include <GL/GLGeometryWrappers.h>
-
-#include <Templatized/MultiCurvilinearRenderer.h>
 
 namespace Visualization {
 
 namespace Templatized {
 
-namespace MultiCurvilinearRendererImplementation {
+namespace MultiCurvilinearGridRendererImplementation {
 
-/*************************************************************************
-Internal helper class to render curvilinear grids of different dimensions:
-*************************************************************************/
+/*******************************************************************************
+Internal helper class to render multi-curvilinear grids of different dimensions:
+*******************************************************************************/
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <int dimensionParam,class DataSetParam>
 class GridRenderer
 	{
 	/* Dummy class; only dimension-specializations make sense */
 	};
 
-template <class ScalarParam,class ValueParam>
-class GridRenderer<ScalarParam,2,ValueParam>
+template <class DataSetParam>
+class GridRenderer<2,DataSetParam>
 	{
 	/* Embedded classes: */
 	public:
-	typedef MultiCurvilinear<ScalarParam,2,ValueParam> DataSet;
+	typedef DataSetParam DataSet;
+	typedef typename DataSet::Scalar Scalar;
+	typedef typename DataSet::Point Point;
 	typedef typename DataSet::Box Box;
-	typedef typename DataSet::Array Array;
 	typedef typename DataSet::Index Index;
+	typedef typename DataSet::Grid Grid;
 	typedef typename DataSet::Cell Cell;
 	
 	/* Methods: */
@@ -66,49 +67,36 @@ class GridRenderer<ScalarParam,2,ValueParam>
 		glVertex(box.getVertex(2));
 		glEnd();
 		}
-	inline static void renderGridOutline(const Array& vertices)
+	inline static void renderGridOutline(const Grid& grid)
 		{
-		/* Get vertex array size: */
-		const Index& numVertices=vertices.getSize();
-		
+		const Index& numVertices=grid.getNumVertices();
 		Index index;
 		
 		/* Render grid's outline: */
-		glBegin(GL_LINE_STRIP);
+		glBegin(GL_LINE_LOOP);
 		index[1]=0;
-		for(index[0]=0;index[0]<numVertices[0];++index[0])
-			glVertex(vertices(index).pos);
-		glEnd();
-		glBegin(GL_LINE_STRIP);
-		index[1]=numVertices[1]-1;
-		for(index[0]=0;index[0]<numVertices[0];++index[0])
-			glVertex(vertices(index).pos);
-		glEnd();
-		glBegin(GL_LINE_STRIP);
-		index[0]=0;
-		for(index[1]=0;index[1]<numVertices[1];++index[1])
-			glVertex(vertices(index).pos);
-		glEnd();
-		glBegin(GL_LINE_STRIP);
-		index[0]=numVertices[0]-1;
-		for(index[1]=0;index[1]<numVertices[1];++index[1])
-			glVertex(vertices(index).pos);
+		for(index[0]=0;index[0]<numVertices[0]-1;++index[0])
+			glVertex(grid.getVertexPosition(index));
+		for(index[1]=0;index[1]<numVertices[1]-1;++index[1])
+			glVertex(grid.getVertexPosition(index));
+		for(index[0]=numVertices[0]-1;index[0]>0;--index[0])
+			glVertex(grid.getVertexPosition(index));
+		for(index[1]=numVertices[1]-1;index[1]>0;--index[1])
+			glVertex(grid.getVertexPosition(index));
 		glEnd();
 		}
-	inline static void renderGridFaces(const Array& vertices,int faceMask)
+	inline static void renderGridFaces(const Grid& grid,int faceMask)
 		{
-		/* Get vertex array size: */
-		const Index& numVertices=vertices.getSize();
-		
+		const Index& numVertices=grid.getNumVertices();
 		Index index;
 		
-		/* Render grid's faces: */
+		/* Render each marked face: */
 		if(faceMask&0x1)
 			{
 			glBegin(GL_LINE_STRIP);
 			index[0]=0;
 			for(index[1]=0;index[1]<numVertices[1];++index[1])
-				glVertex(vertices(index).pos);
+				glVertex(grid.getVertexPosition(index));
 			glEnd();
 			}
 		if(faceMask&0x2)
@@ -116,7 +104,7 @@ class GridRenderer<ScalarParam,2,ValueParam>
 			glBegin(GL_LINE_STRIP);
 			index[0]=numVertices[0]-1;
 			for(index[1]=0;index[1]<numVertices[1];++index[1])
-				glVertex(vertices(index).pos);
+				glVertex(grid.getVertexPosition(index));
 			glEnd();
 			}
 		if(faceMask&0x4)
@@ -124,7 +112,7 @@ class GridRenderer<ScalarParam,2,ValueParam>
 			glBegin(GL_LINE_STRIP);
 			index[1]=0;
 			for(index[0]=0;index[0]<numVertices[0];++index[0])
-				glVertex(vertices(index).pos);
+				glVertex(grid.getVertexPosition(index));
 			glEnd();
 			}
 		if(faceMask&0x8)
@@ -132,15 +120,13 @@ class GridRenderer<ScalarParam,2,ValueParam>
 			glBegin(GL_LINE_STRIP);
 			index[1]=numVertices[1]-1;
 			for(index[0]=0;index[0]<numVertices[0];++index[0])
-				glVertex(vertices(index).pos);
+				glVertex(grid.getVertexPosition(index));
 			glEnd();
 			}
 		}
-	inline static void renderGridCells(const Array& vertices)
+	inline static void renderGridCells(const Grid& grid)
 		{
-		/* Get vertex array size: */
-		const Index& numVertices=vertices.getSize();
-		
+		const Index& numVertices=grid.getNumVertices();
 		Index index;
 		
 		/* Render grid lines along y direction: */
@@ -164,23 +150,25 @@ class GridRenderer<ScalarParam,2,ValueParam>
 	inline static void highlightCell(const Cell& cell)
 		{
 		glBegin(GL_LINE_LOOP);
-		glVertex(cell.getVertexPosition(0));
-		glVertex(cell.getVertexPosition(1));
-		glVertex(cell.getVertexPosition(3));
-		glVertex(cell.getVertexPosition(2));
+		glVertex(cell.getVertexPos(0));
+		glVertex(cell.getVertexPos(1));
+		glVertex(cell.getVertexPos(3));
+		glVertex(cell.getVertexPos(2));
 		glEnd();
 		}
 	};
 
-template <class ScalarParam,class ValueParam>
-class GridRenderer<ScalarParam,3,ValueParam>
+template <class DataSetParam>
+class GridRenderer<3,DataSetParam>
 	{
 	/* Embedded classes: */
 	public:
-	typedef MultiCurvilinear<ScalarParam,3,ValueParam> DataSet;
+	typedef DataSetParam DataSet;
+	typedef typename DataSet::Scalar Scalar;
+	typedef typename DataSet::Point Point;
 	typedef typename DataSet::Box Box;
-	typedef typename DataSet::Array Array;
 	typedef typename DataSet::Index Index;
+	typedef typename DataSet::Grid Grid;
 	typedef typename DataSet::Cell Cell;
 	
 	/* Methods: */
@@ -207,43 +195,50 @@ class GridRenderer<ScalarParam,3,ValueParam>
 		glVertex(box.getVertex(6));
 		glEnd();
 		}
-	inline static void renderGridLine(const Array& vertices,const Index& startIndex,int axis)
+	inline static void renderGridLine(const Grid& grid,const Index& startIndex,int axis)
 		{
-		/* Get pointer to first grid vertex: */
-		const typename DataSet::GridVertex* vPtr=vertices.getAddress(startIndex);
-		int numVertices=vertices.getSize(axis);
-		int stride=vertices.getIncrement(axis);
-		
 		/* Render grid line: */
 		glBegin(GL_LINE_STRIP);
-		for(int i=0;i<numVertices;++i,vPtr+=stride)
-			glVertex(vPtr->pos);
+		Index index=startIndex;
+		for(index[axis]=0;index[axis]<grid.getNumVertices()[axis];++index[axis])
+			glVertex(grid.getVertexPosition(index));
 		glEnd();
 		}
-	inline static void renderGridOutline(const Array& vertices)
+	inline static void renderGridOutline(const Grid& grid)
 		{
-		/* Get vertex array size: */
-		const Index& numVertices=vertices.getSize();
+		const Index& numVertices=grid.getNumVertices();
 		
 		/* Render grid outlines: */
-		renderGridLine(vertices,Index(0,0,0),0);
-		renderGridLine(vertices,Index(0,numVertices[1]-1,0),0);
-		renderGridLine(vertices,Index(0,numVertices[1]-1,numVertices[2]-1),0);
-		renderGridLine(vertices,Index(0,0,numVertices[2]-1),0);
-		renderGridLine(vertices,Index(0,0,0),1);
-		renderGridLine(vertices,Index(numVertices[0]-1,0,0),1);
-		renderGridLine(vertices,Index(numVertices[0]-1,0,numVertices[2]-1),1);
-		renderGridLine(vertices,Index(0,0,numVertices[2]-1),1);
-		renderGridLine(vertices,Index(0,0,0),2);
-		renderGridLine(vertices,Index(numVertices[0]-1,0,0),2);
-		renderGridLine(vertices,Index(numVertices[0]-1,numVertices[1]-1,0),2);
-		renderGridLine(vertices,Index(0,numVertices[1]-1,0),2);
-		}
-	inline static void renderGridFaces(const Array& vertices,int faceMask)
-		{
-		/* Get vertex array size: */
-		const Index& numVertices=vertices.getSize();
+		Index index(0,0,0);
+		renderGridLine(grid,index,0);
+		index[1]=numVertices[1]-1;
+		renderGridLine(grid,index,0);
+		index[2]=numVertices[2]-1;
+		renderGridLine(grid,index,0);
+		index[1]=0;
+		renderGridLine(grid,index,0);
 		
+		index[2]=0;
+		renderGridLine(grid,index,1);
+		index[0]=numVertices[0]-1;
+		renderGridLine(grid,index,1);
+		index[2]=numVertices[2]-1;
+		renderGridLine(grid,index,1);
+		index[0]=0;
+		renderGridLine(grid,index,1);
+		
+		index[2]=0;
+		renderGridLine(grid,index,2);
+		index[0]=numVertices[0]-1;
+		renderGridLine(grid,index,2);
+		index[1]=numVertices[1]-1;
+		renderGridLine(grid,index,2);
+		index[0]=0;
+		renderGridLine(grid,index,2);
+		}
+	inline static void renderGridFaces(const Grid& grid,int faceMask)
+		{
+		const Index& numVertices=grid.getNumVertices();
 		Index index;
 		
 		/* Render grid lines in (y,z)-plane: */
@@ -252,20 +247,20 @@ class GridRenderer<ScalarParam,3,ValueParam>
 			{
 			index[0]=0;
 			if(faceMask&0x01)
-				renderGridLine(vertices,index,1);
+				renderGridLine(grid,index,1);
 			index[0]=numVertices[0]-1;
 			if(faceMask&0x02)
-				renderGridLine(vertices,index,1);
+				renderGridLine(grid,index,1);
 			}
 		index[2]=0;
 		for(index[1]=0;index[1]<numVertices[1];++index[1])
 			{
 			index[0]=0;
 			if(faceMask&0x01)
-				renderGridLine(vertices,index,2);
+				renderGridLine(grid,index,2);
 			index[0]=numVertices[0]-1;
 			if(faceMask&0x02)
-				renderGridLine(vertices,index,2);
+				renderGridLine(grid,index,2);
 			}
 		
 		/* Render grid lines in (x,z)-plane: */
@@ -274,20 +269,20 @@ class GridRenderer<ScalarParam,3,ValueParam>
 			{
 			index[1]=0;
 			if(faceMask&0x04)
-				renderGridLine(vertices,index,0);
+				renderGridLine(grid,index,0);
 			index[1]=numVertices[1]-1;
 			if(faceMask&0x08)
-				renderGridLine(vertices,index,0);
+				renderGridLine(grid,index,0);
 			}
 		index[2]=0;
 		for(index[0]=0;index[0]<numVertices[0];++index[0])
 			{
 			index[1]=0;
 			if(faceMask&0x04)
-				renderGridLine(vertices,index,2);
+				renderGridLine(grid,index,2);
 			index[1]=numVertices[1]-1;
 			if(faceMask&0x08)
-				renderGridLine(vertices,index,2);
+				renderGridLine(grid,index,2);
 			}
 		
 		/* Render grid lines in (x,y)-plane: */
@@ -296,46 +291,44 @@ class GridRenderer<ScalarParam,3,ValueParam>
 			{
 			index[2]=0;
 			if(faceMask&0x10)
-				renderGridLine(vertices,index,0);
+				renderGridLine(grid,index,0);
 			index[2]=numVertices[2]-1;
 			if(faceMask&0x20)
-				renderGridLine(vertices,index,0);
+				renderGridLine(grid,index,0);
 			}
 		index[1]=0;
 		for(index[0]=0;index[0]<numVertices[0];++index[0])
 			{
 			index[2]=0;
 			if(faceMask&0x10)
-				renderGridLine(vertices,index,1);
+				renderGridLine(grid,index,1);
 			index[2]=numVertices[2]-1;
 			if(faceMask&0x20)
-				renderGridLine(vertices,index,1);
+				renderGridLine(grid,index,1);
 			}
 		}
-	inline static void renderGridCells(const Array& vertices)
+	inline static void renderGridCells(const Grid& grid)
 		{
-		/* Get vertex array size: */
-		const Index& numVertices=vertices.getSize();
-		
+		const Index& numVertices=grid.getNumVertices();
 		Index index;
 		
 		/* Render grid lines along z-axis: */
 		index[2]=0;
 		for(index[0]=0;index[0]<numVertices[0];++index[0])
 			for(index[1]=0;index[1]<numVertices[1];++index[1])
-				renderGridLine(vertices,index,2);
+				renderGridLine(grid,index,2);
 		
 		/* Render grid lines along y-axis: */
 		index[1]=0;
 		for(index[0]=0;index[0]<numVertices[0];++index[0])
 			for(index[2]=0;index[2]<numVertices[2];++index[2])
-				renderGridLine(vertices,index,1);
+				renderGridLine(grid,index,1);
 		
 		/* Render grid lines along x-axis: */
 		index[0]=0;
 		for(index[1]=0;index[1]<numVertices[1];++index[1])
 			for(index[2]=0;index[2]<numVertices[2];++index[2])
-				renderGridLine(vertices,index,0);
+				renderGridLine(grid,index,0);
 		}
 	inline static void highlightCell(const Cell& cell)
 		{
@@ -364,44 +357,36 @@ class GridRenderer<ScalarParam,3,ValueParam>
 
 }
 
-/**************************************************
-Methods of class DataSetRenderer<MultiCurvilinear>:
-**************************************************/
+/*********************************************
+Methods of class MultiCurvilinearGridRenderer:
+*********************************************/
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
-DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::DataSetRenderer(
-	const typename DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::DataSet* sDataSet)
+MultiCurvilinearGridRenderer<DataSetParam>::MultiCurvilinearGridRenderer(
+	const typename MultiCurvilinearGridRenderer<DataSetParam>::DataSet* sDataSet)
 	:dataSet(sDataSet),
 	 renderingModeIndex(0)
 	{
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
-inline
-DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::~DataSetRenderer(
-	void)
-	{
-	/* Nothing to do yet... */
-	}
-
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 int
-DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::getNumRenderingModes(
+MultiCurvilinearGridRenderer<DataSetParam>::getNumRenderingModes(
 	void)
 	{
 	return 5;
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 const char*
-DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::getRenderingModeName(
+MultiCurvilinearGridRenderer<DataSetParam>::getRenderingModeName(
 	int renderingModeIndex)
 	{
 	if(renderingModeIndex<0||renderingModeIndex>=5)
-		Misc::throwStdErr("DataSetRenderer::getRenderingModeName: invalid rendering mode index %d",renderingModeIndex);
+		Misc::throwStdErr("MultiCurvilinearGridRenderer::getRenderingModeName: invalid rendering mode index %d",renderingModeIndex);
 	
 	static const char* renderingModeNames[5]=
 		{
@@ -411,74 +396,72 @@ DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::getRe
 	return renderingModeNames[renderingModeIndex];
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 void
-DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::setRenderingMode(
+MultiCurvilinearGridRenderer<DataSetParam>::setRenderingMode(
 	int newRenderingModeIndex)
 	{
 	if(newRenderingModeIndex<0||newRenderingModeIndex>=5)
-		Misc::throwStdErr("DataSetRenderer::setRenderingMode: invalid rendering mode index %d",newRenderingModeIndex);
+		Misc::throwStdErr("MultiCurvilinearGridRenderer::setRenderingMode: invalid rendering mode index %d",newRenderingModeIndex);
 	
 	renderingModeIndex=newRenderingModeIndex;
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 void
-DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::glRenderAction(
+MultiCurvilinearGridRenderer<DataSetParam>::glRenderAction(
 	GLContextData& contextData) const
 	{
 	switch(renderingModeIndex)
 		{
 		case 0:
-			/* Render the data set's bounding box: */
-			MultiCurvilinearRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::renderBoundingBox(dataSet->getDomainBox());
+			/* Render the grid's bounding box: */
+			MultiCurvilinearGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::renderBoundingBox(dataSet->getDomainBox());
 			break;
-		
+			
 		case 1:
 			/* Render each grid's outline: */
 			for(int gridIndex=0;gridIndex<dataSet->getNumGrids();++gridIndex)
-				MultiCurvilinearRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::renderGridOutline(dataSet->getGrid(gridIndex).getVertices());
+				MultiCurvilinearGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::renderGridOutline(dataSet->getGrid(gridIndex));
 			break;
 		
 		case 2:
-			{
-			/* Render each grid's faces: */
+			/* Render the grid's boundary faces: */
 			for(int gridIndex=0;gridIndex<dataSet->getNumGrids();++gridIndex)
 				{
 				int faceMask=0x0;
-				for(int faceIndex=0;faceIndex<dimensionParam*2;++faceIndex)
+				for(int faceIndex=0;faceIndex<DataSetParam::dimension*2;++faceIndex)
 					if(dataSet->isBoundaryFace(gridIndex,faceIndex))
 						faceMask|=1<<faceIndex;
-				MultiCurvilinearRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::renderGridFaces(dataSet->getGrid(gridIndex).getVertices(),faceMask);
+				MultiCurvilinearGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::renderGridFaces(dataSet->getGrid(gridIndex),faceMask);
 				}
 			break;
-			}
 		
 		case 3:
-			/* Render each grid's faces: */
+			/* Render the grid's faces: */
 			for(int gridIndex=0;gridIndex<dataSet->getNumGrids();++gridIndex)
-				MultiCurvilinearRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::renderGridFaces(dataSet->getGrid(gridIndex).getVertices(),~0x0);
+				MultiCurvilinearGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::renderGridFaces(dataSet->getGrid(gridIndex),~0x0);
 			break;
 		
 		case 4:
-			/* Render each grid's cells: */
+			/* Render the grid's cells: */
 			for(int gridIndex=0;gridIndex<dataSet->getNumGrids();++gridIndex)
-				MultiCurvilinearRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::renderGridCells(dataSet->getGrid(gridIndex).getVertices());
+				MultiCurvilinearGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::renderGridCells(dataSet->getGrid(gridIndex));
 			break;
 		}
 	}
 
-template <class ScalarParam,int dimensionParam,class ValueParam>
+template <class DataSetParam>
 inline
 void
-DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::renderCell(
-	const typename DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >::CellID& cellID,
+MultiCurvilinearGridRenderer<DataSetParam>::renderCell(
+	const typename MultiCurvilinearGridRenderer<DataSetParam>::CellID& cellID,
 	GLContextData& contextData) const
 	{
 	/* Highlight the cell: */
-	MultiCurvilinearRendererImplementation::GridRenderer<ScalarParam,dimensionParam,ValueParam>::highlightCell(dataSet->getCell(cellID));
+	MultiCurvilinearGridRendererImplementation::GridRenderer<DataSetParam::dimension,DataSetParam>::highlightCell(dataSet->getCell(cellID));
 	}
 
 }

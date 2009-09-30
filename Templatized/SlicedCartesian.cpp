@@ -1,7 +1,7 @@
 /***********************************************************************
 SlicedSlicedCartesian - Base class for vertex-centered cartesian data sets
 containing multiple scalar-valued slices.
-Copyright (c) 2006-2007 Oliver Kreylos
+Copyright (c) 2006-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -22,30 +22,30 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_TEMPLATIZED_SLICEDCARTESIAN_IMPLEMENTATION
 
+#include <Templatized/SlicedCartesian.h>
+
 #include <Math/Math.h>
 
 #include <Templatized/LinearInterpolator.h>
-
-#include <Templatized/SlicedCartesian.h>
 
 namespace Visualization {
 
 namespace Templatized {
 
-/************************************************
-Methods of class SlicedCartesian::VertexIterator:
-************************************************/
+/****************************************
+Methods of class SlicedCartesian::Vertex:
+****************************************/
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Point
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::VertexIterator::getVertexPos(
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Point
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Vertex::getPosition(
 	void) const
 	{
 	/* Compute vertex position on-the-fly: */
 	Point result;
 	for(int i=0;i<dimension;++i)
-		result[i]=Scalar(index[i])*grid->cellSize[i];
+		result[i]=Scalar(index[i])*ds->cellSize[i];
 	return result;
 	}
 
@@ -53,10 +53,25 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::VertexIterator::getVer
 Methods of class SlicedCartesian::Cell:
 **************************************/
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Point
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell::getVertexPos(
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Vertex
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Cell::getVertex(
+	int vertexIndex) const
+	{
+	/* Calculate the index of the cell vertex: */
+	Index cellVertexIndex=index;
+	for(int i=0;i<dimension;++i)
+		if(vertexIndex&(1<<i))
+			++cellVertexIndex[i];
+	
+	return Vertex(ds,cellVertexIndex);
+	}
+
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+inline
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Point
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Cell::getVertexPosition(
 	int vertexIndex) const
 	{
 	/* Compute vertex position on-the-fly: */
@@ -66,17 +81,18 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell::getVertexPos(
 		int pos=index[i];
 		if(vertexIndex&(1<<i))
 			++pos;
-		result[i]=Scalar(pos)*grid->cellSize[i];
+		result[i]=Scalar(pos)*ds->cellSize[i];
 		}
 	return result;
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+template <class ScalarExtractorParam>
 inline
-typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Vector
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell::calcVertexGradient(
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Vector
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Cell::calcVertexGradient(
 	int vertexIndex,
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Array& slice) const
+	const ScalarExtractorParam& extractor) const
 	{
 	/* Calculate the index of the cell vertex: */
 	Index cellVertexIndex=index;
@@ -85,24 +101,28 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell::calcVertexGradie
 			++cellVertexIndex[i];
 	
 	/* Return the vertex gradient: */
-	return grid->calcVertexGradient(cellVertexIndex,slice);
+	return ds->calcVertexGradient(cellVertexIndex,extractor);
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::CellEdge
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell::getEdge(
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::EdgeID
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Cell::getEdgeID(
 	int edgeIndex) const
 	{
-	return CellEdge(baseVertex+grid->vertexOffsets[CellTopology::edgeVertexIndices[edgeIndex][0]],edgeIndex>>(dimension-1));
+	EdgeID::Index index(baseVertexIndex);
+	index+=ds->vertexOffsets[CellTopology::edgeVertexIndices[edgeIndex][0]];
+	index*=dimension;
+	index+=edgeIndex>>(dimension-1);
+	return EdgeID(index);
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Point
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell::getEdgePos(
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Point
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Cell::calcEdgePosition(
 	int edgeIndex,
-	SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Scalar weight) const
+	SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Scalar weight) const
 	{
 	int edgeBaseIndex=CellTopology::edgeVertexIndices[edgeIndex][0];
 	int edgeDirection=edgeIndex>>(dimension-1);
@@ -112,35 +132,32 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell::getEdgePos(
 		int pos=index[i];
 		if(edgeBaseIndex&(1<<i))
 			++pos;
-		result[i]=Scalar(pos)*grid->cellSize[i];
+		result[i]=Scalar(pos)*ds->cellSize[i];
 		}
-	result[edgeDirection]+=weight*grid->cellSize[edgeDirection];
+	result[edgeDirection]+=weight*ds->cellSize[edgeDirection];
 	return result;
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell::getNeighbour(
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::CellID
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Cell::getNeighbourID(
 	int neighbourIndex) const
 	{
-	Index neighbourCellIndex=index;
-	int face=neighbourIndex>>1;
+	int direction=neighbourIndex>>1;
 	if(neighbourIndex&0x1)
 		{
-		++neighbourCellIndex[face];
-		if(neighbourCellIndex[face]<grid->numCells[face])
-			return Cell(grid,neighbourCellIndex);
+		if(index[direction]<ds->numCells[direction]-1)
+			return CellID(CellID::Index(baseVertexIndex+ds->vertexStrides[direction]));
 		else
-			return Cell();
+			return CellID();
 		}
 	else
 		{
-		--neighbourCellIndex[face];
-		if(neighbourCellIndex[face]>=0)
-			return Cell(grid,neighbourCellIndex);
+		if(index[direction]>0)
+			return CellID(CellID::Index(baseVertexIndex-ds->vertexStrides[direction]));
 		else
-			return Cell();
+			return CellID();
 		}
 	}
 
@@ -148,26 +165,26 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Cell::getNeighbour(
 Methods of class SlicedCartesian::Locator:
 *****************************************/
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::Locator(
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Locator::Locator(
 	void)
 	{
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::Locator(
-	const SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>* sGrid)
-	:cell(sGrid)
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Locator::Locator(
+	const SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>* sDs)
+	:Cell(sDs)
 	{
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
 bool
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::locatePoint(
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Point& position,
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Locator::locatePoint(
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Point& position,
 	bool traceHint)
 	{
 	/* Ignore traceHint parameter; it is cheaper to locate points from scratch each time */
@@ -177,36 +194,36 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::locatePoint(
 	for(int i=0;i<dimension;++i)
 		{
 		/* Convert the position to canonical grid coordinates (cellSize == 1): */
-		Scalar p=position[i]/cell.grid->cellSize[i];
+		Scalar p=position[i]/ds->cellSize[i];
 		
 		/* Find the index of the cell containing the position: */
-		cell.index[i]=int(Math::floor(p));
-		if(cell.index[i]<0)
+		index[i]=int(Math::floor(p));
+		if(index[i]<0)
 			{
-			cell.index[i]=0;
+			index[i]=0;
 			result=false;
 			}
-		else if(cell.index[i]>cell.grid->numCells[i]-1)
+		else if(index[i]>ds->numCells[i]-1)
 			{
-			cell.index[i]=cell.grid->numCells[i]-1;
+			index[i]=ds->numCells[i]-1;
 			result=false;
 			}
 		
 		/* Calculate the position's local coordinate inside its cell: */
-		cellPos[i]=p-Scalar(cell.index[i]);
+		cellPos[i]=p-Scalar(index[i]);
 		}
 	
-	/* Update the cell's base address: */
-	cell.baseVertex=cell.grid->vertices.getAddress(cell.index);
+	/* Update the cell's base vertex index: */
+	baseVertexIndex=ds->numVertices.calcOffset(index);
 	
 	return result;
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 template <class ValueExtractorParam>
 inline
 typename ValueExtractorParam::DestValue
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::calcValue(
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Locator::calcValue(
 	const ValueExtractorParam& extractor) const
 	{
 	typedef typename ValueExtractorParam::DestValue DestValue;
@@ -220,8 +237,8 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::calcValue(
 	Scalar w0=Scalar(1)-w1;
 	for(int vi=0;vi<numSteps;++vi)
 		{
-		ptrdiff_t vIndex=cell.baseVertexIndex+cell.grid->vertexOffsets[vi];
-		v[vi]=Interpolator::interpolate(extractor.getValue(cell.getGrid(),vIndex+0),w0,extractor.getValue(cell.getGrid(),vIndex+1),w1);
+		ptrdiff_t vIndex=baseVertexIndex+ds->vertexOffsets[vi];
+		v[vi]=Interpolator::interpolate(extractor.getValue(vIndex+0),w0,extractor.getValue(vIndex+1),w1);
 		}
 	for(int i=1;i<dimension;++i)
 		{
@@ -237,17 +254,14 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::calcValue(
 	return v[0];
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 template <class ScalarExtractorParam>
 inline
-typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Vector
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::calcGradient(
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Vector
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Locator::calcGradient(
 	const ScalarExtractorParam& extractor) const
 	{
 	typedef LinearInterpolator<Vector,Scalar> Interpolator;
-	
-	/* Get the scalar extractor's scalar slice: */
-	const Array& slice=extractor.getSlice(cell.getGrid());
 	
 	/* Perform multilinear interpolation: */
 	Vector v[CellTopology::numVertices>>1]; // Array of intermediate interpolation values
@@ -257,13 +271,13 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::calcGradient(
 	Scalar w0=Scalar(1)-w1;
 	for(int vi=0;vi<numSteps;++vi)
 		{
-		Index vertexIndex=cell.index;
+		Index vertexIndex=index;
 		for(int i=0;i<interpolationDimension;++i)
 			if(vi&(1<<i))
 				++vertexIndex[i];
-		Vector v0=cell.grid->calcVertexGradient(vertexIndex,slice);
+		Vector v0=ds->calcVertexGradient(vertexIndex,extractor);
 		++vertexIndex[interpolationDimension];
-		Vector v1=cell.grid->calcVertexGradient(vertexIndex,slice);
+		Vector v1=ds->calcVertexGradient(vertexIndex,extractor);
 		v[vi]=Interpolator::interpolate(v0,w0,v1,w1);
 		}
 	for(int i=1;i<dimension;++i)
@@ -284,57 +298,58 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Locator::calcGradient(
 Methods of class SlicedCartesian:
 ********************************/
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+template <class ScalarExtractorParam>
 inline
-typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Vector
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::calcVertexGradient(
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Index& vertexIndex,
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Array& slice) const
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Vector
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::calcVertexGradient(
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Index& vertexIndex,
+	const ScalarExtractorParam& extractor) const
 	{
 	Vector result;
-	const Value* vertex=slice.getAddress(vertexIndex);
+	ptrdiff_t vertex=numVertices.calcOffset(vertexIndex);
 	for(int i=0;i<dimension;++i)
 		{
 		if(vertexIndex[i]==0)
 			{
-			const Value* left=vertex+vertexStrides[i];
-			const Value* right=left+vertexStrides[i];
-			Scalar f0=Scalar(extractor.getValue(*vertex));
-			Scalar f1=Scalar(extractor.getValue(*left));
-			Scalar f2=Scalar(extractor.getValue(*right));
+			ptrdiff_t left=vertex+vertexStrides[i];
+			ptrdiff_t right=left+vertexStrides[i];
+			Scalar f0=Scalar(extractor.getValue(vertex));
+			Scalar f1=Scalar(extractor.getValue(left));
+			Scalar f2=Scalar(extractor.getValue(right));
 			result[i]=(Scalar(-3)*f0+Scalar(4)*f1-f2)/(Scalar(2)*cellSize[i]);
 			}
 		else if(vertexIndex[i]==numVertices[i]-1)
 			{
-			const Value* right=vertex-vertexStrides[i];
-			const Value* left=right-vertexStrides[i];
-			Scalar f0=Scalar(extractor.getValue(*left));
-			Scalar f1=Scalar(extractor.getValue(*right));
-			Scalar f2=Scalar(extractor.getValue(*vertex));
+			ptrdiff_t right=vertex-vertexStrides[i];
+			ptrdiff_t left=right-vertexStrides[i];
+			Scalar f0=Scalar(extractor.getValue(left));
+			Scalar f1=Scalar(extractor.getValue(right));
+			Scalar f2=Scalar(extractor.getValue(vertex));
 			result[i]=(f0-Scalar(4)*f1+Scalar(3)*f2)/(Scalar(2)*cellSize[i]);
 			}
 		else
 			{
-			const Value* left=vertex-vertexStrides[i];
-			const Value* right=vertex+vertexStrides[i];
-			Scalar f0=Scalar(extractor.getValue(*left));
-			Scalar f2=Scalar(extractor.getValue(*right));
+			ptrdiff_t left=vertex-vertexStrides[i];
+			ptrdiff_t right=vertex+vertexStrides[i];
+			Scalar f0=Scalar(extractor.getValue(left));
+			Scalar f2=Scalar(extractor.getValue(right));
 			result[i]=(f2-f0)/(Scalar(2)*cellSize[i]);
 			}
 		}
 	return result;
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::SlicedCartesian(
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::SlicedCartesian(
 	void)
 	:numVertices(0),
-	 numSlices(0),
-	 slices(0),
 	 numCells(0),
 	 cellSize(Scalar(0)),
-	 domainBox(Box::empty)
+	 domainBox(Box::empty),
+	 numSlices(0),
+	 slices(0)
 	{
 	/* Initialize vertex stride array: */
 	for(int i=0;i<dimension;++i)
@@ -346,35 +361,53 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::SlicedCartesian(
 	
 	/* Initialize vertex list bounds: */
 	Index vertexIndex(0);
-	firstVertex=VertexIterator(this,vertexIndex);
-	lastVertex=VertexIterator(this,vertexIndex);
+	firstVertex=Vertex(this,vertexIndex);
+	lastVertex=Vertex(this,vertexIndex);
 	
 	/* Initialize cell list bounds: */
 	Index cellIndex(0);
-	firstCell=CellIterator(this,cellIndex);
-	lastCell=CellIterator(this,cellIndex);
+	firstCell=Cell(this,cellIndex);
+	lastCell=Cell(this,cellIndex);
 	}
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::SlicedCartesian(
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Index& sNumVertices,
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::SlicedCartesian(
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Index& sNumVertices,
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Size& sCellSize,
 	int sNumSlices,
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Size& sCellSize,
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::VScalar* sVertexValues)
-	:numVertices(sNumVertices),
-	 numSlices(sNumSlices),
-	 slices(0),
-	 cellSize(sCellSize)
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::ValueScalar* sVertexValues)
+	:slices(0)
 	{
-	/* Initialize the slice arrays: */
-	slices=new Array[numSlices];
+	setData(sNumVertices,sCellSize,sNumSlices,sVertexValues);
+	}
+
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+inline
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::~SlicedCartesian(
+	void)
+	{
+	/* Delete slice arrays: */
 	for(int slice=0;slice<numSlices;++slice)
-		slices[slice].resize(numVertices);
+		delete[] slices[slice];
+	delete[] slices;
+	}
+
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+inline
+void
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::setData(
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Index& sNumVertices,
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Size& sCellSize,
+	int sNumSlices,
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::ValueScalar* sVertexValues)
+	{
+	/* Set the number of vertices: */
+	numVertices=sNumVertices;
 	
 	/* Initialize vertex stride array: */
 	for(int i=0;i<dimension;++i)
-		vertexStrides[i]=slices[0].getIncrement(i);
+		vertexStrides[i]=numVertices.calcIncrement(i);
 	
 	/* Calculate number of cells: */
 	for(int i=0;i<dimension;++i)
@@ -389,101 +422,21 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::SlicedCartesian(
 			if(i&(1<<j))
 				vertexOffsets[i]+=vertexStrides[j];
 		}
-	
-	/* Initialize vertex list bounds: */
-	Index vertexIndex(0);
-	firstVertex=VertexIterator(this,vertexIndex);
-	vertexIndex[0]=numVertices[0];
-	lastVertex=VertexIterator(this,vertexIndex);
-	
-	/* Initialize cell list bounds: */
-	Index cellIndex(0);
-	firstCell=CellIterator(this,cellIndex);
-	cellIndex[0]=numCells[0];
-	lastCell=CellIterator(this,cellIndex);
-	
-	/* Initialize domain bounding box: */
-	Point domainMax;
-	for(int i=0;i<dimension;++i)
-		domainMax[i]=Scalar(numCells[i])*cellSize[i];
-	domainBox=Box(Point::origin,domainMax);
-	
-	/* Copy source vertex values, if present: */
-	if(sVertexValues!=0)
-		{
-		const VScalar* sPtr=sVertexValues;
-		size_t totalNumVertices=slices[slice].getNumElements();
-		for(int slice=0;slice<numSlices;++slice)
-			{
-			/* Copy all slice vertex values: */
-			VScalar* vPtr=slices[slice].getArray();
-			for(size_t i=0;i<totalNumVertices;++i,++vPtr,++sPtr)
-				*vPtr=*sPtr;
-			}
-		}
-	}
-
-template <class ScalarParam,int dimensionParam,class VScalarParam>
-inline
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::~SlicedCartesian(
-	void)
-	{
-	/* Delete slice arrays: */
-	delete[] slices;
-	}
-
-template <class ScalarParam,int dimensionParam,class VScalarParam>
-inline
-void
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::setData(
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Index& sNumVertices,
-	int sNumSlices,
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Size& sCellSize,
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Value* sVertexValues)
-	{
-	/* Destroy the slice arrays: */
-	if(numSlices>0)
-		delete[] slices;
-	
-	/* Re-initialize the slice arrays: */
-	numVertices=sNumVertices;
-	numSlices=sNumSlices;
-	slices=new Array[numSlices];
-	for(int slice=0;slice<numSlices;++slice)
-		slices[slice].resize(numVertices);
-	
-	/* Initialize vertex stride array: */
-	for(int i=0;i<dimension;++i)
-		vertexStrides[i]=slices[0].getIncrement(i);
 	
 	/* Initialize the cell size: */
 	cellSize=sCellSize;
 	
-	/* Calculate number of cells: */
-	for(int i=0;i<dimension;++i)
-		numCells[i]=numVertices[i]-1;
-	
-	/* Initialize vertex offset array: */
-	for(int i=0;i<CellTopology::numVertices;++i)
-		{
-		/* Vertex indices are, as usual, bit masks of a vertex' position in cell coordinates: */
-		vertexOffsets[i]=0;
-		for(int j=0;j<dimension;++j)
-			if(i&(1<<j))
-				vertexOffsets[i]+=vertexStrides[j];
-		}
-	
 	/* Initialize vertex list bounds: */
 	Index vertexIndex(0);
-	firstVertex=VertexIterator(this,vertexIndex);
+	firstVertex=Vertex(this,vertexIndex);
 	vertexIndex[0]=numVertices[0];
-	lastVertex=VertexIterator(this,vertexIndex);
+	lastVertex=Vertex(this,vertexIndex);
 	
 	/* Initialize cell list bounds: */
 	Index cellIndex(0);
-	firstCell=CellIterator(this,cellIndex);
+	firstCell=Cell(this,cellIndex);
 	cellIndex[0]=numCells[0];
-	lastCell=CellIterator(this,cellIndex);
+	lastCell=Cell(this,cellIndex);
 	
 	/* Initialize domain bounding box: */
 	Point domainMax;
@@ -491,33 +444,86 @@ SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::setData(
 		domainMax[i]=Scalar(numCells[i])*cellSize[i];
 	domainBox=Box(Point::origin,domainMax);
 	
+	
+	/* Re-initialize the slice arrays: */
+	for(int slice=0;slice<numSlices;++slice)
+		delete[] slices[slice];
+	delete[] slices;
+	numSlices=sNumSlices;
+	slices=new ValueScalar*[numSlices];
+	size_t totalNumVertices=size_t(numVertices.calcIncrement(-1));
+	for(int slice=0;slice<numSlices;++slice)
+		slices[slice]=new ValueScalar[totalNumVertices];
+	
 	/* Copy source vertex values, if present: */
 	if(sVertexValues!=0)
 		{
-		const VScalar* sPtr=sVertexValues;
-		size_t totalNumVertices=slices[slice].getNumElements();
+		const ValueScalar* sPtr=sVertexValues;
 		for(int slice=0;slice<numSlices;++slice)
 			{
 			/* Copy all slice vertex values: */
-			VScalar* vPtr=slices[slice].getArray();
+			ValueScalar* vPtr=slices[slice];
 			for(size_t i=0;i<totalNumVertices;++i,++vPtr,++sPtr)
 				*vPtr=*sPtr;
 			}
 		}
 	}
 
-
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 inline
-typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Point
-SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::getVertexPos(
-	const typename SlicedCartesian<ScalarParam,dimensionParam,VScalarParam>::Index& vertexIndex) const
+int
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::addSlice(
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::ValueScalar* sSliceValues)
+	{
+	/* Create a new slice array: */
+	ValueScalar** newSlices=new ValueScalar*[numSlices+1];
+	for(int slice=0;slice<numSlices;++slice)
+		newSlices[slice]=slices[slice];
+	
+	/* Initialize the new slice: */
+	size_t totalNumVertices=size_t(numVertices.calcIncrement(-1));
+	newSlices[numSlices]=new ValueScalar[totalNumVertices];
+	
+	if(sSliceValues!=0)
+		{
+		/* Copy the given slice values: */
+		ValueScalar* slicePtr=newSlices[numSlices];
+		for(size_t i=0;i<totalNumVertices;++i,++slicePtr,++sSliceValues)
+			*slicePtr=*sSliceValues;
+		}
+	
+	/* Install the new slice array: */
+	delete[] slices;
+	++numSlices;
+	slices=newSlices;
+	
+	return numSlices-1;
+	}
+
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+inline
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Point
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::getVertexPosition(
+	const typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Index& vertexIndex) const
 	{
 	/* Compute vertex position on-the-fly: */
 	Point result;
 	for(int i=0;i<dimension;++i)
 		result[i]=Scalar(vertexIndex[i])*cellSize[i];
 	return result;
+	}
+
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+inline
+typename SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::Scalar
+SlicedCartesian<ScalarParam,dimensionParam,ValueScalarParam>::calcAverageCellSize(
+	void) const
+	{
+	/* Compute and return cell size: */
+	Scalar size=cellSize[0];
+	for(int i=1;i<dimension;++i)
+		size*=cellSize[i];
+	return Math::pow(size,Scalar(1)/Scalar(dimension));
 	}
 
 }

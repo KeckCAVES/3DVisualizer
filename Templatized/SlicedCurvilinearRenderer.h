@@ -1,9 +1,8 @@
 /***********************************************************************
 SlicedCurvilinearRenderer - Class to render sliced curvilinear data
 sets. Implemented as a specialization of the generic DataSetRenderer
-class. Evil hack to test SlicedCurvilinear class; needs to be joined
-with regular CurvilinearRenderer, since neither uses data values.
-Copyright (c) 2008 Oliver Kreylos
+class.
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -27,56 +26,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Templatized/DataSetRenderer.h>
 #include <Templatized/SlicedCurvilinear.h>
-
-/* Forward declarations: */
-class GLContextData;
+#include <Templatized/CurvilinearGridRenderer.h>
 
 namespace Visualization {
 
 namespace Templatized {
 
 template <class ScalarParam,int dimensionParam,class ValueScalarParam>
-class DataSetRenderer<SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> >
+class DataSetRenderer<SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> >:public CurvilinearGridRenderer<SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> >
 	{
-	/* Embedded classes: */
-	public:
-	typedef SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> DataSet; // Type of rendered data set
-	typedef typename DataSet::Scalar Scalar; // Scalar type of data set's domain
-	static const int dimension=dimensionParam; // Dimension of data set's domain
-	typedef typename DataSet::Point Point; // Type for points in data set's domain
-	typedef typename DataSet::Vector Vector; // Type for vectors in data set's domain
-	typedef typename DataSet::Box Box; // Type for axis-aligned boxes in data set's domain
-	typedef typename DataSet::CellID CellID; // Type for cell IDs in data set
-	typedef typename DataSet::Cell Cell; // Type for cells in data set
-	
-	/* Elements: */
-	private:
-	const DataSet* dataSet; // Pointer to the data set to be rendered
-	int renderingModeIndex; // Index of currently selected rendering mode
-	
 	/* Constructors and destructors: */
 	public:
-	DataSetRenderer(const DataSet* sDataSet); // Creates a renderer for the given data set
-	~DataSetRenderer(void);
-	
-	/* Methods: */
-	static int getNumRenderingModes(void); // Returns the number of supported rendering modes
-	static const char* getRenderingModeName(int renderingModeIndex); // Returns name of given rendering mode
-	int getRenderingMode(void) const // Returns the current rendering mode
+	DataSetRenderer(const SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>* sDataSet) // Creates a renderer for the given data set
+		:CurvilinearGridRenderer<SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam> >(sDataSet)
 		{
-		return renderingModeIndex;
 		}
-	void setRenderingMode(int newRenderingModeIndex); // Sets a new rendering mode
-	void glRenderAction(GLContextData& contextData) const; // Renders the data set
-	void renderCell(const CellID& cellID,GLContextData& contextData) const; // Highlights the given cell
 	};
 
 }
 
 }
-
-#ifndef VISUALIZATION_TEMPLATIZED_SLICEDCURVILINEARRENDERER_IMPLEMENTATION
-#include <Templatized/SlicedCurvilinearRenderer.cpp>
-#endif
 
 #endif

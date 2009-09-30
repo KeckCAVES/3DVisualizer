@@ -111,10 +111,6 @@ class VolumeRendererExtractor:public Visualization::Abstract::Algorithm
 	static const char* name; // Identifying name of this algorithm
 	Parameters parameters; // The volume renderer extraction parameters used by this extractor
 	
-	/* Private methods: */
-	static const DS* getDs(const Visualization::Abstract::DataSet* sDataSet);
-	static const SE& getSe(const Visualization::Abstract::ScalarExtractor* sScalarExtractor);
-	
 	/* Constructors and destructors: */
 	public:
 	VolumeRendererExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates a volume renderer extractor

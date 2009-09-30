@@ -28,17 +28,17 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/Slider.h>
 
 #include <Abstract/Element.h>
-#if 1
-#include <Templatized/SliceVolumeRendererSampling.h>
-#else
-#include <Templatized/SliceVolumeRenderer.h>
-#endif
 
 /* Forward declarations: */
 class GLColorMap;
 namespace GLMotif {
 class TextField;
 }
+#ifdef VISUALIZATION_USE_SHADERS
+class SingleChannelRaycaster;
+#else
+class PaletteRenderer;
+#endif
 
 namespace Visualization {
 
@@ -54,13 +54,17 @@ class VolumeRenderer:public Visualization::Abstract::Element
 	typedef typename DataSetWrapper::DS DS; // Type of templatized data set
 	typedef typename DS::Scalar Scalar; // Scalar type of data set's domain
 	typedef typename DataSetWrapper::SE SE; // Type of templatized scalar extractor
-	typedef Visualization::Templatized::SliceVolumeRenderer<DS,SE> SVR; // Type of templatized volume renderer
+	typedef typename DataSetWrapper::ScalarExtractor ScalarExtractor; // Compatible scalar extractor wrapper class
 	
 	/* Elements: */
 	private:
-	Scalar sliceFactor; // Current slice distance for texture- or raycasting-based volume rendering
-	float transparencyGamma; // Overall transparency adjustment factor
-	SVR svr; // The slice volume renderer
+	#ifdef VISUALIZATION_USE_SHADERS
+	SingleChannelRaycaster* renderer; // A raycasting volume renderer
+	#else
+	const GLColorMap* colorMap; // A transfer function to map scalar values to colors and opacities
+	PaletteRenderer* renderer; // A texture-based volume renderer
+	float transparencyGamma; // A gamma correction factor to apply to color map opacities
+	#endif
 	
 	/* UI components: */
 	GLMotif::TextField* sliceFactorValue; // Text field to display current slice factor
@@ -70,7 +74,7 @@ class VolumeRenderer:public Visualization::Abstract::Element
 	
 	/* Constructors and destructors: */
 	public:
-	VolumeRenderer(Visualization::Abstract::Parameters* sParameters,Scalar sSliceFactor,float sTransparencyGamma,const DS* sDs,const SE& sSe,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates a volume renderer for the given data set and parameters
+	VolumeRenderer(Visualization::Abstract::Algorithm* algorithm,Visualization::Abstract::Parameters* sParameters); // Creates a volume renderer for the given algorithm and parameters
 	private:
 	VolumeRenderer(const VolumeRenderer& source); // Prohibit copy constructor
 	VolumeRenderer& operator=(const VolumeRenderer& source); // Prohibit assignment operator
@@ -88,10 +92,6 @@ class VolumeRenderer:public Visualization::Abstract::Element
 	virtual void glRenderAction(GLContextData& contextData) const;
 	
 	/* New methods: */
-	SVR& getSvr(void) // Returns the slice volume renderer
-		{
-		return svr;
-		}
 	void sliderValueChangedCallback(GLMotif::Slider::ValueChangedCallbackData* cbData); // Callback when the sliders in the settings dialog change value
 	};
 

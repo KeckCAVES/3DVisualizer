@@ -28,6 +28,5 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Templatized/CartesianRenderer.h>
 #include <Templatized/SliceCaseTableTesseract.h>
 #include <Templatized/IsosurfaceCaseTableTesseract.h>
-#include <Templatized/SliceVolumeRendererCartesian.h>
 
 #endif

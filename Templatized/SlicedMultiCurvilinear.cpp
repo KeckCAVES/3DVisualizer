@@ -74,7 +74,7 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Grid::setGr
 	
 	/* Initialize vertex stride array: */
 	for(int i=0;i<dimension;++i)
-		vertexStrides[i]=grid.getIncrement(i);
+		vertexStrides[i]=numVertices.calcIncrement(i);
 	
 	/* Calculate number of cells: */
 	for(int i=0;i<dimension;++i)
@@ -94,9 +94,9 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Grid::setGr
 	if(sVertexPositions!=0)
 		{
 		/* Copy all grid vertex positions: */
-		int totalNumVertices=grid.getNumElements();
+		size_t totalNumVertices=size_t(numVertices.calcIncrement(-1));
 		Point* vPtr=grid.getArray();
-		for(int i=0;i<totalNumVertices;++i)
+		for(size_t i=0;i<totalNumVertices;++i)
 			vPtr[i]=sVertexPositions[i];
 		}
 	}
@@ -191,14 +191,14 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Cell::getNe
 	if(neighbourIndex&0x1)
 		{
 		if(index[direction]<grid.numCells[direction]-1)
-			return CellID(baseVertexIndex+grid.vertexStrides[direction]);
+			return CellID(CellID::Index(baseVertexIndex+grid.vertexStrides[direction]));
 		else
 			return ds->retrieveGridConnector(*this,neighbourIndex);
 		}
 	else
 		{
 		if(index[direction]>0)
-			return CellID(baseVertexIndex-grid.vertexStrides[direction]);
+			return CellID(CellID::Index(baseVertexIndex-grid.vertexStrides[direction]));
 		else
 			return ds->retrieveGridConnector(*this,neighbourIndex);
 		}
@@ -421,7 +421,7 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::lo
 				{
 				/* Check if we can actually move in this direction: */
 				moveCellID=CellID();
-				if(index[i]<ds->grids[gridIndex].numCells[moveDim]-1||(moveCellID=ds->retrieveGridConnector(*this,i*2+1)).isValid())
+				if(index[i]<ds->grids[gridIndex].numCells[i]-1||(moveCellID=ds->retrieveGridConnector(*this,i*2+1)).isValid())
 					{
 					maxMove=cellPos[i]-Scalar(1);
 					moveDim=i;
@@ -499,8 +499,8 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::ca
 	Scalar w0=Scalar(1)-w1;
 	for(int vi=0;vi<numSteps;++vi)
 		{
-		int linearIndex=baseVertexIndex+grid.vertexOffsets[vi];
-		v[vi]=Interpolator::interpolate(extractor.getValue(linearIndex+0),w0,extractor.getValue(linearIndex+1),w1);
+		ptrdiff_t vIndex=baseVertexIndex+grid.vertexOffsets[vi];
+		v[vi]=Interpolator::interpolate(extractor.getValue(vIndex+0),w0,extractor.getValue(vIndex+1),w1);
 		}
 	for(int i=1;i<dimension;++i)
 		{
@@ -577,13 +577,13 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::calcVertexG
 	Matrix gridJacobian;
 	Vector valueGradient;
 	const Point* gridPtr=grid.grid.getArray()-grid.gridBaseLinearIndex;
-	int vertex=grid.getVertexLinearIndex(vertexIndex);
+	ptrdiff_t vertex=grid.getVertexLinearIndex(vertexIndex);
 	for(int i=0;i<dimension;++i)
 		{
 		if(vertexIndex[i]==0)
 			{
-			int left=vertex+grid.vertexStrides[i];
-			int right=left+grid.vertexStrides[i];
+			ptrdiff_t left=vertex+grid.vertexStrides[i];
+			ptrdiff_t right=left+grid.vertexStrides[i];
 			for(int j=0;j<dimension;++j)
 				gridJacobian(i,j)=Math::div2(Scalar(-3)*gridPtr[vertex][j]+Scalar(4)*gridPtr[left][j]-gridPtr[right][j]);
 			Scalar f0=Scalar(extractor.getValue(vertex));
@@ -593,8 +593,8 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::calcVertexG
 			}
 		else if(vertexIndex[i]==grid.numVertices[i]-1)
 			{
-			int right=vertex-grid.vertexStrides[i];
-			int left=right-grid.vertexStrides[i];
+			ptrdiff_t right=vertex-grid.vertexStrides[i];
+			ptrdiff_t left=right-grid.vertexStrides[i];
 			for(int j=0;j<dimension;++j)
 				gridJacobian(i,j)=Math::div2(gridPtr[left][j]-Scalar(4)*gridPtr[right][j]+Scalar(3)*gridPtr[vertex][j]);
 			Scalar f0=Scalar(extractor.getValue(left));
@@ -604,8 +604,8 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::calcVertexG
 			}
 		else
 			{
-			int left=vertex-grid.vertexStrides[i];
-			int right=vertex+grid.vertexStrides[i];
+			ptrdiff_t left=vertex-grid.vertexStrides[i];
+			ptrdiff_t right=vertex+grid.vertexStrides[i];
 			for(int j=0;j<dimension;++j)
 				gridJacobian(i,j)=Math::div2(gridPtr[right][j]-gridPtr[left][j]);
 			Scalar f0=Scalar(extractor.getValue(left));
@@ -829,7 +829,7 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::setGrid(
 	totalNumCells=totalNumCells+newGridNumCells-oldGridNumCells;
 	
 	/* Update the grid structures: */
-	int linearIndex=0;
+	ptrdiff_t linearIndex=0;
 	for(int gi=0;gi<numGrids;++gi)
 		{
 		grids[gi].gridBaseLinearIndex=linearIndex;
@@ -920,9 +920,9 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::finalizeGri
 	domainBox=Box::empty;
 	for(int gridIndex=0;gridIndex<numGrids;++gridIndex)
 		{
-		int numGridVertices=grids[gridIndex].grid.getNumElements();
+		size_t numGridVertices=grids[gridIndex].grid.getNumElements();
 		const Point* vPtr=grids[gridIndex].grid.getArray();
-		for(int i=0;i<numGridVertices;++i,++vPtr)
+		for(size_t i=0;i<numGridVertices;++i,++vPtr)
 			domainBox.addPoint(*vPtr);
 		}
 	
@@ -980,16 +980,16 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::finalizeGri
 	
 	{
 	/* Count the number of boundary faces to create a fixed-size kd-tree: */
-	int totalNumBoundaryFaces=0;
+	size_t totalNumBoundaryFaces=0;
 	for(int gridIndex=0;gridIndex<numGrids;++gridIndex)
 		{
 		const Grid& grid=grids[gridIndex];
 		for(int i=0;i<dimension;++i)
 			{
-			int numBoundaryFaces=1;
+			size_t numBoundaryFaces=1;
 			for(int j=0;j<dimension;++j)
 				if(i!=j)
-					numBoundaryFaces*=grid.numVertices[j]-1;
+					numBoundaryFaces*=size_t(grid.numVertices[j]-1);
 			totalNumBoundaryFaces+=numBoundaryFaces*2;
 			}
 		}
@@ -1127,12 +1127,12 @@ SlicedMultiCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::isInteriorF
 		{
 		const Grid& grid=grids[gridIndex];
 		int faceDimension=faceIndex>>1;
-		int numFaces=1;
+		size_t numFaces=1;
 		for(int i=0;i<dimension;++i)
 			if(i!=faceDimension)
-				numFaces*=grid.numCells[i];
-		int numConnectedFaces=0;
-		for(int i=0;i<numFaces;++i)
+				numFaces*=size_t(grid.numCells[i]);
+		size_t numConnectedFaces=0;
+		for(size_t i=0;i<numFaces;++i)
 			if(gc[i].isValid())
 				++numConnectedFaces;
 		

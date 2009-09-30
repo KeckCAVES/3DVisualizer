@@ -226,7 +226,7 @@ class Cartesian
 		public:
 		void setEpsilon(Scalar newEpsilon) // Sets a new accuracy threshold in local cell dimension
 			{
-			/* Not needed for cartesian data sets */
+			/* Not needed for Cartesian data sets */
 			}
 		CellID getCellID(void) const // Returns the ID of the cell containing the last located point
 			{

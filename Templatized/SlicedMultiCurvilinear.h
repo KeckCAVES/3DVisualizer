@@ -81,7 +81,7 @@ class SlicedMultiCurvilinear
 		private:
 		Index numVertices; // Number of vertices in grid in each dimension
 		GridArray grid; // Array defining grid's mesh
-		int gridBaseLinearIndex; // Linear base index of this grid's vertices in the data set
+		ptrdiff_t gridBaseLinearIndex; // Linear base index of this grid's vertices in the data set
 		int vertexStrides[dimension]; // Array of pointer stride values in the vertex array
 		Index numCells; // Number of cells in data set in each dimension
 		int vertexOffsets[CellTopology::numVertices]; // Array of pointer offsets from a cell's base vertex to all cell vertices
@@ -113,13 +113,13 @@ class SlicedMultiCurvilinear
 			{
 			return grid(vertexIndex);
 			}
-		const Point& getVertexPosition(int vertexLinearIndex) const // Returns a vertex' position based on its linear index in the overall data set
+		const Point& getVertexPosition(ptrdiff_t vertexLinearIndex) const // Returns a vertex' position based on its linear index in the overall data set
 			{
 			return grid.getArray()[vertexLinearIndex-gridBaseLinearIndex];
 			}
-		int getVertexLinearIndex(const Index& vertexIndex) const // Returns the linear index of a vertex in the overall data set
+		ptrdiff_t getVertexLinearIndex(const Index& vertexIndex) const // Returns the linear index of a vertex in the overall data set
 			{
-			return grid.calcLinearIndex(vertexIndex)+gridBaseLinearIndex;
+			return numVertices.calcOffset(vertexIndex)+gridBaseLinearIndex;
 			}
 		const Index& getNumCells(void) const // Returns number of cells in grid
 			{
@@ -215,7 +215,7 @@ class SlicedMultiCurvilinear
 		const SlicedMultiCurvilinear* ds; // Pointer to the data set containing the cell
 		int gridIndex; // Index of grid containing the cell
 		Index index; // Array index of cell's base vertex in data set storage
-		int baseVertexIndex; // Linear index of cell's base vertex in data set storage (grid and value slices)
+		ptrdiff_t baseVertexIndex; // Linear index of cell's base vertex in data set storage (grid and value slices)
 		
 		/* Constructors and destructors: */
 		public:

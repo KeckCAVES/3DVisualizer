@@ -57,3 +57,12 @@
 3D Visualizer 1.5:
 - Adapted 3D Visualizer to Vrui release 1.0-063 and bumped required Vrui
   version to same.
+
+3D Visualizer 1.6:
+- Provided new volume rendering implementation using GLSL shaders and
+  raycasting for improved visual quality and performance on latest-
+  generation graphics cards.
+- Created new algorithm to volume-render three independent scalar
+  variables simultaneously.
+- Created new module for multi-valued image stacks.
+- Created new (experimental) module for GoCAD voxet files.

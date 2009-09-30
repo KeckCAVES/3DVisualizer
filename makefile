@@ -51,7 +51,8 @@ MODULE_NAMES = SphericalASCIIFile \
                CitcomtVectorFile \
                StructuredHexahedralTecplotASCIIFile \
                UnstructuredHexahedralTecplotASCIIFile \
-               ImageStack
+               ImageStack \
+               MultiChannelImageStack
 
 # List of other available modules:
 # Add any of these to the MODULE_NAMES list to build them
@@ -74,6 +75,12 @@ UNSUPPORTED_MODULE_NAMES = AnalyzeFile \
                            VanKekenFile \
                            UnstructuredPlot3DFile
 
+# Flag whether to use GLSL shaders instead of fixed OpenGL functionality
+# for some visualization algorithms, especially volume rendering. This
+# flag should only be set to 1 on newer, dedicated 3D graphics cards
+# such as Nvidia's G80 series.
+USE_SHADERS = 0
+
 # Flag whether to build the 3D Visualizer collaboration module for
 # spatially distributed shared data exploration.
 USE_COLLABORATION = 0
@@ -86,7 +93,7 @@ USE_EMINEO = 0
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.5
+VERSION = 1.6
 
 # Set up destination directories for compilation products:
 OBJDIRBASE = o
@@ -140,6 +147,10 @@ endif
 PLUGINNAME = $(LIBDIR)/$(MODULEDIR)/lib$(1).$(VRUI_PLUGINFILEEXT)
 
 # Pattern rule to link visualization module plug-ins:
+$(call PLUGINNAME,%): CFLAGS += $(VRUI_PLUGINCFLAGS)
+ifneq ($(USE_SHADERS),0)
+  $(call PLUGINNAME,%): CFLAGS += -DVISUALIZATION_USE_SHADERS
+endif
 $(call PLUGINNAME,%): CFLAGS += $(VRUI_PLUGINCFLAGS)
 $(call PLUGINNAME,%): $(OBJDIR)/Concrete/%.o
 	@mkdir -p $(LIBDIR)/$(MODULEDIR)
@@ -199,8 +210,6 @@ VISUALIZER_SOURCES = $(ABSTRACT_SOURCES) \
                      $(TEMPLATIZED_SOURCES) \
                      $(WRAPPERS_SOURCES) \
                      $(CONCRETE_SOURCES) \
-                     VolumeRenderer.cpp \
-                     PaletteRenderer.cpp \
                      BaseLocator.cpp \
                      CuttingPlaneLocator.cpp \
                      EvaluationLocator.cpp \
@@ -213,13 +222,31 @@ VISUALIZER_SOURCES = $(ABSTRACT_SOURCES) \
                      ColorMap.cpp \
                      PaletteEditor.cpp \
                      Visualizer.cpp
+ifneq ($(USE_SHADERS),0)
+  VISUALIZER_SOURCES += Polyhedron.cpp \
+                        Raycaster.cpp \
+                        SingleChannelRaycaster.cpp \
+                        TripleChannelRaycaster.cpp
+else
+  VISUALIZER_SOURCES += VolumeRenderer.cpp \
+                        PaletteRenderer.cpp
+endif
 ifneq ($(USE_COLLABORATION),0)
   VISUALIZER_SOURCES += SharedVisualizationPipe.cpp \
                         SharedVisualizationClient.cpp
 endif
 
+# List of required shaders:
+SHADERDIR = $(RESOURCEDIR)/Shaders
+SHADERS = SingleChannelRaycaster.vs \
+          SingleChannelRaycaster.fs \
+          TripleChannelRaycaster.vs \
+          TripleChannelRaycaster.fs
+
 # Per-source compiler flags:
 $(OBJDIR)/Concrete/EarthRenderer.o: CFLAGS += -DEARTHRENDERER_IMAGEDIR='"$(INSTALLDIR)/$(RESOURCEDIR)"'
+$(OBJDIR)/SingleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(INSTALLDIR)/$(SHADERDIR)"'
+$(OBJDIR)/TripleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(INSTALLDIR)/$(SHADERDIR)"'
 $(OBJDIR)/Visualizer.o: CFLAGS += -DVISUALIZER_MODULENAMETEMPLATE='"$(INSTALLDIR)/$(call PLUGINNAME,%s)"'
 ifneq ($(USE_COLLABORATION),0)
   ifneq ($(USE_EMINEO),0)
@@ -255,6 +282,8 @@ $(call PLUGINNAME,StructuredHexahedralTecplotASCIIFile): $(OBJDIR)/Concrete/Tecp
 $(call PLUGINNAME,UnstructuredHexahedralTecplotASCIIFile): $(OBJDIR)/Concrete/TecplotASCIIFileHeaderParser.o \
                                                            $(OBJDIR)/Concrete/UnstructuredHexahedralTecplotASCIIFile.o
 
+$(call PLUGINNAME,MultiChannelImageStack): PACKAGES += MYIMAGES
+
 $(call PLUGINNAME,DicomImageStack): $(OBJDIR)/Concrete/DicomImageStack.o \
                                     $(OBJDIR)/Concrete/DicomImageFile.o
 
@@ -275,6 +304,10 @@ $(BINDIR)/SharedVisualizationServer: $(SHAREDVISUALIZATIONSERVER_SOURCES:%.cpp=$
 	@echo Linking $@...
 	@g++ -o $@ $^ $(VRUI_LINKFLAGS) $(VRUI_PLUGINHOSTLINKFLAGS)
 
+#
+# Rule to install 3D Visualizer in a destination directory
+#
+
 install: $(ALL)
 	@echo Installing 3D Visualizer in $(INSTALLDIR)...
 	@install -d $(INSTALLDIR)
@@ -287,3 +320,7 @@ endif
 	@install $(MODULES) $(INSTALLDIR)/$(LIBDIR)/$(MODULEDIR)
 	@install -d $(INSTALLDIR)/$(RESOURCEDIR)
 	@install $(RESOURCEDIR)/EarthTopography.png $(RESOURCEDIR)/EarthTopography.ppm $(INSTALLDIR)/$(RESOURCEDIR)
+ifneq ($(USE_SHADERS),0)
+	@install -d $(INSTALLDIR)/$(SHADERDIR)
+	@install $(SHADERS:%=$(SHADERDIR)/%) $(INSTALLDIR)/$(SHADERDIR)
+endif

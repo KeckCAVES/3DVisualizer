@@ -39,7 +39,8 @@ Methods of class Algortithm:
 
 Algorithm::Algorithm(VariableManager* sVariableManager,Comm::MulticastPipe* sPipe)
 	:variableManager(sVariableManager),pipe(sPipe),
-	 master(pipe==0||pipe->isMaster())
+	 master(pipe==0||pipe->isMaster()),
+	 busyFunction(0)
 	{
 	}
 
@@ -47,6 +48,18 @@ Algorithm::~Algorithm(void)
 	{
 	/* Shut down a cluster communication pipe (doesn't do anything if there was no pipe): */
 	delete pipe;
+	
+	/* Delete the busy function: */
+	delete busyFunction;
+	}
+
+void Algorithm::setBusyFunction(Algorithm::BusyFunction* newBusyFunction)
+	{
+	/* Delete the previous busy function: */
+	delete busyFunction;
+	
+	/* Set the busy function: */
+	busyFunction=newBusyFunction;
 	}
 
 bool Algorithm::hasGlobalCreator(void) const

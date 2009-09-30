@@ -430,7 +430,7 @@ MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>::Locator::locatePoint(
 				{
 				/* Check if we can actually move in this direction: */
 				moveCellID=CellID();
-				if(index[i]<ds->grids[gridIndex].numCells[moveDim]-1||(moveCellID=ds->retrieveGridConnector(*this,i*2+1)).isValid())
+				if(index[i]<ds->grids[gridIndex].numCells[i]-1||(moveCellID=ds->retrieveGridConnector(*this,i*2+1)).isValid())
 					{
 					maxMove=cellPos[i]-Scalar(1);
 					moveDim=i;

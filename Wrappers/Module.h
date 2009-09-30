@@ -43,6 +43,8 @@ class SeededColoredIsosurfaceExtractor;
 template <class DataSetWrapperParam>
 class VolumeRendererExtractor;
 template <class DataSetWrapperParam>
+class TripleChannelVolumeRendererExtractor;
+template <class DataSetWrapperParam>
 class ArrowRakeExtractor;
 template <class DataSetWrapperParam>
 class StreamlineExtractor;
@@ -72,6 +74,7 @@ class Module:public Visualization::Abstract::Module
 	typedef Visualization::Wrappers::GlobalIsosurfaceExtractor<DataSet> GlobalIsosurfaceExtractor; // Global isosurface extractor class
 	typedef Visualization::Wrappers::SeededColoredIsosurfaceExtractor<DataSet> SeededColoredIsosurfaceExtractor; // Colored seeded isosurface extractor class
 	typedef Visualization::Wrappers::VolumeRendererExtractor<DataSet> VolumeRendererExtractor; // Volume renderer extractor class
+	typedef Visualization::Wrappers::TripleChannelVolumeRendererExtractor<DataSet> TripleChannelVolumeRendererExtractor; // Volume renderer extractor class with three scalar channels
 	typedef Visualization::Wrappers::ArrowRakeExtractor<DataSet> ArrowRakeExtractor; // Arrow rake extractor class
 	typedef Visualization::Wrappers::StreamlineExtractor<DataSet> StreamlineExtractor; // Streamline extractor class
 	typedef Visualization::Wrappers::MultiStreamlineExtractor<DataSet> MultiStreamlineExtractor; // Streamline bundle extractor class

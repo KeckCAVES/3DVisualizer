@@ -1,7 +1,7 @@
 /***********************************************************************
 SlicedCartesian - Base class for vertex-centered cartesian data sets
 containing multiple scalar-valued slices.
-Copyright (c) 2006-2007 Oliver Kreylos
+Copyright (c) 2006-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,19 +23,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_TEMPLATIZED_SLICEDCARTESIAN_INCLUDED
 #define VISUALIZATION_TEMPLATIZED_SLICEDCARTESIAN_INCLUDED
 
-#include <Misc/Array.h>
+#include <Misc/ArrayIndex.h>
 #include <Geometry/ComponentArray.h>
 #include <Geometry/Point.h>
 #include <Geometry/Vector.h>
 #include <Geometry/Box.h>
 
+#include <Templatized/SlicedDataValue.h>
 #include <Templatized/Tesseract.h>
+#include <Templatized/LinearIndexID.h>
+#include <Templatized/IteratorWrapper.h>
 
 namespace Visualization {
 
 namespace Templatized {
 
-template <class ScalarParam,int dimensionParam,class VScalarParam>
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
 class SlicedCartesian
 	{
 	/* Embedded classes: */
@@ -53,202 +56,152 @@ class SlicedCartesian
 	typedef Tesseract<dimensionParam> CellTopology; // Policy class to select appropriate cell algorithms
 	
 	/* Definition of the data set's value space: */
-	typedef VScalarParam VScalar; // Data set's value type
+	typedef ValueScalarParam ValueScalar; // Data set's value type
+	typedef SlicedDataValue<ValueScalar> Value; // Data set's compound value type
 	
 	/* Low-level definitions of data set storage: */
-	typedef Misc::Array<VScalar,dimensionParam> Array; // Array type for data set storage
-	typedef typename Array::Index Index; // Index type for data set storage
+	typedef Misc::ArrayIndex<dimensionParam> Index; // Index type for data set storage
 	
 	/* Data set interface classes: */
-	class VertexIterator;
-	class CellEdge;
-	class Cell;
-	class CellIterator;
-	class Locator;
+	typedef LinearIndexID VertexID;
 	
-	class VertexIterator // Class to iterate through all vertices in a data set
+	class Vertex // Class to represent and iterate through vertices
 		{
 		friend class SlicedCartesian;
 		
 		/* Elements: */
 		private:
-		const SlicedCartesian* grid; // Data set containing the vertex pointed to by the iterator
-		Index index; // Index of vertex pointed to by the iterator
+		const SlicedCartesian* ds; // Pointer to data set containing the vertex
+		Index index; // Array index of vertex in data set storage
 		
 		/* Constructors and destructors: */
 		public:
-		VertexIterator(void) // Creates invalid iterator
-			:grid(0)
+		Vertex(void) // Creates an invalid vertex
+			:ds(0)
 			{
 			}
 		private:
-		VertexIterator(const SlicedCartesian* sGrid,const Index& sIndex) // Creates iterator to given vertex
-			:grid(sGrid),index(sIndex)
+		Vertex(const SlicedCartesian* sDs,const Index& sIndex)
+			:ds(sDs),index(sIndex)
 			{
 			}
 		
 		/* Methods: */
 		public:
-		friend bool operator==(const VertexIterator& vi1,const VertexIterator& vi2) // Compares two vertex iterators for equality
+		Point getPosition(void) const; // Returns vertex' position in domain
+		template <class ValueExtractorParam>
+		typename ValueExtractorParam::DestValue getValue(const ValueExtractorParam& extractor) const // Returns vertex' value based on given extractor
 			{
-			return vi1.index==vi2.index&&vi1.grid==vi2.grid;
+			return extractor.getValue(ds->numVertices.calcOffset(index));
 			}
-		friend bool operator!=(const VertexIterator& vi1,const VertexIterator& vi2) // Compares two vertex iterators for inequality
+		template <class ScalarExtractorParam>
+		Vector calcGradient(const ScalarExtractorParam& extractor) const // Returns gradient at the vertex, based on given scalar extractor
 			{
-			return vi1.index!=vi2.index||vi1.grid!=vi2.grid;
+			return ds->calcVertexGradient(index,extractor);
 			}
-		Point getVertexPos(void) const; // Returns position of vertex pointed to by the iterator
-		VScalar getVertexValue(const Array& slice) const // Returns per-slice value of vertex pointed to by the iterator
+		VertexID getID(void) const // Returns vertex' ID
 			{
-			return slice(index);
+			return VertexID(VertexID::Index(ds->numVertices.calcOffset(index)));
 			}
-		VertexIterator& operator++(void) // Pre-increment operator
+		
+		/* Iterator methods: */
+		friend bool operator==(const Vertex& v1,const Vertex& v2)
 			{
-			index.preInc(grid->numVertices);
+			return v1.index==v2.index&&v1.ds==v2.ds;
+			}
+		friend bool operator!=(const Vertex& v1,const Vertex& v2)
+			{
+			return v1.index!=v2.index||v1.ds!=v2.ds;
+			}
+		Vertex& operator++(void) // Pre-increment operator
+			{
+			index.preInc(ds->numVertices);
 			return *this;
 			}
 		};
 	
-	class CellEdge // Class to represent edges of cells in a data set
-		{
-		friend class Cell;
-		
-		/* Elements: */
-		private:
-		const Value* baseVertex; // Base vertex of the edge
-		int edgeDirection; // Direction of the edge
-		
-		/* Constructors: */
-		private:
-		CellEdge(const Value* sBaseVertex,int sEdgeDirection) // Elementwise constructor
-			:baseVertex(sBaseVertex),edgeDirection(sEdgeDirection)
-			{
-			}
-		
-		/* Methods: */
-		public:
-		friend bool operator==(const CellEdge& ce1,const CellEdge& ce2) // Compares two cell edges for equality
-			{
-			return ce1.baseVertex==ce2.baseVertex&&ce1.edgeDirection==ce2.edgeDirection;
-			}
-		friend bool operator!=(const CellEdge& ce1,const CellEdge& ce2) // Compares two cell edges for inequality
-			{
-			return ce1.baseVertex!=ce2.baseVertex||ce1.edgeDirection!=ce2.edgeDirection;
-			}
-		static size_t hash(const CellEdge& source,size_t tableSize) // Calculates hash index for a cell edge
-			{
-			return (reinterpret_cast<size_t>(source.baseVertex)*dimension+source.edgeDirection)%tableSize;
-			}
-		};
+	typedef IteratorWrapper<Vertex> VertexIterator; // Class to iterate through vertices
 	
-	class Cell // Class to represent individual cells in a data set
+	typedef LinearIndexID EdgeID; // Class to identify cell edges
+	
+	typedef LinearIndexID CellID; // Class to identify cells
+	
+	class Locator;
+	
+	class Cell // Class to represent and iterate through cells
 		{
 		friend class SlicedCartesian;
-		friend class CellIterator;
 		friend class Locator;
 		
 		/* Elements: */
 		private:
-		const SlicedCartesian* grid; // Data set containing the cell
-		Index index; // Index of the cell
+		const SlicedCartesian* ds; // Pointer to the data set containing the cell
+		Index index; // Array index of cell's base vertex in data set storage
 		ptrdiff_t baseVertexIndex; // Index of base vertex of the cell
 		
 		/* Constructors and destructors: */
 		public:
 		Cell(void) // Creates an invalid cell
-			:grid(0),baseVertexIndex(-1)
+			:ds(0),baseVertexIndex(-1)
 			{
 			}
 		private:
-		Cell(const SlicedCartesian* sGrid) // Creates an invalid cell in the given data set
-			:grid(sGrid),baseVertexIndex(-1)
+		Cell(const SlicedCartesian* sDs) // Creates an invalid cell in the given data set
+			:ds(sDs),baseVertexIndex(-1)
 			{
 			}
-		Cell(const SlicedCartesian* sGrid,const Index& sIndex) // Elementwise constructor
-			:grid(sGrid),index(sIndex),baseVertexIndex(grid->slice[0].calcLinearIndex(index))
+		Cell(const SlicedCartesian* sDs,const Index& sIndex) // Elementwise constructor
+			:ds(sDs),index(sIndex),baseVertexIndex(ds->numVertices.calcOffset(index))
 			{
 			}
 		
 		/* Methods: */
 		public:
-		const SlicedCartesian* getGrid(void) const // Returns the data set containing the cell
-			{
-			return grid;
-			}
 		bool isValid(void) const // Returns true if the cell is valid
 			{
 			return baseVertexIndex>=0;
 			}
-		friend bool operator==(const Cell& cell1,const Cell& cell2) // Compares two cells for equality
+		VertexID getVertexID(int vertexIndex) const // Returns ID of given vertex of the cell
 			{
-			return cell1.baseVertexIndex==cell2.baseVertexIndex;
+			return VertexID(VertexID::Index(baseVertexIndex+ds->vertexOffsets[vertexIndex]));
 			}
-		friend bool operator!=(const Cell& cell1,const Cell& cell2) // Compares two cells for inequality
+		Vertex getVertex(int vertexIndex) const; // Returns the given vertex of the cell
+		Point getVertexPosition(int vertexIndex) const; // Returns position of given vertex of the cell
+		template <class ValueExtractorParam>
+		typename ValueExtractorParam::DestValue getVertexValue(int vertexIndex,const ValueExtractorParam& extractor) const // Returns value of given vertex of the cell, based on given extractor
 			{
-			return cell1.baseVertexIndex!=cell2.baseVertexIndex;
-			}
-		static size_t hash(const Cell& source,size_t tableSize) // Calculates hash index for a cell
-			{
-			return size_t(source.baseVertexIndex)%tableSize;
-			}
-		Point getVertexPos(int vertexIndex) const; // Returns position of given vertex of the cell
-		VScalar getVertexValue(int vertexIndex,const Array& slice) const // Returns value of given vertex of the cell
-			{
-			return slice.getArray()[baseVertexIndex+grid->vertexOffsets[vertexIndex]];
+			return extractor.getValue(baseVertexIndex+ds->vertexOffsets[vertexIndex]);
 			}
 		template <class ScalarExtractorParam>
-		Vector calcVertexGradient(int vertexIndex,const Aray& slice) const; // Returns gradient at given vertex of the cell, based on given scalar slice
-		CellEdge getEdge(int edgeIndex) const; // Returns an edge of the cell
-		Point getEdgePos(int edgeIndex,Scalar weight) const; // Returns an interpolated point along the given edge
-		Cell getNeighbour(int neighbourIndex) const; // Returns a face neighbour of the cell
-		};
-	
-	class CellIterator // Class to iterate through all cells in a data set
-		{
-		friend class SlicedCartesian;
+		Vector calcVertexGradient(int vertexIndex,const ScalarExtractorParam& extractor) const; // Returns gradient at given vertex of the cell, based on given scalar extractor
+		EdgeID getEdgeID(int edgeIndex) const; // Returns ID of given edge of the cell
+		Point calcEdgePosition(int edgeIndex,Scalar weight) const; // Returns an interpolated point along the given edge
+		CellID getID(void) const // Returns cell's ID
+			{
+			return CellID(CellID::Index(baseVertexIndex));
+			}
+		CellID getNeighbourID(int neighbourIndex) const; // Returns ID of neighbour across the given face of the cell
 		
-		/* Elements: */
-		private:
-		Cell cell; // Cell pointed to by the iterator
-		
-		/* Constructors and destructors: */
-		public:
-		CellIterator(void) // Creates invalid iterator
+		/* Iterator methods: */
+		friend bool operator==(const Cell& cell1,const Cell& cell2)
 			{
+			return cell1.baseVertexIndex==cell2.baseVertexIndex&&cell1.ds==cell2.ds;
 			}
-		private:
-		CellIterator(const SlicedCartesian* sGrid,const Index& sIndex) // Creates iterator to given cell
-			:cell(sGrid,sIndex)
+		friend bool operator!=(const Cell& cell1,const Cell& cell2)
 			{
+			return cell1.baseVertexIndex!=cell2.baseVertexIndex||cell1.ds!=cell2.ds;
 			}
-		
-		/* Methods: */
-		public:
-		friend bool operator==(const CellIterator& ci1,const CellIterator& ci2) // Compares two cell iterators for equality
+		Cell& operator++(void) // Pre-increment operator
 			{
-			return ci1.cell==ci2.cell;
-			}
-		friend bool operator!=(const CellIterator& ci1,const CellIterator& ci2) // Compares two cell iterators for inequality
-			{
-			return ci1.cell!=ci2.cell;
-			}
-		const Cell& operator*(void) const // Returns cell pointed to by the iterator
-			{
-			return cell;
-			}
-		const Cell* operator->(void) const // Returns cell pointed to by the iterator
-			{
-			return &cell;
-			}
-		CellIterator& operator++(void) // Pre-increment operator
-			{
-			cell.index.preInc(cell.grid->numCells);
-			cell.baseVertexIndex=cell.grid->slice[0].calcLinearIndex(cell.index);
+			index.preInc(ds->numCells);
+			baseVertexIndex=ds->numVertices.calcOffset(index);
 			return *this;
 			}
 		};
 	
-	class Locator // Class responsible for evaluating a data set at a given position
+	typedef IteratorWrapper<Cell> CellIterator; // Class to iterate through cells
+	
+	class Locator:private Cell // Class responsible for evaluating a data set at a given position
 		{
 		friend class SlicedCartesian;
 		
@@ -257,28 +210,26 @@ class SlicedCartesian
 		typedef Geometry::ComponentArray<Scalar,dimensionParam> CellPosition; // Type for local cell coordinates
 		
 		/* Elements: */
-		Cell cell; // Cell containing the last located point
+		using Cell::ds;
+		using Cell::index;
+		using Cell::baseVertexIndex;
 		CellPosition cellPos; // Local coordinates of last located point inside its cell
 		
 		/* Constructors and destructors: */
 		public:
 		Locator(void); // Creates invalid locator
 		private:
-		Locator(const SlicedCartesian* sGrid); // Creates non-localized locator associated with given data set
+		Locator(const SlicedCartesian* sDs); // Creates non-localized locator associated with given data set
 		
 		/* Methods: */
 		public:
 		void setEpsilon(Scalar newEpsilon) // Sets a new accuracy threshold in local cell dimension
 			{
-			/* Not needed for cartesian data sets */
+			/* Not needed for Cartesian data sets */
 			}
-		bool isValid(void) const // Returns true if the locator points to a valid cell
+		CellID getCellID(void) const // Returns the ID of the cell containing the last located point
 			{
-			return cell.isValid();
-			}
-		const Cell& getCell(void) const // Returns the cell containing the last located point
-			{
-			return cell;
+			return Cell::getID();
 			}
 		bool locatePoint(const Point& position,bool traceHint =false); // Sets locator to given position; returns true if position is inside found cell
 		template <class ValueExtractorParam>
@@ -287,14 +238,13 @@ class SlicedCartesian
 		Vector calcGradient(const ScalarExtractorParam& extractor) const; // Calculates gradient at last located position
 		};
 	
+	friend class Vertex;
 	friend class Cell;
 	friend class Locator;
 	
 	/* Elements: */
 	private:
 	Index numVertices; // Number of vertices in data set in each dimension
-	int numSlices; // Number of scalar value slices in the data set
-	Array* slices; // Array of vertex values defining data set for each slice
 	int vertexStrides[dimension]; // Array of pointer stride values in the vertex array
 	Index numCells; // Number of cells in data set in each dimension
 	int vertexOffsets[CellTopology::numVertices]; // Array of pointer offsets from a cell's base vertex to all cell vertices
@@ -302,44 +252,52 @@ class SlicedCartesian
 	VertexIterator firstVertex,lastVertex; // Bounds of vertex list
 	CellIterator firstCell,lastCell; // Bounds of cell list
 	Box domainBox; // Bounding box of all vertices
+	int numSlices; // Number of scalar value slices in the data set
+	ValueScalar** slices; // Array of vertex value slices
 	
 	/* Private methods: */
-	Vector calcVertexGradient(const Index& vertexIndex,const Array& slice) const; // Returns gradient at a vertex based on the given value slice
+	template <class ScalarExtractorParam>
+	Vector calcVertexGradient(const Index& vertexIndex,const ScalarExtractorParam& extractor) const; // Returns gradient at a vertex based on the given scalar extractor
 	
 	/* Constructors and destructors: */
 	public:
 	SlicedCartesian(void); // Creates an "empty" data set
-	SlicedCartesian(const Index& sNumVertices,int sNumSlices,const Size& sCellSize,const VScalar* sVertexValues =0); // Creates a data set of the given number of vertices and cell size; copies slice-major vertex data if pointer is not null
+	SlicedCartesian(const Index& sNumVertices,const Size& sCellSize,int sNumSlices,const ValueScalar* sVertexValues =0); // Creates a data set of the given number of vertices and cell size; copies slice-major vertex data if pointer is not null
 	~SlicedCartesian(void); // Destroys the data set
 	
 	/* Data set construction methods: */
-	void setData(const Index& sNumVertices,int sNumSlices,const Size& sCellSize,const Value* sVertexValues =0); // Sets the number of vertices and cell size of the data set; copies slice-major vertex data if pointer is not null
+	void setData(const Index& sNumVertices,const Size& sCellSize,int sNumSlices,const ValueScalar* sVertexValues =0); // Sets the number of vertices and cell size of the data set; copies slice-major vertex data if pointer is not null
+	int addSlice(const ValueScalar* sSliceValues =0); // Adds another slice to the data set; copies vertex data if pointer is not null
 	
 	/* Low-level data access methods: */
 	const Index& getNumVertices(void) const // Returns number of vertices in the data set
 		{
 		return numVertices;
 		}
+	int getVertexStride(int direction) const // Returns the data set's vertex stride in one direction
+		{
+		return vertexStrides[direction];
+		}
+	Point getVertexPosition(const Index& vertexIndex) const; // Returns a vertex' position
 	int getNumSlices(void) const
 		{
 		return numSlices;
 		}
-	const Array& getVertices(int sliceIndex) const // Returns the vertices defining the data set for the given slice
+	const ValueScalar* getSliceArray(int sliceIndex) const // Returns one of the data set's value slices as a C array
 		{
 		return slices[sliceIndex];
 		}
-	Array& getVertices(int sliceIndex) // Ditto
+	ValueScalar* getSliceArray(int sliceIndex) // Ditto
 		{
 		return slices[sliceIndex];
 		}
-	Point getVertexPos(const Index& vertexIndex) const; // Returns a vertex' position
-	VScalar getVertexValue(const Index& vertexIndex,int sliceIndex) const // Returns a vertex' data value inside a slice
+	ValueScalar getVertexValue(int sliceIndex,const Index& vertexIndex) const // Returns a vertex' data value inside a slice
 		{
-		return slices[sliceIndex](vertexIndex).value;
+		return slices[sliceIndex][numVertices.calcOffset(vertexIndex)];
 		}
-	VScalar& getVertexValue(const Index& vertexIndex,int sliceIndex) // Ditto
+	ValueScalar& getVertexValue(int sliceIndex,const Index& vertexIndex)  // Ditto
 		{
-		return slices[sliceIndex](vertexIndex).value;
+		return slices[sliceIndex][numVertices.calcOffset(vertexIndex)];
 		}
 	const Index& getNumCells(void) const // Returns number of cells in grid
 		{
@@ -355,6 +313,10 @@ class SlicedCartesian
 		{
 		return numVertices.calcIncrement(-1);
 		}
+	Vertex getVertex(const VertexID& vertexID) const // Returns vertex of given valid ID
+		{
+		return Vertex(this,numVertices.calcIndex(vertexID.getIndex()));
+		}
 	const VertexIterator& beginVertices(void) const // Returns iterator to first vertex in the data set
 		{
 		return firstVertex;
@@ -366,6 +328,10 @@ class SlicedCartesian
 	size_t getTotalNumCells(void) const // Returns total number of cells in the data set
 		{
 		return numCells.calcIncrement(-1);
+		}
+	Cell getCell(const CellID& cellID) const // Return cell of given valid ID
+		{
+		return Cell(this,numVertices.calcIndex(cellID.getIndex()));
 		}
 	const CellIterator& beginCells(void) const // Returns iterator to first cell in the data set
 		{
@@ -379,6 +345,7 @@ class SlicedCartesian
 		{
 		return domainBox;
 		}
+	Scalar calcAverageCellSize(void) const; // Calculates an estimate of the average cell size in the data set
 	Locator getLocator(void) const // Returns an unlocalized locator for the data set
 		{
 		return Locator(this);

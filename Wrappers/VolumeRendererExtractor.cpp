@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_WRAPPERS_VOLUMERENDEREREXTRACTOR_IMPLEMENTATION
 
+#include <Wrappers/VolumeRendererExtractor.h>
+
 #include <Misc/ThrowStdErr.h>
 #include <Misc/File.h>
 #include <Comm/MulticastPipe.h>
@@ -30,8 +32,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Abstract/VariableManager.h>
 #include <Wrappers/ScalarExtractor.h>
-
-#include <Wrappers/VolumeRendererExtractor.h>
 
 namespace Visualization {
 
@@ -197,34 +197,6 @@ Methods of class VolumeRendererExtractor:
 
 template <class DataSetWrapperParam>
 inline
-const typename VolumeRendererExtractor<DataSetWrapperParam>::DS*
-VolumeRendererExtractor<DataSetWrapperParam>::getDs(
-	const Visualization::Abstract::DataSet* sDataSet)
-	{
-	/* Get a pointer to the data set wrapper: */
-	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(sDataSet);
-	if(myDataSet==0)
-		Misc::throwStdErr("VolumeRendererExtractor::VolumeRendererExtractor: Mismatching data set type");
-	
-	return &myDataSet->getDs();
-	}
-
-template <class DataSetWrapperParam>
-inline
-const typename VolumeRendererExtractor<DataSetWrapperParam>::SE&
-VolumeRendererExtractor<DataSetWrapperParam>::getSe(
-	const Visualization::Abstract::ScalarExtractor* sScalarExtractor)
-	{
-	/* Get a pointer to the scalar extractor wrapper: */
-	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(sScalarExtractor);
-	if(myScalarExtractor==0)
-		Misc::throwStdErr("VolumeRendererExtractor::VolumeRendererExtractor: Mismatching scalar extractor type");
-	
-	return myScalarExtractor->getSe();
-	}
-
-template <class DataSetWrapperParam>
-inline
 VolumeRendererExtractor<DataSetWrapperParam>::VolumeRendererExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
 	 Comm::MulticastPipe* sPipe)
@@ -232,7 +204,7 @@ VolumeRendererExtractor<DataSetWrapperParam>::VolumeRendererExtractor(
 	 parameters(sVariableManager->getCurrentScalarVariable())
 	{
 	/* Initialize parameters: */
-	parameters.sliceFactor=Scalar(2);
+	parameters.sliceFactor=Scalar(1);
 	parameters.transparencyGamma=1.0f;
 	}
 
@@ -249,21 +221,8 @@ Visualization::Abstract::Element*
 VolumeRendererExtractor<DataSetWrapperParam>::createElement(
 	Visualization::Abstract::Parameters* extractParameters)
 	{
-	/* Get proper pointer to parameter object: */
-	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
-	if(myParameters==0)
-		Misc::throwStdErr("VolumeRendererExtractor::createElement: Mismatching parameter object type");
-	int svi=myParameters->scalarVariableIndex;
-	
-	/* Get the data set and scalar extractor: */
-	const DS* ds=getDs(getVariableManager()->getDataSetByScalarVariable(svi));
-	const SE& se=getSe(getVariableManager()->getScalarExtractor(svi));
-	
 	/* Create a new volume renderer visualization element: */
-	VolumeRenderer* result=new VolumeRenderer(myParameters,myParameters->sliceFactor,myParameters->transparencyGamma,ds,se,getVariableManager()->getColorMap(svi),getPipe());
-	
-	/* Return the result: */
-	return result;
+	return new VolumeRenderer(this,extractParameters);
 	}
 
 template <class DataSetWrapperParam>
@@ -275,21 +234,8 @@ VolumeRendererExtractor<DataSetWrapperParam>::startSlaveElement(
 	if(isMaster())
 		Misc::throwStdErr("VolumeRendererExtractor::startSlaveElement: Cannot be called on master node");
 	
-	/* Get proper pointer to parameter object: */
-	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
-	if(myParameters==0)
-		Misc::throwStdErr("VolumeRendererExtractor::startSlaveElement: Mismatching parameter object type");
-	int svi=myParameters->scalarVariableIndex;
-	
-	/* Get the data set and scalar extractor: */
-	const DS* ds=getDs(getVariableManager()->getDataSetByScalarVariable(svi));
-	const SE& se=getSe(getVariableManager()->getScalarExtractor(svi));
-	
 	/* Create a new volume renderer visualization element: */
-	VolumeRenderer* result=new VolumeRenderer(myParameters,myParameters->sliceFactor,myParameters->transparencyGamma,ds,se,getVariableManager()->getColorMap(svi),getPipe());
-	
-	/* Return the result: */
-	return result;
+	return new VolumeRenderer(this,extractParameters);
 	}
 
 }

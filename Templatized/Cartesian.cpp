@@ -22,11 +22,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_TEMPLATIZED_CARTESIAN_IMPLEMENTATION
 
+#include <Templatized/Cartesian.h>
+
 #include <Math/Math.h>
 
 #include <Templatized/LinearInterpolator.h>
-
-#include <Templatized/Cartesian.h>
 
 namespace Visualization {
 
@@ -233,7 +233,7 @@ Cartesian<ScalarParam,dimensionParam,ValueParam>::Locator::locatePoint(
 		cellPos[i]=p-Scalar(index[i]);
 		}
 	
-	/* Update the cell's base address: */
+	/* Update the cell's base vertex: */
 	baseVertex=ds->vertices.getAddress(index);
 	
 	return result;
@@ -420,7 +420,7 @@ Cartesian<ScalarParam,dimensionParam,ValueParam>::setData(
 	
 	/* Initialize vertex stride array: */
 	for(int i=0;i<dimension;++i)
-		vertexStrides[i]=vertices.getIncrement(i);
+		vertexStrides[i]=numVertices.calcIncrement(i);
 	
 	/* Initialize the cell size: */
 	cellSize=sCellSize;

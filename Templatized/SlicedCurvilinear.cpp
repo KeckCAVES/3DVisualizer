@@ -401,8 +401,8 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::Locator::calcVal
 	Scalar w0=Scalar(1)-w1;
 	for(int vi=0;vi<numSteps;++vi)
 		{
-		int linearIndex=baseVertexIndex+ds->vertexOffsets[vi];
-		v[vi]=Interpolator::interpolate(extractor.getValue(linearIndex+0),w0,extractor.getValue(linearIndex+1),w1);
+		ptrdiff_t vIndex=baseVertexIndex+ds->vertexOffsets[vi];
+		v[vi]=Interpolator::interpolate(extractor.getValue(vIndex+0),w0,extractor.getValue(vIndex+1),w1);
 		}
 	for(int i=1;i<dimension;++i)
 		{
@@ -470,7 +470,7 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::initStructure(
 	{
 	/* Initialize vertex stride array: */
 	for(int i=0;i<dimension;++i)
-		vertexStrides[i]=grid.getIncrement(i);
+		vertexStrides[i]=numVertices.calcIncrement(i);
 	
 	/* Calculate number of cells: */
 	for(int i=0;i<dimension;++i)
@@ -513,13 +513,13 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::calcVertexGradie
 	Matrix gridJacobian;
 	Vector valueGradient;
 	const Point* gridPtr=grid.getArray();
-	int vertex=grid.calcLinearIndex(vertexIndex);
+	ptrdiff_t vertex=grid.calcLinearIndex(vertexIndex);
 	for(int i=0;i<dimension;++i)
 		{
 		if(vertexIndex[i]==0)
 			{
-			int left=vertex+vertexStrides[i];
-			int right=left+vertexStrides[i];
+			ptrdiff_t left=vertex+vertexStrides[i];
+			ptrdiff_t right=left+vertexStrides[i];
 			for(int j=0;j<dimension;++j)
 				gridJacobian(i,j)=Math::div2(Scalar(-3)*gridPtr[vertex][j]+Scalar(4)*gridPtr[left][j]-gridPtr[right][j]);
 			Scalar f0=Scalar(extractor.getValue(vertex));
@@ -529,8 +529,8 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::calcVertexGradie
 			}
 		else if(vertexIndex[i]==numVertices[i]-1)
 			{
-			int right=vertex-vertexStrides[i];
-			int left=right-vertexStrides[i];
+			ptrdiff_t right=vertex-vertexStrides[i];
+			ptrdiff_t left=right-vertexStrides[i];
 			for(int j=0;j<dimension;++j)
 				gridJacobian(i,j)=Math::div2(gridPtr[left][j]-Scalar(4)*gridPtr[right][j]+Scalar(3)*gridPtr[vertex][j]);
 			Scalar f0=Scalar(extractor.getValue(left));
@@ -540,8 +540,8 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::calcVertexGradie
 			}
 		else
 			{
-			int left=vertex-vertexStrides[i];
-			int right=vertex+vertexStrides[i];
+			ptrdiff_t left=vertex-vertexStrides[i];
+			ptrdiff_t right=vertex+vertexStrides[i];
 			for(int j=0;j<dimension;++j)
 				gridJacobian(i,j)=Math::div2(gridPtr[right][j]-gridPtr[left][j]);
 			Scalar f0=Scalar(extractor.getValue(left));
@@ -647,9 +647,9 @@ SlicedCurvilinear<ScalarParam,dimensionParam,ValueScalarParam>::setGrid(
 	if(sVertexPositions!=0)
 		{
 		/* Copy all grid vertex positions: */
-		int totalNumVertices=grid.getNumElements();
+		size_t totalNumVertices=numVertices.calcIncrement(-1);
 		Point* vPtr=grid.getArray();
-		for(int i=0;i<totalNumVertices;++i)
+		for(size_t i=0;i<totalNumVertices;++i)
 			vPtr[i]=sVertexPositions[i];
 		
 		/* Finalize grid structure: */

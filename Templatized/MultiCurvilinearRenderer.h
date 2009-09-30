@@ -2,7 +2,7 @@
 MultiCurvilinearRenderer - Class to render multi-grid curvilinear data
 sets. Implemented as a specialization of the generic DataSetRenderer
 class.
-Copyright (c) 2007 Oliver Kreylos
+Copyright (c) 2007-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -26,56 +26,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Templatized/DataSetRenderer.h>
 #include <Templatized/MultiCurvilinear.h>
-
-/* Forward declarations: */
-class GLContextData;
+#include <Templatized/MultiCurvilinearGridRenderer.h>
 
 namespace Visualization {
 
 namespace Templatized {
 
 template <class ScalarParam,int dimensionParam,class ValueParam>
-class DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >
+class DataSetRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >:public MultiCurvilinearGridRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >
 	{
-	/* Embedded classes: */
-	public:
-	typedef MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> DataSet; // Type of rendered data set
-	typedef typename DataSet::Scalar Scalar; // Scalar type of data set's domain
-	static const int dimension=dimensionParam; // Dimension of data set's domain
-	typedef typename DataSet::Point Point; // Type for points in data set's domain
-	typedef typename DataSet::Vector Vector; // Type for vectors in data set's domain
-	typedef typename DataSet::Box Box; // Type for axis-aligned boxes in data set's domain
-	typedef typename DataSet::CellID CellID; // Type for cell IDs in data set
-	typedef typename DataSet::Cell Cell; // Type for cells in data set
-	
-	/* Elements: */
-	private:
-	const DataSet* dataSet; // Pointer to the data set to be rendered
-	int renderingModeIndex; // Index of currently selected rendering mode
-	
 	/* Constructors and destructors: */
 	public:
-	DataSetRenderer(const DataSet* sDataSet); // Creates a renderer for the given data set
-	~DataSetRenderer(void);
-	
-	/* Methods: */
-	static int getNumRenderingModes(void); // Returns the number of supported rendering modes
-	static const char* getRenderingModeName(int renderingModeIndex); // Returns name of given rendering mode
-	int getRenderingMode(void) const // Returns the current rendering mode
+	DataSetRenderer(const MultiCurvilinear<ScalarParam,dimensionParam,ValueParam>* sDataSet) // Creates a renderer for the given data set
+		:MultiCurvilinearGridRenderer<MultiCurvilinear<ScalarParam,dimensionParam,ValueParam> >(sDataSet)
 		{
-		return renderingModeIndex;
 		}
-	void setRenderingMode(int newRenderingModeIndex); // Sets a new rendering mode
-	void glRenderAction(GLContextData& contextData) const; // Renders the data set
-	void renderCell(const CellID& cellID,GLContextData& contextData) const; // Highlights the given cell
 	};
 
 }
 
 }
-
-#ifndef VISUALIZATION_TEMPLATIZED_MULTICURVILINEARRENDERER_IMPLEMENTATION
-#include <Templatized/MultiCurvilinearRenderer.cpp>
-#endif
 
 #endif

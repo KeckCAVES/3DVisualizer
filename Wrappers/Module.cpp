@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Wrappers/GlobalIsosurfaceExtractor.h>
 #include <Wrappers/SeededColoredIsosurfaceExtractor.h>
 #include <Wrappers/VolumeRendererExtractor.h>
+#include <Wrappers/TripleChannelVolumeRendererExtractor.h>
 #include <Wrappers/ArrowRakeExtractor.h>
 #include <Wrappers/StreamlineExtractor.h>
 #include <Wrappers/MultiStreamlineExtractor.h>
@@ -70,7 +71,7 @@ int
 Module<DSParam,DataValueParam>::getNumScalarAlgorithms(
 	void) const
 	{
-	return 5;
+	return 6;
 	}
 
 template <class DSParam,class DataValueParam>
@@ -79,7 +80,7 @@ const char*
 Module<DSParam,DataValueParam>::getScalarAlgorithmName(
 	int scalarAlgorithmIndex) const
 	{
-	if(scalarAlgorithmIndex<0||scalarAlgorithmIndex>=5)
+	if(scalarAlgorithmIndex<0||scalarAlgorithmIndex>=6)
 		Misc::throwStdErr("Module::getAlgorithmName: invalid algorithm index %d",scalarAlgorithmIndex);
 	
 	const char* result=0;
@@ -104,6 +105,10 @@ Module<DSParam,DataValueParam>::getScalarAlgorithmName(
 		case 4:
 			result=VolumeRendererExtractor::getClassName();
 			break;
+		
+		case 5:
+			result=TripleChannelVolumeRendererExtractor::getClassName();
+			break;
 		}
 	return result;
 	}
@@ -116,7 +121,7 @@ Module<DSParam,DataValueParam>::getScalarAlgorithm(
 	Visualization::Abstract::VariableManager* variableManager,
 	Comm::MulticastPipe* pipe) const
 	{
-	if(scalarAlgorithmIndex<0||scalarAlgorithmIndex>=5)
+	if(scalarAlgorithmIndex<0||scalarAlgorithmIndex>=6)
 		Misc::throwStdErr("Module::getAlgorithm: invalid algorithm index %d",scalarAlgorithmIndex);
 	
 	Visualization::Abstract::Algorithm* result=0;
@@ -140,6 +145,10 @@ Module<DSParam,DataValueParam>::getScalarAlgorithm(
 		
 		case 4:
 			result=new VolumeRendererExtractor(variableManager,pipe);
+			break;
+		
+		case 5:
+			result=new TripleChannelVolumeRendererExtractor(variableManager,pipe);
 			break;
 		}
 	return result;

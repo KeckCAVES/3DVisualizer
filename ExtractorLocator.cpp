@@ -22,9 +22,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include "ExtractorLocator.h"
 
+#include <Misc/FunctionCalls.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GLMotif/WidgetManager.h>
 #include <GLMotif/PopupWindow.h>
+#include <GLMotif/RowColumn.h>
 #include <GLMotif/Label.h>
 #include <Vrui/Vrui.h>
 
@@ -48,11 +50,30 @@ GLMotif::PopupWindow* ExtractorLocator::createBusyDialog(const char* algorithmNa
 	/* Create the busy dialog window: */
 	GLMotif::PopupWindow* busyDialogPopup=new GLMotif::PopupWindow("BusyDialogPopup",Vrui::getWidgetManager(),"Element Extractor");
 	
+	GLMotif::RowColumn* busyDialog=new GLMotif::RowColumn("BusyDialog",busyDialogPopup,false);
+	busyDialog->setOrientation(GLMotif::RowColumn::HORIZONTAL);
+	busyDialog->setPacking(GLMotif::RowColumn::PACK_TIGHT);
+	
 	char label[256];
 	snprintf(label,sizeof(label),"Extracting %s...",algorithmName);
-	new GLMotif::Label("BusyLabel",busyDialogPopup,label);
+	new GLMotif::Label("BusyLabel",busyDialog,label);
+	
+	percentageLabel=new GLMotif::Label("PercentageLabel",busyDialog,"");
+	
+	busyDialog->manageChild();
 	
 	return busyDialogPopup;
+	}
+
+void ExtractorLocator::busyFunction(float percentageCompletion)
+	{
+	if(busyDialog!=0)
+		{
+		char percentage[10];
+		snprintf(percentage,sizeof(percentage),"%5.1f",percentageCompletion);
+		percentageLabel->setLabel(percentage);
+		Vrui::requestUpdate();
+		}
 	}
 
 ExtractorLocator::ExtractorLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Extractor::Algorithm* sExtractor)
@@ -63,6 +84,9 @@ ExtractorLocator::ExtractorLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* s
 	 dragging(false),
 	 lastSeedRequestID(0)
 	{
+	/* Set the algorithm's busy function: */
+	extractor->setBusyFunction(new Misc::VoidMethodCall<float,ExtractorLocator>(this,&ExtractorLocator::busyFunction));
+	
 	#ifdef VISUALIZER_USE_COLLABORATION
 	if(application->sharedVisualizationClient!=0)
 		{

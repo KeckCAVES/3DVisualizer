@@ -235,6 +235,8 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 					try
 						{
 						parser.readDoubles(numVariables,ignoreFlags,columnBuffer);
+						parser.skipLine();
+						parser.skipWs();
 						}
 					catch(std::runtime_error err)
 						{

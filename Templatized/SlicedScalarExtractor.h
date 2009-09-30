@@ -1,7 +1,7 @@
 /***********************************************************************
 SlicedScalarExtractor - Specialized scalar extractor class to extract
 scalar values from data sets containing scalar slices.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2009 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #ifndef VISUALIZATION_SLICEDSCALAREXTRACTOR_INCLUDED
 #define VISUALIZATION_SLICEDSCALAREXTRACTOR_INCLUDED
+
+#include <stddef.h>
 
 #include <Templatized/SlicedDataValue.h>
 
@@ -58,7 +60,7 @@ class ScalarExtractor<ScalarParam,SlicedDataValue<SourceValueScalarParam> >
 		}
 	
 	/* Methods: */
-	DestValue getValue(int linearIndex) const // Extracts scalar from given linear index in slice value array
+	DestValue getValue(ptrdiff_t linearIndex) const // Extracts scalar from given linear index in slice value array
 		{
 		return DestValue(valueArray[linearIndex]);
 		}
