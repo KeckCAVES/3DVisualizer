@@ -66,3 +66,8 @@
   variables simultaneously.
 - Created new module for multi-valued image stacks.
 - Created new (experimental) module for GoCAD voxet files.
+
+3D Visualizer 1.7:
+- Adapted shared visualization protocol to collaboration infrastructure
+  version 1.3.
+- Fixed regression bug in non-shader version of volume renderer.

@@ -20,17 +20,14 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#include "SharedVisualizationServer.h"
-
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <iostream>
 #include <Misc/Time.h>
 #include <Collaboration/CollaborationServer.h>
-#include <Collaboration/AgoraServer.h>
-#include <Collaboration/EmineoServer.h>
-#include <Collaboration/GrapheinServer.h>
+
+#include "SharedVisualizationServer.h"
 
 volatile bool runServerLoop=true;
 
@@ -41,9 +38,11 @@ void termSignalHandler(int)
 
 int main(int argc,char* argv[])
 	{
+	/* Create a new configuration object: */
+	Collaboration::CollaborationServer::Configuration* cfg=new Collaboration::CollaborationServer::Configuration;
+	
 	/* Parse the command line: */
-	int listenPortId=0;
-	Misc::Time tickTime(0.02); // Server update time interval in seconds
+	Misc::Time tickTime(cfg->getTickTime()); // Server update time interval in seconds
 	for(int i=1;i<argc;++i)
 		{
 		if(argv[i][0]=='-')
@@ -52,9 +51,9 @@ int main(int argc,char* argv[])
 				{
 				++i;
 				if(i<argc)
-					listenPortId=atoi(argv[i]);
+					cfg->setListenPortId(atoi(argv[i]));
 				else
-					std::cerr<<"CollaborationServerMain: ignored dangling -port option"<<std::endl;
+					std::cerr<<"SharedVisualizationServerMain: ignored dangling -port option"<<std::endl;
 				}
 			else if(strcasecmp(argv[i]+1,"tick")==0)
 				{
@@ -62,7 +61,7 @@ int main(int argc,char* argv[])
 				if(i<argc)
 					tickTime=Misc::Time(atof(argv[i]));
 				else
-					std::cerr<<"CollaborationServerMain: ignored dangling -tick option"<<std::endl;
+					std::cerr<<"SharedVisualizationServerMain: ignored dangling -tick option"<<std::endl;
 				}
 			}
 		}
@@ -75,17 +74,8 @@ int main(int argc,char* argv[])
 	sigaction(SIGPIPE,&sigPipeAction,0);
 	
 	/* Create the collaboration server object: */
-	Collaboration::CollaborationServer server(listenPortId);
+	Collaboration::CollaborationServer server(cfg);
 	std::cout<<"SharedVisualizationServerMain: Started server on port "<<server.getListenPortId()<<std::endl;
-	
-	/* Add an Agora protocol object: */
-	server.registerProtocol(new Collaboration::AgoraServer);
-	
-	/* Add an Emineo protocol object: */
-	server.registerProtocol(new Collaboration::EmineoServer);
-	
-	/* Add a Graphein protocol object: */
-	server.registerProtocol(new Collaboration::GrapheinServer);
 	
 	/* Add a shared Visualizer protocol object: */
 	server.registerProtocol(new Collaboration::SharedVisualizationServer);

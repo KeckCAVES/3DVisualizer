@@ -85,15 +85,11 @@ USE_SHADERS = 0
 # spatially distributed shared data exploration.
 USE_COLLABORATION = 0
 
-# Flag whether the Vrui collaboration infrastructure has built-in
-# support for 3D video using the Emineo rendering architecture.
-USE_EMINEO = 0
-
 # Version number for installation subdirectories. This is used to keep
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.6
+VERSION = 1.7
 
 # Set up destination directories for compilation products:
 OBJDIRBASE = o
@@ -248,11 +244,6 @@ $(OBJDIR)/Concrete/EarthRenderer.o: CFLAGS += -DEARTHRENDERER_IMAGEDIR='"$(INSTA
 $(OBJDIR)/SingleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(INSTALLDIR)/$(SHADERDIR)"'
 $(OBJDIR)/TripleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(INSTALLDIR)/$(SHADERDIR)"'
 $(OBJDIR)/Visualizer.o: CFLAGS += -DVISUALIZER_MODULENAMETEMPLATE='"$(INSTALLDIR)/$(call PLUGINNAME,%s)"'
-ifneq ($(USE_COLLABORATION),0)
-  ifneq ($(USE_EMINEO),0)
-    $(OBJDIR)/Visualizer.o: CFLAGS += -DVISUALIZER_USE_EMINEO
-  endif
-endif
 
 #
 # Rule to build 3D Visualizer main program

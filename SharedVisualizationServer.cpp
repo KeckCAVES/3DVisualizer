@@ -336,3 +336,21 @@ void SharedVisualizationServer::afterServerUpdate(ProtocolServer::ClientState* c
 	}
 
 }
+
+/****************
+DSO entry points:
+****************/
+
+extern "C" {
+
+Collaboration::ProtocolServer* createObject(Collaboration::ProtocolServerLoader& objectLoader)
+	{
+	return new Collaboration::SharedVisualizationServer;
+	}
+
+void destroyObject(Collaboration::ProtocolServer* object)
+	{
+	delete object;
+	}
+
+}

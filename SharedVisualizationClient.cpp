@@ -369,8 +369,8 @@ void SharedVisualizationClient::receiveServerUpdate(ProtocolClient::RemoteClient
 
 void SharedVisualizationClient::rejectedByServer(void)
 	{
-	/* Signal an error: */
-	Misc::throwStdErr("SharedVisualizationClient: Server does not support shared Visualizer protocol. Bummer.");
+	/* Write a warning message: */
+	std::cout<<"SharedVisualizationClient: Server does not support shared Visualizer protocol. Bummer."<<std::endl;
 	}
 
 void SharedVisualizationClient::frame(ProtocolClient::RemoteClientState* rcs)

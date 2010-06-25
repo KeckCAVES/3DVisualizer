@@ -144,6 +144,11 @@ VolumeRenderer<DataSetWrapperParam>::VolumeRenderer(
 	renderer->setAutosaveGLState(true);
 	renderer->setTextureCaching(true);
 	renderer->setSharePalette(false);
+	
+	/* Set the volume renderer's parameters: */
+	colorMap=variableManager->getColorMap(svi);
+	transparencyGamma=1.0f;
+	
 	#endif
 	}
 

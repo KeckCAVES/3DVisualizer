@@ -54,11 +54,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Vrui/Vrui.h>
 #ifdef VISUALIZER_USE_COLLABORATION
 #include <Collaboration/CollaborationClient.h>
-#include <Collaboration/AgoraClient.h>
-#ifdef VISUALIZER_USE_EMINEO
-#include <Collaboration/EmineoClient.h>
-#endif
-#include <Collaboration/GrapheinClient.h>
 #endif
 
 #include <Abstract/DataSetRenderer.h>
@@ -588,38 +583,42 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 			#ifdef VISUALIZER_USE_COLLABORATION
 			else if(strcasecmp(argv[i]+1,"share")==0)
 				{
-				if(i<argc-2)
+				try
 					{
-					try
+					/* Create a configuration object: */
+					Collaboration::CollaborationClient::Configuration* cfg=new Collaboration::CollaborationClient::Configuration;
+					
+					/* Check if the next argument is a server name: */
+					if(i+2<argc&&strcasecmp(argv[i+1],"-server")==0)
 						{
-						/* Connect to the specified shared Visualizer server: */
-						collaborationClient=new Collaboration::CollaborationClient(argv[i+1],atoi(argv[i+2]));
+						i+=2;
 						
-						/* Register the Agora protocol: */
-						collaborationClient->registerProtocol(new Collaboration::AgoraClient);
-						
-						#ifdef VISUALIZER_USE_EMINEO
-						/* Register the Emineo protocol: */
-						collaborationClient->registerProtocol(new Collaboration::EmineoClient);
-						#endif
-						
-						/* Register the Graphein protocol: */
-						collaborationClient->registerProtocol(new Collaboration::GrapheinClient);
-						
-						/* Register a shared Visualizer plug-in: */
-						sharedVisualizationClient=new Collaboration::SharedVisualizationClient(this);
-						collaborationClient->registerProtocol(sharedVisualizationClient);
+						/* Split the server name into host name and port ID: */
+						char* colonPtr=0;
+						for(char* sPtr=argv[i];*sPtr!='\0';++sPtr)
+							if(*sPtr==':')
+								colonPtr=sPtr;
+						if(colonPtr!=0)
+							cfg->setServer(std::string(argv[i],colonPtr),atoi(colonPtr+1));
+						else
+							{
+							/* Use the default port: */
+							cfg->setServer(argv[i],26000);
+							}
 						}
-					catch(std::runtime_error err)
-						{
-						std::cerr<<"Caught exception "<<err.what()<<" while creating shared Visualizer client"<<std::endl;
-						delete collaborationClient;
-						collaborationClient=0;
-						}
+					
+					/* Create the collaboration client: */
+					collaborationClient=new Collaboration::CollaborationClient(cfg);
+					
+					/* Register the shared Visualizer protocol: */
+					collaborationClient->registerProtocol(new Collaboration::SharedVisualizationClient(this));
 					}
-				else
-					std::cerr<<"Ignoring dangling -share flag"<<std::endl;
-				i+=2;
+				catch(std::runtime_error err)
+					{
+					std::cerr<<"Caught exception "<<err.what()<<" while creating shared Visualizer client"<<std::endl;
+					delete collaborationClient;
+					collaborationClient=0;
+					}
 				}
 			#endif
 			}
@@ -703,25 +702,8 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 		{
 		try
 			{
-			/* Try a special environment variable first: */
-			const char* clientName=getenv("SHAREDVISUALIZER_CLIENTNAME");
-			
-			if(clientName==0)
-				{
-				/* Try the local host name next: */
-				clientName=getenv("HOSTNAME");
-				if(clientName==0)
-					clientName=getenv("HOST");
-				}
-			
-			if(clientName==0)
-				{
-				/* Assign a default name: */
-				clientName="Anonymous Visualizer";
-				}
-			
 			/* Connect to the server: */
-			collaborationClient->connect(clientName);
+			collaborationClient->connect();
 			}
 		catch(std::runtime_error err)
 			{
@@ -729,6 +711,9 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 			delete collaborationClient;
 			collaborationClient=0;
 			}
+		
+		/* Get a pointer to the shared Visualizer protocol: */
+		sharedVisualizationClient=dynamic_cast<Collaboration::SharedVisualizationClient*>(collaborationClient->getProtocol(Collaboration::SharedVisualizationClient::protocolName));
 		}
 	#endif
 	
