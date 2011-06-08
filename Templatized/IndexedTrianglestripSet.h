@@ -1,7 +1,7 @@
 /***********************************************************************
 IndexedTrianglestripSet - Class to represent surfaces as sets of
 triangle strips sharing vertices.
-Copyright (c) 2007 Oliver Kreylos
+Copyright (c) 2007-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -223,7 +223,7 @@ class IndexedTrianglestripSet:public GLObject
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_INDEXEDTRIANGLESTRIPSET_IMPLEMENTATION
-#include <Templatized/IndexedTrianglestripSet.cpp>
+#include <Templatized/IndexedTrianglestripSet.icpp>
 #endif
 
 #endif

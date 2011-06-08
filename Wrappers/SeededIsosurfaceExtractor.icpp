@@ -1,0 +1,415 @@
+/***********************************************************************
+SeededIsosurfaceExtractor - Wrapper class to map from the abstract
+visualization algorithm interface to a templatized isosurface extractor
+implementation.
+Copyright (c) 2005-2010 Oliver Kreylos
+
+This file is part of the 3D Data Visualizer (Visualizer).
+
+The 3D Data Visualizer is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+The 3D Data Visualizer is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with the 3D Data Visualizer; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+***********************************************************************/
+
+#define VISUALIZATION_WRAPPERS_SEEDEDISOSURFACEEXTRACTOR_IMPLEMENTATION
+
+#include <Wrappers/SeededIsosurfaceExtractor.h>
+
+#include <Misc/ThrowStdErr.h>
+#include <Misc/StandardMarshallers.h>
+#include <Misc/StandardValueCoders.h>
+#include <Geometry/GeometryMarshallers.h>
+#include <Geometry/GeometryValueCoders.h>
+#include <GL/GLColorMap.h>
+#include <GLMotif/StyleSheet.h>
+#include <GLMotif/WidgetManager.h>
+#include <GLMotif/PopupWindow.h>
+#include <GLMotif/Margin.h>
+#include <GLMotif/Label.h>
+#include <GLMotif/TextField.h>
+#include <GLMotif/RowColumn.h>
+
+#include <Abstract/VariableManager.h>
+#include <Abstract/ParametersSink.h>
+#include <Abstract/ParametersSource.h>
+#include <Templatized/IsosurfaceExtractorIndexedTriangleSet.h>
+#include <Wrappers/ScalarExtractor.h>
+#include <Wrappers/ElementSizeLimit.h>
+#include <Wrappers/AlarmTimerElement.h>
+
+namespace Visualization {
+
+namespace Wrappers {
+
+/******************************************************
+Methods of class SeededIsosurfaceExtractor::Parameters:
+******************************************************/
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededIsosurfaceExtractor<DataSetWrapperParam>::Parameters::write(
+	Visualization::Abstract::ParametersSink& sink) const
+	{
+	/* Write all parameters: */
+	sink.writeScalarVariable("scalarVariable",scalarVariableIndex);
+	sink.write("maxNumTriangles",Visualization::Abstract::Writer<unsigned int>((unsigned int)maxNumTriangles));
+	sink.write("smoothShading",Visualization::Abstract::Writer<bool>(smoothShading));
+	sink.write("isovalue",Visualization::Abstract::Writer<VScalar>(isovalue));
+	sink.write("seedPoint",Visualization::Abstract::Writer<Point>(seedPoint));
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededIsosurfaceExtractor<DataSetWrapperParam>::Parameters::read(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read all parameters: */
+	source.readScalarVariable("scalarVariable",scalarVariableIndex);
+	unsigned int mnt;
+	source.read("maxNumTriangles",Visualization::Abstract::Reader<unsigned int>(mnt));
+	maxNumTriangles=size_t(mnt);
+	source.read("smoothShading",Visualization::Abstract::Reader<bool>(smoothShading));
+	source.read("isovalue",Visualization::Abstract::Reader<VScalar>(isovalue));
+	source.read("seedPoint",Visualization::Abstract::Reader<Point>(seedPoint));
+	
+	/* Get a templatized locator to track the seed point: */
+	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(source.getVariableManager()->getDataSetByScalarVariable(scalarVariableIndex));
+	if(myDataSet==0)
+		Misc::throwStdErr("SeededIsosurfaceExtractor::Parameters::read: Mismatching data set type");
+	dsl=myDataSet->getDs().getLocator();
+	locatorValid=dsl.locatePoint(seedPoint);
+	}
+
+/**************************************************
+Static elements of class SeededIsosurfaceExtractor:
+**************************************************/
+
+template <class DataSetWrapperParam>
+const char* SeededIsosurfaceExtractor<DataSetWrapperParam>::name="Seeded Isosurface";
+
+/******************************************
+Methods of class SeededIsosurfaceExtractor:
+******************************************/
+
+template <class DataSetWrapperParam>
+inline
+const typename SeededIsosurfaceExtractor<DataSetWrapperParam>::DS*
+SeededIsosurfaceExtractor<DataSetWrapperParam>::getDs(
+	const Visualization::Abstract::DataSet* sDataSet)
+	{
+	/* Get a pointer to the data set wrapper: */
+	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(sDataSet);
+	if(myDataSet==0)
+		Misc::throwStdErr("SeededIsosurfaceExtractor::SeededIsosurfaceExtractor: Mismatching data set type");
+	
+	return &myDataSet->getDs();
+	}
+
+template <class DataSetWrapperParam>
+inline
+const typename SeededIsosurfaceExtractor<DataSetWrapperParam>::SE&
+SeededIsosurfaceExtractor<DataSetWrapperParam>::getSe(
+	const Visualization::Abstract::ScalarExtractor* sScalarExtractor)
+	{
+	/* Get a pointer to the scalar extractor wrapper: */
+	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(sScalarExtractor);
+	if(myScalarExtractor==0)
+		Misc::throwStdErr("SeededIsosurfaceExtractor::SeededIsosurfaceExtractor: Mismatching scalar extractor type");
+	
+	return myScalarExtractor->getSe();
+	}
+
+template <class DataSetWrapperParam>
+inline
+SeededIsosurfaceExtractor<DataSetWrapperParam>::SeededIsosurfaceExtractor(
+	Visualization::Abstract::VariableManager* sVariableManager,
+	Comm::MulticastPipe* sPipe)
+	:Abstract::Algorithm(sVariableManager,sPipe),
+	 parameters(sVariableManager->getCurrentScalarVariable()),
+	 ise(getDs(sVariableManager->getDataSetByScalarVariable(parameters.scalarVariableIndex)),getSe(sVariableManager->getScalarExtractor(parameters.scalarVariableIndex))),
+	 currentIsosurface(0),
+	 maxNumTrianglesSlider(0),extractionModeBox(0),currentValue(0)
+	{
+	/* Initialize parameters: */
+	parameters.maxNumTriangles=1000000;
+	parameters.smoothShading=true;
+	
+	/* Set the templatized isosurface extractor's extraction mode: */
+	ise.setExtractionMode(parameters.smoothShading?ISE::SMOOTH:ISE::FLAT);
+	}
+
+template <class DataSetWrapperParam>
+inline
+SeededIsosurfaceExtractor<DataSetWrapperParam>::~SeededIsosurfaceExtractor(
+	void)
+	{
+	}
+
+template <class DataSetWrapperParam>
+inline
+GLMotif::Widget*
+SeededIsosurfaceExtractor<DataSetWrapperParam>::createSettingsDialog(
+	GLMotif::WidgetManager* widgetManager)
+	{
+	/* Get the style sheet: */
+	const GLMotif::StyleSheet* ss=widgetManager->getStyleSheet();
+	
+	/* Create the settings dialog window: */
+	GLMotif::PopupWindow* settingsDialogPopup=new GLMotif::PopupWindow("SeededIsosurfaceExtractorSettingsDialogPopup",widgetManager,"Seeded Isosurface Extractor Settings");
+	settingsDialogPopup->setResizableFlags(true,false);
+	
+	GLMotif::RowColumn* settingsDialog=new GLMotif::RowColumn("SettingsDialog",settingsDialogPopup,false);
+	settingsDialog->setNumMinorWidgets(2);
+	
+	new GLMotif::Label("MaxNumTrianglesLabel",settingsDialog,"Maximum Number of Triangles");
+	
+	maxNumTrianglesSlider=new GLMotif::TextFieldSlider("MaxNumTrianglesSlider",settingsDialog,9,ss->fontHeight*10.0f);
+	maxNumTrianglesSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	maxNumTrianglesSlider->setValueType(GLMotif::TextFieldSlider::UINT);
+	maxNumTrianglesSlider->setValueRange(1000.0,10000000.0,0.1);
+	maxNumTrianglesSlider->setValue(parameters.maxNumTriangles);
+	maxNumTrianglesSlider->getValueChangedCallbacks().add(this,&SeededIsosurfaceExtractor::maxNumTrianglesCallback);
+	
+	new GLMotif::Label("ExtractionModeLabel",settingsDialog,"Extraction Mode");
+	
+	extractionModeBox=new GLMotif::RadioBox("ExtractionModeBox",settingsDialog,false);
+	extractionModeBox->setOrientation(GLMotif::RowColumn::HORIZONTAL);
+	extractionModeBox->setPacking(GLMotif::RowColumn::PACK_GRID);
+	extractionModeBox->setAlignment(GLMotif::Alignment::LEFT);
+	extractionModeBox->setSelectionMode(GLMotif::RadioBox::ALWAYS_ONE);
+	
+	extractionModeBox->addToggle("Flat Shading");
+	extractionModeBox->addToggle("Smooth Shading");
+	
+	extractionModeBox->setSelectedToggle(parameters.smoothShading?1:0);
+	extractionModeBox->getValueChangedCallbacks().add(this,&SeededIsosurfaceExtractor::extractionModeBoxCallback);
+	
+	extractionModeBox->manageChild();
+	
+	new GLMotif::Label("CurrentValueLabel",settingsDialog,"Current Isovalue");
+	
+	GLMotif::Margin* currentValueMargin=new GLMotif::Margin("CurrentValueMargin",settingsDialog,false);
+	currentValueMargin->setAlignment(GLMotif::Alignment::LEFT);
+	
+	currentValue=new GLMotif::TextField("CurrentValue",currentValueMargin,16);
+	currentValue->setPrecision(10);
+	currentValue->setString("");
+	
+	currentValueMargin->manageChild();
+	
+	settingsDialog->manageChild();
+	
+	return settingsDialogPopup;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededIsosurfaceExtractor<DataSetWrapperParam>::readParameters(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read the current parameters: */
+	parameters.read(source);
+	
+	/* Update extractor state: */
+	ise.update(getDs(getVariableManager()->getDataSetByScalarVariable(parameters.scalarVariableIndex)),getSe(getVariableManager()->getScalarExtractor(parameters.scalarVariableIndex)));
+	ise.setExtractionMode(parameters.smoothShading?ISE::SMOOTH:ISE::FLAT);
+	
+	/* Update the GUI: */
+	if(maxNumTrianglesSlider!=0)
+		maxNumTrianglesSlider->setValue(parameters.maxNumTriangles);
+	if(extractionModeBox!=0)
+		extractionModeBox->setSelectedToggle(parameters.smoothShading?1:0);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededIsosurfaceExtractor<DataSetWrapperParam>::setSeedLocator(
+	const Visualization::Abstract::DataSet::Locator* seedLocator)
+	{
+	/* Get a pointer to the locator wrapper: */
+	const Locator* myLocator=dynamic_cast<const Locator*>(seedLocator);
+	if(myLocator==0)
+		Misc::throwStdErr("SeededIsosurfaceExtractor::setSeedLocator: Mismatching locator type");
+	
+	/* Calculate the seeding point: */
+	parameters.seedPoint=seedLocator->getPosition();
+	
+	/* Copy the locator: */
+	parameters.dsl=myLocator->getDsl();
+	parameters.locatorValid=myLocator->isValid();
+	
+	if(parameters.locatorValid)
+		{
+		/* Calculate the isovalue: */
+		parameters.isovalue=VScalar(parameters.dsl.calcValue(ise.getScalarExtractor()));
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+SeededIsosurfaceExtractor<DataSetWrapperParam>::createElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("SeededIsosurfaceExtractor::createElement: Mismatching parameter object type");
+	int svi=myParameters->scalarVariableIndex;
+	
+	/* Update the GUI: */
+	if(currentValue!=0)
+		currentValue->setValue(double(myParameters->isovalue));
+	
+	/* Create a new isosurface visualization element: */
+	Isosurface* result=new Isosurface(myParameters,myParameters->isovalue,getVariableManager()->getColorMap(svi),getPipe());
+	
+	/* Update the isosurface extractor: */
+	ise.update(getDs(getVariableManager()->getDataSetByScalarVariable(svi)),getSe(getVariableManager()->getScalarExtractor(svi)));
+	ise.setExtractionMode(myParameters->smoothShading?ISE::SMOOTH:ISE::FLAT);
+	
+	/* Extract the isosurface into the visualization element: */
+	ise.startSeededIsosurface(myParameters->dsl,result->getSurface());
+	ElementSizeLimit<Isosurface> esl(*result,myParameters->maxNumTriangles);
+	ise.continueSeededIsosurface(esl);
+	ise.finishSeededIsosurface();
+	
+	/* Return the result: */
+	return result;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+SeededIsosurfaceExtractor<DataSetWrapperParam>::startElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("SeededIsosurfaceExtractor::createElement: Mismatching parameter object type");
+	int svi=myParameters->scalarVariableIndex;
+	
+	/* Update the GUI: */
+	if(currentValue!=0)
+		currentValue->setValue(double(myParameters->isovalue));
+	
+	/* Create a new isosurface visualization element: */
+	currentIsosurface=new Isosurface(myParameters,myParameters->isovalue,getVariableManager()->getColorMap(svi),getPipe());
+	
+	/* Update the isosurface extractor: */
+	ise.update(getDs(getVariableManager()->getDataSetByScalarVariable(svi)),getSe(getVariableManager()->getScalarExtractor(svi)));
+	ise.setExtractionMode(myParameters->smoothShading?ISE::SMOOTH:ISE::FLAT);
+	
+	/* Start extracting the isosurface into the visualization element: */
+	ise.startSeededIsosurface(myParameters->dsl,currentIsosurface->getSurface());
+	
+	/* Return the result: */
+	return currentIsosurface.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+bool
+SeededIsosurfaceExtractor<DataSetWrapperParam>::continueElement(
+	const Realtime::AlarmTimer& alarm)
+	{
+	/* Continue extracting the isosurface into the visualization element: */
+	size_t maxNumTriangles=dynamic_cast<Parameters*>(currentIsosurface->getParameters())->maxNumTriangles;
+	AlarmTimerElement<Isosurface> atcf(alarm,*currentIsosurface,maxNumTriangles);
+	return ise.continueSeededIsosurface(atcf)||currentIsosurface->getElementSize()>=maxNumTriangles;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededIsosurfaceExtractor<DataSetWrapperParam>::finishElement(
+	void)
+	{
+	ise.finishSeededIsosurface();
+	currentIsosurface=0;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+SeededIsosurfaceExtractor<DataSetWrapperParam>::startSlaveElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	if(isMaster())
+		Misc::throwStdErr("SeededIsosurfaceExtractor::startSlaveElement: Cannot be called on master node");
+	
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("SeededIsosurfaceExtractor::startSlaveElement: Mismatching parameter object type");
+	
+	/* Update the GUI: */
+	if(currentValue!=0)
+		currentValue->setValue(double(myParameters->isovalue));
+	
+	/* Create a new isosurface visualization element: */
+	currentIsosurface=new Isosurface(myParameters,myParameters->isovalue,getVariableManager()->getColorMap(myParameters->scalarVariableIndex),getPipe());
+	
+	return currentIsosurface.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededIsosurfaceExtractor<DataSetWrapperParam>::continueSlaveElement(
+	void)
+	{
+	if(isMaster())
+		Misc::throwStdErr("SeededIsosurfaceExtractor::continueSlaveElement: Cannot be called on master node");
+	
+	currentIsosurface->getSurface().receive();
+	}
+	
+template <class DataSetWrapperParam>
+inline
+void
+SeededIsosurfaceExtractor<DataSetWrapperParam>::maxNumTrianglesCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Update the parameters structure: */
+	parameters.maxNumTriangles=size_t(cbData->value+0.5);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededIsosurfaceExtractor<DataSetWrapperParam>::extractionModeBoxCallback(
+	GLMotif::RadioBox::ValueChangedCallbackData* cbData)
+	{
+	switch(extractionModeBox->getToggleIndex(cbData->newSelectedToggle))
+		{
+		case 0:
+			parameters.smoothShading=false;
+			ise.setExtractionMode(ISE::FLAT);
+			break;
+		
+		case 1:
+			parameters.smoothShading=true;
+			ise.setExtractionMode(ISE::SMOOTH);
+			break;
+		}
+	}
+
+}
+
+}

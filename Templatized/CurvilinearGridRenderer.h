@@ -1,6 +1,6 @@
 /***********************************************************************
 CurvilinearGridRenderer - Helper class to render curvilinear grids.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -69,7 +69,7 @@ class CurvilinearGridRenderer
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_CURVILINEARGRIDRENDERER_IMPLEMENTATION
-#include <Templatized/CurvilinearGridRenderer.cpp>
+#include <Templatized/CurvilinearGridRenderer.icpp>
 #endif
 
 #endif

@@ -1,7 +1,7 @@
 /***********************************************************************
 TripleChannelRaycaster - Class for volume renderers with three
 independent scalar channels.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,9 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <TripleChannelRaycaster.h>
 
 #include <string>
+#include <iostream>
 #include <GL/gl.h>
 #include <GL/GLContextData.h>
+#include <GL/Extensions/GLARBMultitexture.h>
 #include <GL/Extensions/GLARBTextureFloat.h>
+#include <GL/Extensions/GLEXTTexture3D.h>
 #include <GL/GLShader.h>
 
 /*************************************************
@@ -41,8 +44,10 @@ TripleChannelRaycaster::DataItem::DataItem(void)
 		colorMapTextureIDs[channel]=0;
 	
 	/* Initialize all required OpenGL extensions: */
+	GLARBMultitexture::initExtension();
 	if(haveFloatTextures)
 		GLARBTextureFloat::initExtension();
+	GLEXTTexture3D::initExtension();
 	
 	/* Create the volume texture object: */
 	glGenTextures(1,&volumeTextureID);
@@ -200,17 +205,25 @@ void TripleChannelRaycaster::initContext(GLContextData& contextData) const
 	/* Initialize the data item: */
 	initDataItem(dataItem);
 	
-	/* Load and compile the vertex program: */
-	std::string vertexShaderName=VISUALIZER_SHADERDIR;
-	vertexShaderName.append("/TripleChannelRaycaster.vs");
-	dataItem->shader.compileVertexShader(vertexShaderName.c_str());
-	std::string fragmentShaderName=VISUALIZER_SHADERDIR;
-	fragmentShaderName.append("/TripleChannelRaycaster.fs");
-	dataItem->shader.compileFragmentShader(fragmentShaderName.c_str());
-	dataItem->shader.linkShader();
-	
-	/* Initialize the raycasting shader: */
-	initShader(dataItem);
+	try
+		{
+		/* Load and compile the vertex program: */
+		std::string vertexShaderName=VISUALIZER_SHADERDIR;
+		vertexShaderName.append("/TripleChannelRaycaster.vs");
+		dataItem->shader.compileVertexShader(vertexShaderName.c_str());
+		std::string fragmentShaderName=VISUALIZER_SHADERDIR;
+		fragmentShaderName.append("/TripleChannelRaycaster.fs");
+		dataItem->shader.compileFragmentShader(fragmentShaderName.c_str());
+		dataItem->shader.linkShader();
+		
+		/* Initialize the raycasting shader: */
+		initShader(dataItem);
+		}
+	catch(std::runtime_error err)
+		{
+		/* Print an error message, but continue: */
+		std::cerr<<"TripleChannelRaycaster::initContext: Caught exception "<<err.what()<<std::endl;
+		}
 	}
 
 void TripleChannelRaycaster::setStepSize(Raycaster::Scalar newStepSize)

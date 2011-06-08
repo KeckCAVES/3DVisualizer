@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_WRAPPERS_CURVILINEARINCLUDES_INCLUDED
 #define VISUALIZATION_WRAPPERS_CURVILINEARINCLUDES_INCLUDED
 
-#define NONSTANDARD_GLVERTEX_TEMPLATES
+#define GLVERTEX_NONSTANDARD_TEMPLATES
 #include <Templatized/Curvilinear.h>
 #include <Templatized/CurvilinearRenderer.h>
 #include <Templatized/SliceCaseTableTesseract.h>

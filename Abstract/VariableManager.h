@@ -110,10 +110,12 @@ class VariableManager
 		{
 		return dataSet->getScalarVariableName(scalarVariableIndex);
 		}
+	int getScalarVariable(const char* scalarVariableName) const; // Returns the index of the scalar variable of the given name
 	const char* getVectorVariableName(int vectorVariableIndex) const // Returns the name of the given vector variable
 		{
 		return dataSet->getVectorVariableName(vectorVariableIndex);
 		}
+	int getVectorVariable(const char* vectorVariableName) const; // Returns the index of the vector variable of the given name
 	int getCurrentScalarVariable(void) const // Returns the index of the currently selected scalar variable
 		{
 		return currentScalarVariableIndex;
@@ -125,9 +127,11 @@ class VariableManager
 	void setCurrentScalarVariable(int newCurrentScalarVariable); // Sets the currently selected scalar variable
 	void setCurrentVectorVariable(int newCurrentVectorVariable); // Sets the currently selected vector variable
 	const ScalarExtractor* getScalarExtractor(int scalarVariableIndex); // Returns a new scalar extractor for the given scalar variable
+	int getScalarVariable(const ScalarExtractor* scalarExtractor) const; // Returns the index of the given scalar extractor
 	const DataSet::VScalarRange& getScalarValueRange(int scalarVariableIndex); // Returns the value range of the given scalar variable
 	const GLColorMap* getColorMap(int scalarVariableIndex); // Returns the color map for the given scalar variable
 	const VectorExtractor* getVectorExtractor(int vectorVariableIndex); // Returns a new vector extractor for the given vector variable
+	int getVectorVariable(const VectorExtractor* vectorExtractor) const; // Returns the index of the given vector extractor
 	const ScalarExtractor* getCurrentScalarExtractor(void) const // Returns the current scalar extractor
 		{
 		return scalarVariables[currentScalarVariableIndex].scalarExtractor;
@@ -145,7 +149,15 @@ class VariableManager
 		return vectorExtractors[currentVectorVariableIndex];
 		}
 	void showColorBar(bool show); // Shows or hides the color bar dialog
+	GLMotif::PopupWindow* getColorBarDialog(void) // Returns the color bar dialog
+		{
+		return colorBarDialogPopup;
+		}
 	void showPaletteEditor(bool show); // Shows or hides the palette editor
+	PaletteEditor* getPaletteEditor(void) // Returns the palette editor dialog
+		{
+		return paletteEditor;
+		}
 	void createPalette(int newPaletteType); // Creates a default palette for the current scalar variable
 	void loadPalette(const char* paletteFileName); // Loads a palette for the current scalar variable
 	void insertPaletteEditorControlPoint(double newControlPoint); // Inserts a new control point into the palette editor at the given value

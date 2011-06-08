@@ -1,0 +1,274 @@
+/***********************************************************************
+TripleChannelVolumeRendererExtractor - Wrapper class to map from the
+abstract visualization algorithm interface to a templatized volume
+renderer implementation.
+Copyright (c) 2009-2011 Oliver Kreylos
+
+This file is part of the 3D Data Visualizer (Visualizer).
+
+The 3D Data Visualizer is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+The 3D Data Visualizer is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with the 3D Data Visualizer; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+***********************************************************************/
+
+#define VISUALIZATION_WRAPPERS_TRIPLECHANNELVOLUMERENDEREREXTRACTOR_IMPLEMENTATION
+
+#include <Wrappers/TripleChannelVolumeRendererExtractor.h>
+
+#include <stdio.h>
+#include <Misc/ThrowStdErr.h>
+#include <Misc/StandardMarshallers.h>
+#include <Misc/StandardValueCoders.h>
+#include <Geometry/GeometryMarshallers.h>
+#include <Geometry/GeometryValueCoders.h>
+#include <GLMotif/StyleSheet.h>
+#include <GLMotif/WidgetManager.h>
+#include <GLMotif/PopupWindow.h>
+#include <GLMotif/Margin.h>
+#include <GLMotif/Blind.h>
+#include <GLMotif/Label.h>
+#include <GLMotif/RowColumn.h>
+
+#include <Abstract/VariableManager.h>
+#include <Abstract/ParametersSink.h>
+#include <Abstract/ParametersSource.h>
+#include <Wrappers/ScalarExtractor.h>
+
+namespace Visualization {
+
+namespace Wrappers {
+
+/*****************************************************************
+Methods of class TripleChannelVolumeRendererExtractor::Parameters:
+*****************************************************************/
+
+template <class DataSetWrapperParam>
+inline
+void
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::Parameters::write(
+	Visualization::Abstract::ParametersSink& sink) const
+	{
+	/* Write all parameters: */
+	sink.writeScalarVariable("scalarVariable0",scalarVariableIndices[0]);
+	sink.writeScalarVariable("scalarVariable1",scalarVariableIndices[1]);
+	sink.writeScalarVariable("scalarVariable2",scalarVariableIndices[2]);
+	sink.write("outOfDomainValues",Visualization::Abstract::ArrayWriter<VScalar>(outOfDomainValues,3));
+	sink.write("sliceFactor",Visualization::Abstract::Writer<Scalar>(sliceFactor));
+	sink.write("channelEnableds",Visualization::Abstract::ArrayWriter<bool>(channelEnableds,3));
+	sink.write("transparencyGammas",Visualization::Abstract::ArrayWriter<float>(transparencyGammas,3));
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::Parameters::read(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read all parameters: */
+	source.readScalarVariable("scalarVariable0",scalarVariableIndices[0]);
+	source.readScalarVariable("scalarVariable1",scalarVariableIndices[1]);
+	source.readScalarVariable("scalarVariable2",scalarVariableIndices[2]);
+	source.read("outOfDomainValues",Visualization::Abstract::ArrayReader<VScalar>(outOfDomainValues,3));
+	source.read("sliceFactor",Visualization::Abstract::Reader<Scalar>(sliceFactor));
+	source.read("channelEnableds",Visualization::Abstract::ArrayReader<bool>(channelEnableds,3));
+	source.read("transparencyGammas",Visualization::Abstract::ArrayReader<float>(transparencyGammas,3));
+	}
+
+/*************************************************************
+Static elements of class TripleChannelVolumeRendererExtractor:
+*************************************************************/
+
+template <class DataSetWrapperParam>
+const char* TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::name="Triple-Channel Volume Renderer";
+
+/*****************************************************
+Methods of class TripleChannelVolumeRendererExtractor:
+*****************************************************/
+
+template <class DataSetWrapperParam>
+inline
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::TripleChannelVolumeRendererExtractor(
+	Visualization::Abstract::VariableManager* sVariableManager,
+	 Comm::MulticastPipe* sPipe)
+	:Abstract::Algorithm(sVariableManager,sPipe)
+	{
+	/* Initialize parameters: */
+	for(int channel=0;channel<3;++channel)
+		parameters.scalarVariableIndices[channel]=(sVariableManager->getCurrentScalarVariable()+channel)%sVariableManager->getNumScalarVariables();
+	for(int channel=0;channel<3;++channel)
+		parameters.outOfDomainValues[channel]=sVariableManager->getScalarValueRange(parameters.scalarVariableIndices[channel]).first;
+	parameters.sliceFactor=Scalar(1);
+	for(int channel=0;channel<3;++channel)
+		{
+		parameters.channelEnableds[channel]=true;
+		parameters.transparencyGammas[channel]=1.0f;
+		}
+	
+	/* Initialize the UI components: */
+	for(int channel=0;channel<3;++channel)
+		{
+		scalarVariableBoxes[channel]=0;
+		outOfDomainValueSliders[channel]=0;
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::~TripleChannelVolumeRendererExtractor(
+	void)
+	{
+	}
+
+template <class DataSetWrapperParam>
+inline
+GLMotif::Widget*
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::createSettingsDialog(
+	GLMotif::WidgetManager* widgetManager)
+	{
+	/* Get the style sheet: */
+	const GLMotif::StyleSheet* ss=widgetManager->getStyleSheet();
+	
+	/* Create the settings dialog window: */
+	GLMotif::PopupWindow* settingsDialogPopup=new GLMotif::PopupWindow("TripleChannelVolumeRendererExtractorSettingsDialogPopup",widgetManager,"Triple-Channel Volume Renderer Extractor Settings");
+	settingsDialogPopup->setResizableFlags(true,false);
+	
+	GLMotif::RowColumn* settingsDialog=new GLMotif::RowColumn("SettingsDialog",settingsDialogPopup,false);
+	settingsDialog->setNumMinorWidgets(2);
+	
+	std::vector<std::string> scalarVariables;
+	for(int i=0;i<getVariableManager()->getNumScalarVariables();++i)
+		scalarVariables.push_back(getVariableManager()->getScalarVariableName(i));
+	for(int channel=0;channel<3;++channel)
+		{
+		/* Create a label for the volume renderer channel: */
+		char name[40],label[20];
+		snprintf(name,sizeof(name),"ScalarVariableLabel%d",channel);
+		snprintf(label,sizeof(label),"Scalar Channel %d",channel+1);
+		new GLMotif::Label(name,settingsDialog,label);
+		
+		snprintf(name,sizeof(name),"ScalarVariableMargin%d",channel);
+		GLMotif::Margin* scalarVariableMargin=new GLMotif::Margin(name,settingsDialog,false);
+		scalarVariableMargin->setAlignment(GLMotif::Alignment::LEFT);
+		
+		/* Create a drop-down box to select the variable for the volume renderer channel: */
+		snprintf(name,sizeof(name),"ScalarVariableBox%d",channel);
+		scalarVariableBoxes[channel]=new GLMotif::DropdownBox(name,scalarVariableMargin,scalarVariables);
+		scalarVariableBoxes[channel]->setSelectedItem(parameters.scalarVariableIndices[channel]);
+		scalarVariableBoxes[channel]->getValueChangedCallbacks().add(this,&TripleChannelVolumeRendererExtractor::scalarVariableBoxCallback);
+		
+		scalarVariableMargin->manageChild();
+		
+		new GLMotif::Blind("Blind1",settingsDialog);
+		
+		/* Create a slider to select the channel's out-of-domain value: */
+		snprintf(name,sizeof(name),"OutOfDomainValueSlider%d",channel);
+		outOfDomainValueSliders[channel]=new GLMotif::TextFieldSlider(name,settingsDialog,12,ss->fontHeight*20.0f);
+		outOfDomainValueSliders[channel]->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
+		const Abstract::DataSet::VScalarRange& scalarRange=getVariableManager()->getScalarValueRange(parameters.scalarVariableIndices[channel]);
+		outOfDomainValueSliders[channel]->setValueRange(scalarRange.first,scalarRange.second,0.0);
+		outOfDomainValueSliders[channel]->setValue(parameters.outOfDomainValues[channel]);
+		outOfDomainValueSliders[channel]->getValueChangedCallbacks().add(this,&TripleChannelVolumeRendererExtractor::outOfDomainValueCallback);
+		}
+	
+	settingsDialog->manageChild();
+	
+	return settingsDialogPopup;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::readParameters(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read the current parameters: */
+	parameters.read(source);
+	
+	/* Update the GUI: */
+	for(int channel=0;channel<3;++channel)
+		{
+		if(scalarVariableBoxes[channel]!=0)
+			scalarVariableBoxes[channel]->setSelectedItem(parameters.scalarVariableIndices[channel]);
+		if(outOfDomainValueSliders[channel]!=0)
+			outOfDomainValueSliders[channel]->setValue(parameters.outOfDomainValues[channel]);
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::createElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Create a new volume renderer visualization element: */
+	return new TripleChannelVolumeRenderer(this,extractParameters);
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::startSlaveElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	if(isMaster())
+		Misc::throwStdErr("TripleChannelVolumeRendererExtractor::startSlaveElement: Cannot be called on master node");
+	
+	/* Create a new volume renderer visualization element: */
+	return new TripleChannelVolumeRenderer(this,extractParameters);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::scalarVariableBoxCallback(
+	GLMotif::DropdownBox::ValueChangedCallbackData* cbData)
+	{
+	/* Find the index of the dropdown box: */
+	int channel;
+	for(channel=0;channel<3&&scalarVariableBoxes[channel]!=cbData->dropdownBox;++channel)
+		;
+	if(channel<3)
+		{
+		/* Get the new selected item: */
+		parameters.scalarVariableIndices[channel]=cbData->newSelectedItem;
+		
+		/* Update the channel's out-of-domain value: */
+		const Abstract::DataSet::VScalarRange& scalarRange=getVariableManager()->getScalarValueRange(parameters.scalarVariableIndices[channel]);
+		parameters.outOfDomainValues[channel]=scalarRange.first;
+		
+		/* Update the corresponding out-of-domain value slider: */
+		outOfDomainValueSliders[channel]->setValueRange(scalarRange.first,scalarRange.second,0.0);
+		outOfDomainValueSliders[channel]->setValue(parameters.outOfDomainValues[channel]);
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::outOfDomainValueCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Find the index of the slider: */
+	int channel;
+	for(channel=0;channel<3&&outOfDomainValueSliders[channel]!=cbData->slider;++channel)
+		;
+	if(channel<3)
+		{
+		/* Update the parameters dialog: */
+		parameters.outOfDomainValues[channel]=VScalar(cbData->value);
+		}
+	}
+
+}
+
+}

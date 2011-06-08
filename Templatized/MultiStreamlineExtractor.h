@@ -1,7 +1,7 @@
 /***********************************************************************
 MultiStreamlineExtractor - Generic class to extract multiple stream
 lines from data sets in parallel.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -133,7 +133,7 @@ class MultiStreamlineExtractor
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_MULTISTREAMLINEEXTRACTOR_IMPLEMENTATION
-#include <Templatized/MultiStreamlineExtractor.cpp>
+#include <Templatized/MultiStreamlineExtractor.icpp>
 #endif
 
 #endif

@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/SphericalASCIIFile.h>
+
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
@@ -29,16 +31,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iomanip>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
-#include <Misc/ValueSource.h>
-#include <Threads/GzippedFileCharacterSource.h>
+#include <IO/File.h>
+#include <IO/OpenFile.h>
+#include <IO/ValueSource.h>
 #include <Plugins/FactoryManager.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
 
 #include <Concrete/SphericalCoordinateTransformer.h>
 #include <Concrete/EarthDataSet.h>
-
-#include <Concrete/SphericalASCIIFile.h>
 
 namespace Visualization {
 
@@ -204,8 +205,8 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 		Misc::throwStdErr("SphericalASCIIFile::load: No scalar or vector data values specified");
 	
 	/* Open the data file: */
-	Threads::GzippedFileCharacterSource dataFile(dataFileName);
-	Misc::ValueSource reader(dataFile);
+	IO::AutoFile dataFile(IO::openFile(dataFileName));
+	IO::ValueSource reader(*dataFile);
 	reader.setPunctuation('\n',true);
 	
 	/* Skip the data file header: */
@@ -280,16 +281,25 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 		index0Max=numVertices[nodeCountOrder[0]];
 		index0Increment=1;
 		}
+	unsigned int lineNumber=numHeaderLines+1;
 	for(index[nodeCountOrder[0]]=index0Min;index[nodeCountOrder[0]]!=index0Max;index[nodeCountOrder[0]]+=index0Increment)
 		{
 		for(index[nodeCountOrder[1]]=0;index[nodeCountOrder[1]]<numVertices[nodeCountOrder[1]];++index[nodeCountOrder[1]])
 			for(index[nodeCountOrder[2]]=0;index[nodeCountOrder[2]]<numVertices[nodeCountOrder[2]];++index[nodeCountOrder[2]])
 				{
-				/* Read all relevant columns from the next line: */
-				for(int i=0;i<=maxColumnIndex;++i)
-					columns[i]=reader.readNumber();
-				reader.skipLine();
-				reader.skipWs();
+				try
+					{
+					/* Read all relevant columns from the next line: */
+					for(int i=0;i<=maxColumnIndex;++i)
+						columns[i]=reader.readNumber();
+					reader.skipLine();
+					reader.skipWs();
+					++lineNumber;
+					}
+				catch(IO::ValueSource::NumberError err)
+					{
+					Misc::throwStdErr("SphericalASCIIFile::load: Number format error in line %u",lineNumber);
+					}
 				
 				/* Get the vertex' linear index: */
 				int linearIndex=grid.calcLinearIndex(index);

@@ -1,6 +1,6 @@
 ========================================================================
-README for 3D Visualizer version 1.7
-Copyright (c) 2005-2009 Oliver Kreylos
+README for 3D Visualizer version 1.8
+Copyright (c) 2005-2011 Oliver Kreylos
 ========================================================================
 
 Overview
@@ -10,8 +10,9 @@ Overview
 analysis of 3D multivariate gridded data, such as produced by finite
 element method (FEM) simulations, confocal microscopy, serial
 sectioning, computerized axial tomography (CAT) scans, or magnetic
-resonance imaging (MRI) scans. 3D Visualizer is based on the Vrui
-software development toolkit (see
+resonance imaging (MRI) scans.
+
+3D Visualizer is based on the Vrui software development toolkit (see
 http://idav.ucdavis.edu/~okreylos/ResDev/Vrui), and runs in a variety of
 environments ranging from laptop or desktop computers over semi-
 immersive environments such as Geowalls to fully immersive virtual
@@ -21,12 +22,13 @@ can be found at http://www.keckcaves.org.
 3D Visualizer's development was supported by the University of
 California, Davis, by the UC Davis W.M. Keck Center for Active
 Visualization in the Earth Sciences (KeckCAVES,
-http://www.keckcaves.org), and the W.M Keck Foundation.
+http://www.keckcaves.org), the W.M Keck Foundation, and the National
+Science Foundation.
 
 Requirements
 ============
 
-3D Visualizer requires Vrui version 1.0 build 063 or newer.
+3D Visualizer requires Vrui version 2.1 build 001 or newer.
 To read images in PNG format, libpng has to be installed, and Vrui has
 to be configured with support for PNG images (see Vrui README file).
 
@@ -44,7 +46,7 @@ be used; installation (to a system directory such as /usr/local) is
 only recommended if 3D Visualizer will be used from multiple user
 accounts.
 
-0. Install Vrui from ~/src/Vrui-1.0 (see Vrui README file).
+0. Install Vrui from ~/src/Vrui-2.1-<build> (see Vrui README file).
 
 1. Change into ~/src directory and unpack the 3D Visualizer tarball:
    > cd ~/src
@@ -55,11 +57,12 @@ accounts.
 2. Change into 3D Visualizer base directory:
    > cd 3DVisualizer-<version>
 
-3. Adapt makefile if Vrui installation path is *not* ~/Vrui-1.0 by
+3. Adapt makefile if Vrui installation path is *not* ~/Vrui-2.1 by
    setting the VRUIDIR variable to the correct location. VRUIDIR is
    *not* the directory containing Vrui's sources (and the Vrui README
    file), but the directory specified via the INSTALLDIR variable in
    Vrui's makefile.
+	 If you did not change Vrui's installation path, ignore this step.
 
 4. Optional: Adapt makefile if 3D Visualizer is to be installed in a
    different location, for example /usr/local. Set INSTALLDIR to the
@@ -125,5 +128,5 @@ directory, (see steps 4 and 6 above).
    > ./bin/3DVisualizer -palette AlaskaData/slab2.pal
      -class MultiCitcomtFile AlaskaData/slab2.dat Temp "log(Visc)"
 
-6. See Vrui-1.0 documentation or 3D Visualizer's user's guide on Vrui's
+6. See Vrui-2.1 documentation or 3D Visualizer's user's guide on Vrui's
    basic user interface and how to use 3D Visualizer.

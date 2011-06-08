@@ -3,7 +3,7 @@ MultiStreamline - Wrapper class for multiple related streamlines as
 visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2006-2009 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_WRAPPERS_MULTISTREAMLINE_INCLUDED
 #define VISUALIZATION_WRAPPERS_MULTISTREAMLINE_INCLUDED
 
-#define NONSTANDARD_GLVERTEX_TEMPLATES
+#define GLVERTEX_NONSTANDARD_TEMPLATES
 #include <GL/GLVertex.h>
 
 #include <Abstract/Element.h>
@@ -92,7 +92,7 @@ class MultiStreamline:public Visualization::Abstract::Element
 }
 
 #ifndef VISUALIZATION_WRAPPERS_MULTISTREAMLINE_IMPLEMENTATION
-#include <Wrappers/MultiStreamline.cpp>
+#include <Wrappers/MultiStreamline.icpp>
 #endif
 
 #endif

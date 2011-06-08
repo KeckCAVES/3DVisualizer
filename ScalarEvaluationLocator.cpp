@@ -1,7 +1,7 @@
 /***********************************************************************
 ScalarEvaluationLocator - Class for locators evaluating scalar
 properties of data sets.
-Copyright (c) 2008-2009 Oliver Kreylos
+Copyright (c) 2008-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include "ScalarEvaluationLocator.h"
 
+#include <Misc/StandardValueCoders.h>
+#include <Misc/ConfigurationFile.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GLMotif/Blind.h>
 #include <GLMotif/Margin.h>
@@ -29,6 +31,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/Button.h>
 #include <GLMotif/TextField.h>
 #include <GLMotif/RowColumn.h>
+#include <GLMotif/WidgetStateHelper.h>
 #include <Vrui/Vrui.h>
 
 #include <Abstract/DataSet.h>
@@ -40,13 +43,34 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 Methods of class ScalarEvaluationLocator:
 ****************************************/
 
-ScalarEvaluationLocator::ScalarEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication)
-	:EvaluationLocator(sLocatorTool,sApplication,"Scalar Evaluation Dialog"),
-	 scalarExtractor(application->variableManager->getCurrentScalarExtractor()),
+ScalarEvaluationLocator::ScalarEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg)
+	:EvaluationLocator(sLocatorTool,sApplication,""),
+	 scalarExtractor(0),
 	 valueValid(false)
 	{
+	Visualization::Abstract::VariableManager* vm=application->variableManager;
+	
+	/* Get the scalar extractor: */
+	if(cfg!=0)
+		{
+		/* Read the scalar variable from the configuration file: */
+		std::string scalarVariableName=vm->getScalarVariableName(vm->getCurrentScalarVariable());
+		scalarVariableName=cfg->retrieveValue<std::string>("./scalarVariableName",scalarVariableName);
+		scalarExtractor=vm->getScalarExtractor(vm->getScalarVariable(scalarVariableName.c_str()));
+		}
+	else
+		{
+		/* Get an extractor for the current scalar variable: */
+		scalarExtractor=vm->getCurrentScalarExtractor();
+		}
+	
+	/* Set the dialog's title string: */
+	std::string title="Evaluate Scalars -- ";
+	title.append(vm->getScalarVariableName(vm->getScalarVariable(scalarExtractor)));
+	evaluationDialogPopup->setTitleString(title.c_str());
+	
 	/* Add to the evaluation dialog: */
-	new GLMotif::Label("ValueLabel",evaluationDialog,application->variableManager->getScalarVariableName(application->variableManager->getCurrentScalarVariable()));
+	new GLMotif::Label("ValueLabel",evaluationDialog,vm->getScalarVariableName(vm->getScalarVariable(scalarExtractor)));
 	
 	GLMotif::RowColumn* valueBox=new GLMotif::RowColumn("ValueBox",evaluationDialog,false);
 	valueBox->setOrientation(GLMotif::RowColumn::HORIZONTAL);
@@ -73,10 +97,30 @@ ScalarEvaluationLocator::ScalarEvaluationLocator(Vrui::LocatorTool* sLocatorTool
 	
 	/* Pop up the evaluation dialog: */
 	Vrui::popupPrimaryWidget(evaluationDialogPopup,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
+	
+	if(cfg!=0)
+		{
+		/* Read the evaluation dialog's position: */
+		GLMotif::readTopLevelPosition(evaluationDialogPopup,*cfg);
+		}
 	}
 
 ScalarEvaluationLocator::~ScalarEvaluationLocator(void)
 	{
+	}
+
+void ScalarEvaluationLocator::storeState(Misc::ConfigurationFileSection& configFileSection) const
+	{
+	Visualization::Abstract::VariableManager* vm=application->variableManager;
+	
+	/* Write the algorithm type: */
+	configFileSection.storeString("./algorithm","Evaluate Scalars");
+	
+	/* Write the scalar variable name: */
+	configFileSection.storeValue<std::string>("./scalarVariableName",vm->getScalarVariableName(vm->getScalarVariable(scalarExtractor)));
+	
+	/* Write the evaluation dialog's position: */
+	GLMotif::writeTopLevelPosition(evaluationDialogPopup,configFileSection);
 	}
 
 void ScalarEvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
@@ -99,7 +143,7 @@ void ScalarEvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackDa
 		else
 			{
 			valueValid=false;
-			value->setLabel("");
+			value->setString("");
 			}
 		}
 	}

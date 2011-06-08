@@ -1,7 +1,7 @@
 ########################################################################
 # Makefile for 3D Visualizer, a generic visualization program for 3D
 # multivariate gridded data.
-# Copyright (c) 1999-2009 Oliver Kreylos
+# Copyright (c) 1999-2011 Oliver Kreylos
 #
 # This file is part of the WhyTools Build Environment.
 # 
@@ -25,7 +25,7 @@
 # same setting in Vrui's makefile. By default the directories match; if
 # the installation directory was adjusted during Vrui's installation, it
 # must be adjusted here as well.
-VRUIDIR = $(HOME)/Vrui-1.0
+VRUIDIR = $(HOME)/Vrui-2.1
 
 # Base installation directory for 3D Visualizer and its module
 # plug-ins. The module plug-ins cannot be moved from this location
@@ -37,6 +37,16 @@ VRUIDIR = $(HOME)/Vrui-1.0
 # Important note: Do not use ~ as an abbreviation for the user's home
 # directory here; use $(HOME) instead.
 INSTALLDIR = $(shell pwd)
+
+# Flag whether to use GLSL shaders instead of fixed OpenGL functionality
+# for some visualization algorithms, especially volume rendering. This
+# flag should only be set to 1 on newer, dedicated 3D graphics cards
+# such as Nvidia's G80 series.
+USE_SHADERS = 0
+
+# Flag whether to build the 3D Visualizer collaboration module for
+# spatially distributed shared data exploration.
+USE_COLLABORATION = 0
 
 # List of default visualization modules:
 MODULE_NAMES = SphericalASCIIFile \
@@ -52,6 +62,7 @@ MODULE_NAMES = SphericalASCIIFile \
                StructuredHexahedralTecplotASCIIFile \
                UnstructuredHexahedralTecplotASCIIFile \
                ImageStack \
+               DicomImageStack \
                MultiChannelImageStack
 
 # List of other available modules:
@@ -59,6 +70,7 @@ MODULE_NAMES = SphericalASCIIFile \
 UNSUPPORTED_MODULE_NAMES = AnalyzeFile \
                            ByteVolFile \
                            GaleFEMVectorFile \
+                           GocadVoxetFile \
                            ConvectionFile \
                            ConvectionFileCartesian \
                            CSConvectionFile \
@@ -68,6 +80,7 @@ UNSUPPORTED_MODULE_NAMES = AnalyzeFile \
                            SeismicTomographyModel \
                            FloatGridFile \
                            FloatVolFile \
+                           MultiVolFile \
                            VecVolFile \
                            Kollmann0p9File \
                            MagaliSubductionFile \
@@ -75,53 +88,58 @@ UNSUPPORTED_MODULE_NAMES = AnalyzeFile \
                            VanKekenFile \
                            UnstructuredPlot3DFile
 
-# Flag whether to use GLSL shaders instead of fixed OpenGL functionality
-# for some visualization algorithms, especially volume rendering. This
-# flag should only be set to 1 on newer, dedicated 3D graphics cards
-# such as Nvidia's G80 series.
-USE_SHADERS = 0
-
-# Flag whether to build the 3D Visualizer collaboration module for
-# spatially distributed shared data exploration.
-USE_COLLABORATION = 0
+########################################################################
+# Nothing underneath here needs to be changed.
+########################################################################
 
 # Version number for installation subdirectories. This is used to keep
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.7
+VERSION = 1.8
 
 # Set up destination directories for compilation products:
 OBJDIRBASE = o
+ifeq ($(shell uname -m),x86_64)
+  LIBDIRBASE = lib64
+else
+  LIBDIRBASE = lib
+endif
 BINDIRBASE = bin
-MODULEDIRBASE = 3DVisualizer-$(VERSION)
+MODULEDIR = 3DVisualizer-$(VERSION)
 
-# Set resource directory:
+# Set up resource directories: */
 RESOURCEDIR = share/3DVisualizer-$(VERSION)
 
 # Set up additional flags for the C++ compiler:
 CFLAGS = 
 
 # Create debug or fully optimized versions of the software:
+VRUIMAKEDIR = $(VRUIDIR)/share
 ifdef DEBUG
   # Include the debug version of the Vrui application makefile fragment:
-  include $(VRUIDIR)/etc/Vrui.debug.makeinclude
+  include $(VRUIMAKEDIR)/Vrui.debug.makeinclude
   # Enable debugging and disable optimization:
   CFLAGS += -g3 -O0
   # Set destination directories for created objects:
   OBJDIR = $(OBJDIRBASE)/debug
+  LIBDIR = $(LIBDIRBASE)/debug
   BINDIR = $(BINDIRBASE)/debug
-  MODULEDIR = $(MODULEDIRBASE)/debug
 else
   # Include the release version of the Vrui application makefile fragment:
-  include $(VRUIDIR)/etc/Vrui.makeinclude
+  include $(VRUIMAKEDIR)/Vrui.makeinclude
   # Disable debugging and enable optimization:
   CFLAGS += -g0 -O3 -DNDEBUG
   # Set destination directories for created objects:
   OBJDIR = $(OBJDIRBASE)
+  LIBDIR = $(LIBDIRBASE)
   BINDIR = $(BINDIRBASE)
-  MODULEDIR = $(MODULEDIRBASE)
 endif
+
+# Set up installation directory structure:
+BININSTALLDIR = $(INSTALLDIR)/$(BINDIRBASE)
+PLUGININSTALLDIR = $(INSTALLDIR)/$(LIBDIR)/$(MODULEDIR)
+SHAREINSTALLDIR = $(INSTALLDIR)/$(RESOURCEDIR)
 
 # Add base directory to include path:
 CFLAGS += -I.
@@ -131,13 +149,6 @@ $(OBJDIR)/%.o: %.cpp
 	@mkdir -p $(OBJDIR)/$(*D)
 	@echo Compiling $<...
 	@g++ -c -o $@ $(VRUI_CFLAGS) $(CFLAGS) $<
-
-# System-default destination directory for dynamic libraries:
-ifeq (`uname -m`,x86_64)
-  LIBDIR = lib64
-else
-  LIBDIR = lib
-endif
 
 # Function to generate full plug-in names:
 PLUGINNAME = $(LIBDIR)/$(MODULEDIR)/lib$(1).$(VRUI_PLUGINFILEEXT)
@@ -176,27 +187,11 @@ distclean:
 	-rm -rf lib lib64
 
 # List of required source files:
-ABSTRACT_SOURCES = Abstract/ScalarExtractor.cpp \
-                   Abstract/VectorExtractor.cpp \
-                   Abstract/DataSet.cpp \
-                   Abstract/VariableManager.cpp \
-                   Abstract/DataSetRenderer.cpp \
-                   Abstract/Algorithm.cpp \
-                   Abstract/Element.cpp \
-                   Abstract/CoordinateTransformer.cpp \
-                   Abstract/Module.cpp
+ABSTRACT_SOURCES = $(wildcard Abstract/*.cpp)
 
-TEMPLATIZED_SOURCES = Templatized/Simplex.cpp \
-                      Templatized/Tesseract.cpp \
-                      Templatized/SliceCaseTableSimplex.cpp \
-                      Templatized/SliceCaseTableTesseract.cpp \
-                      Templatized/IsosurfaceCaseTableSimplex.cpp \
-                      Templatized/IsosurfaceCaseTableTesseract.cpp
+TEMPLATIZED_SOURCES = $(wildcard Templatized/*.cpp)
 
-WRAPPERS_SOURCES = Wrappers/ParametersIOHelper.cpp \
-                   Wrappers/RenderArrow.cpp \
-                   Wrappers/CartesianCoordinateTransformer.cpp \
-                   Wrappers/SlicedScalarVectorDataValue.cpp
+WRAPPERS_SOURCES = $(wildcard Wrappers/*.cpp)
 
 CONCRETE_SOURCES = Concrete/SphericalCoordinateTransformer.cpp \
                    Concrete/EarthRenderer.cpp \
@@ -233,17 +228,16 @@ ifneq ($(USE_COLLABORATION),0)
 endif
 
 # List of required shaders:
-SHADERDIR = $(RESOURCEDIR)/Shaders
 SHADERS = SingleChannelRaycaster.vs \
           SingleChannelRaycaster.fs \
           TripleChannelRaycaster.vs \
           TripleChannelRaycaster.fs
 
 # Per-source compiler flags:
-$(OBJDIR)/Concrete/EarthRenderer.o: CFLAGS += -DEARTHRENDERER_IMAGEDIR='"$(INSTALLDIR)/$(RESOURCEDIR)"'
-$(OBJDIR)/SingleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(INSTALLDIR)/$(SHADERDIR)"'
-$(OBJDIR)/TripleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(INSTALLDIR)/$(SHADERDIR)"'
-$(OBJDIR)/Visualizer.o: CFLAGS += -DVISUALIZER_MODULENAMETEMPLATE='"$(INSTALLDIR)/$(call PLUGINNAME,%s)"'
+$(OBJDIR)/Concrete/EarthRenderer.o: CFLAGS += -DEARTHRENDERER_IMAGEDIR='"$(SHAREINSTALLDIR)"'
+$(OBJDIR)/SingleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(SHAREINSTALLDIR)/Shaders"'
+$(OBJDIR)/TripleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(SHAREINSTALLDIR)/Shaders"'
+$(OBJDIR)/Visualizer.o: CFLAGS += -DVISUALIZER_MODULENAMETEMPLATE='"$(PLUGININSTALLDIR)/lib%s.$(VRUI_PLUGINFILEEXT)"'
 
 #
 # Rule to build 3D Visualizer main program
@@ -275,8 +269,10 @@ $(call PLUGINNAME,UnstructuredHexahedralTecplotASCIIFile): $(OBJDIR)/Concrete/Te
 
 $(call PLUGINNAME,MultiChannelImageStack): PACKAGES += MYIMAGES
 
-$(call PLUGINNAME,DicomImageStack): $(OBJDIR)/Concrete/DicomImageStack.o \
-                                    $(OBJDIR)/Concrete/DicomImageFile.o
+$(call PLUGINNAME,DicomImageStack): $(OBJDIR)/Concrete/HuffmanTable.o \
+                                    $(OBJDIR)/Concrete/JPEGDecompressor.o \
+                                    $(OBJDIR)/Concrete/DicomFile.o \
+                                    $(OBJDIR)/Concrete/DicomImageStack.o
 
 # Keep module object files around after building:
 .SECONDARY: $(MODULE_NAMES:%=$(OBJDIR)/Concrete/%.o)
@@ -302,16 +298,16 @@ $(BINDIR)/SharedVisualizationServer: $(SHAREDVISUALIZATIONSERVER_SOURCES:%.cpp=$
 install: $(ALL)
 	@echo Installing 3D Visualizer in $(INSTALLDIR)...
 	@install -d $(INSTALLDIR)
-	@install -d $(INSTALLDIR)/bin
-	@install $(BINDIR)/3DVisualizer $(INSTALLDIR)/bin
+	@install -d $(BININSTALLDIR)
+	@install $(BINDIR)/3DVisualizer $(BININSTALLDIR)
 ifneq ($(USE_COLLABORATION),0)
-	@install $(BINDIR)/SharedVisualizationServer $(INSTALLDIR)/bin
+	@install $(BINDIR)/SharedVisualizationServer $(BININSTALLDIR)
 endif
-	@install -d $(INSTALLDIR)/$(LIBDIR)/$(MODULEDIR)
-	@install $(MODULES) $(INSTALLDIR)/$(LIBDIR)/$(MODULEDIR)
-	@install -d $(INSTALLDIR)/$(RESOURCEDIR)
-	@install $(RESOURCEDIR)/EarthTopography.png $(RESOURCEDIR)/EarthTopography.ppm $(INSTALLDIR)/$(RESOURCEDIR)
+	@install -d $(PLUGININSTALLDIR)
+	@install $(MODULES) $(PLUGININSTALLDIR)
+	@install -d $(SHAREINSTALLDIR)
+	@install $(RESOURCEDIR)/EarthTopography.png $(RESOURCEDIR)/EarthTopography.ppm $(SHAREINSTALLDIR)
 ifneq ($(USE_SHADERS),0)
-	@install -d $(INSTALLDIR)/$(SHADERDIR)
-	@install $(SHADERS:%=$(SHADERDIR)/%) $(INSTALLDIR)/$(SHADERDIR)
+	@install -d $(SHAREINSTALLDIR)/Shaders
+	@install $(SHADERS:%=$(RESOURCEDIR)/Shaders/%) $(SHAREINSTALLDIR)/Shaders
 endif

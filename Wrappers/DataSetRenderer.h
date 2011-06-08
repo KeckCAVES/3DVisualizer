@@ -1,7 +1,7 @@
 /***********************************************************************
 DataSetRenderer - Wrapper class to map from the abstract data set
 renderer interface to its templatized data set renderer implementation.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -110,7 +110,7 @@ class DataSetRenderer:public Visualization::Abstract::DataSetRenderer,public GLO
 }
 
 #ifndef VISUALIZATION_WRAPPERS_DATASETRENDERER_IMPLEMENTATION
-#include <Wrappers/DataSetRenderer.cpp>
+#include <Wrappers/DataSetRenderer.icpp>
 #endif
 
 #endif

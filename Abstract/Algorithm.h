@@ -44,6 +44,7 @@ namespace Visualization {
 namespace Abstract {
 class VariableManager;
 class Parameters;
+class ParametersSource;
 class Element;
 }
 }
@@ -98,6 +99,7 @@ class Algorithm
 	virtual bool hasSeededCreator(void) const; // Returns true if the algorithm has a seeded creation method
 	virtual bool hasIncrementalCreator(void) const; // Returns true if the algorithm has incremental creation methods
 	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager); // Returns a new UI widget to change internal settings of the algorithm
+	virtual void readParameters(ParametersSource& source) =0; // Reads parameters from source and updates algorithm's internal state
 	virtual Parameters* cloneParameters(void) const =0; // Returns a copy of the algorithm's current extraction parameters
 	virtual void setSeedLocator(const DataSet::Locator* seedLocator); // Updates the algorithm's current extraction parameters according to the given seed locator
 	virtual Element* createElement(Parameters* extractParameters); // Creates a complete visualization element using the current extraction settings; inherits parameter object

@@ -1,0 +1,488 @@
+/***********************************************************************
+SeededColoredIsosurfaceExtractor - Wrapper class to map from the
+abstract visualization algorithm interface to a templatized colored
+isosurface extractor implementation.
+Copyright (c) 2008-2011 Oliver Kreylos
+
+This file is part of the 3D Data Visualizer (Visualizer).
+
+The 3D Data Visualizer is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+The 3D Data Visualizer is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with the 3D Data Visualizer; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+***********************************************************************/
+
+#define VISUALIZATION_WRAPPERS_SEEDEDCOLOREDISOSURFACEEXTRACTOR_IMPLEMENTATION
+
+#include <Wrappers/SeededColoredIsosurfaceExtractor.h>
+
+#include <Misc/ThrowStdErr.h>
+#include <Misc/StandardMarshallers.h>
+#include <Misc/StandardValueCoders.h>
+#include <Geometry/GeometryMarshallers.h>
+#include <Geometry/GeometryValueCoders.h>
+#include <GL/GLColorMap.h>
+#include <GLMotif/StyleSheet.h>
+#include <GLMotif/WidgetManager.h>
+#include <GLMotif/PopupWindow.h>
+#include <GLMotif/Margin.h>
+#include <GLMotif/Label.h>
+#include <GLMotif/TextField.h>
+#include <GLMotif/ToggleButton.h>
+#include <GLMotif/RowColumn.h>
+
+#include <Abstract/VariableManager.h>
+#include <Abstract/ParametersSink.h>
+#include <Abstract/ParametersSource.h>
+#include <Templatized/ColoredIsosurfaceExtractor.h>
+#include <Wrappers/ScalarExtractor.h>
+#include <Wrappers/ElementSizeLimit.h>
+#include <Wrappers/AlarmTimerElement.h>
+
+namespace Visualization {
+
+namespace Wrappers {
+
+/*************************************************************
+Methods of class SeededColoredIsosurfaceExtractor::Parameters:
+*************************************************************/
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::Parameters::write(
+	Visualization::Abstract::ParametersSink& sink) const
+	{
+	/* Write all parameters: */
+	sink.writeScalarVariable("scalarVariable",scalarVariableIndex);
+	sink.writeScalarVariable("colorScalarVariable",colorScalarVariableIndex);
+	sink.write("maxNumTriangles",Visualization::Abstract::Writer<unsigned int>((unsigned int)maxNumTriangles));
+	sink.write("smoothShading",Visualization::Abstract::Writer<bool>(smoothShading));
+	sink.write("lighting",Visualization::Abstract::Writer<bool>(lighting));
+	sink.write("isovalue",Visualization::Abstract::Writer<VScalar>(isovalue));
+	sink.write("seedPoint",Visualization::Abstract::Writer<Point>(seedPoint));
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::Parameters::read(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read all parameters: */
+	source.readScalarVariable("scalarVariable",scalarVariableIndex);
+	source.readScalarVariable("colorScalarVariable",colorScalarVariableIndex);
+	unsigned int mnt;
+	source.read("maxNumTriangles",Visualization::Abstract::Reader<unsigned int>(mnt));
+	maxNumTriangles=size_t(mnt);
+	source.read("smoothShading",Visualization::Abstract::Reader<bool>(smoothShading));
+	source.read("lighting",Visualization::Abstract::Reader<bool>(lighting));
+	source.read("isovalue",Visualization::Abstract::Reader<VScalar>(isovalue));
+	source.read("seedPoint",Visualization::Abstract::Reader<Point>(seedPoint));
+	
+	/* Get a templatized locator to track the seed point: */
+	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(source.getVariableManager()->getDataSetByScalarVariable(scalarVariableIndex));
+	if(myDataSet==0)
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::Parameters::read: Mismatching data set type");
+	dsl=myDataSet->getDs().getLocator();
+	locatorValid=dsl.locatePoint(seedPoint);
+	}
+
+/*********************************************************
+Static elements of class SeededColoredIsosurfaceExtractor:
+*********************************************************/
+
+template <class DataSetWrapperParam>
+const char* SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::name="Seeded Colored Isosurface";
+
+/*************************************************
+Methods of class SeededColoredIsosurfaceExtractor:
+*************************************************/
+
+template <class DataSetWrapperParam>
+inline
+const typename SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::DS*
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::getDs(
+	Visualization::Abstract::VariableManager* variableManager,
+	int scalarVariableIndex,
+	int colorScalarVariableIndex)
+	{
+	/* Get the abstract data set pointer: */
+	const Visualization::Abstract::DataSet* ds1=variableManager->getDataSetByScalarVariable(scalarVariableIndex);
+	const Visualization::Abstract::DataSet* ds2=variableManager->getDataSetByScalarVariable(colorScalarVariableIndex);
+	if(ds1!=ds2)
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::SeededColoredIsosurfaceExtractor: Incompatible scalar and color scalar variables");
+	
+	/* Get a pointer to the data set wrapper: */
+	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(ds1);
+	if(myDataSet==0)
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::SeededColoredIsosurfaceExtractor: Mismatching data set type");
+	
+	return &myDataSet->getDs();
+	}
+
+template <class DataSetWrapperParam>
+inline
+const typename SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::SE&
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::getSe(
+	const Visualization::Abstract::ScalarExtractor* sScalarExtractor)
+	{
+	/* Get a pointer to the scalar extractor wrapper: */
+	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(sScalarExtractor);
+	if(myScalarExtractor==0)
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::SeededColoredIsosurfaceExtractor: Mismatching scalar extractor type");
+	
+	return myScalarExtractor->getSe();
+	}
+
+template <class DataSetWrapperParam>
+inline
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::SeededColoredIsosurfaceExtractor(
+	Visualization::Abstract::VariableManager* sVariableManager,
+	Comm::MulticastPipe* sPipe)
+	:Abstract::Algorithm(sVariableManager,sPipe),
+	 parameters(sVariableManager->getCurrentScalarVariable(),sVariableManager->getCurrentScalarVariable()),
+	 cise(getDs(sVariableManager,parameters.scalarVariableIndex,parameters.colorScalarVariableIndex),getSe(sVariableManager->getScalarExtractor(parameters.scalarVariableIndex)),getSe(sVariableManager->getScalarExtractor(parameters.colorScalarVariableIndex))),
+	 currentColoredIsosurface(0),
+	 maxNumTrianglesSlider(0),colorScalarVariableBox(0),extractionModeBox(0),lightingToggle(0),currentValue(0)
+	{
+	/* Initialize parameters: */
+	parameters.maxNumTriangles=1000000;
+	parameters.smoothShading=true;
+	parameters.lighting=true;
+	
+	/* Set the templatized colored isosurface extractor's extraction mode: */
+	cise.setExtractionMode(parameters.smoothShading?CISE::SMOOTH:CISE::FLAT);
+	}
+
+template <class DataSetWrapperParam>
+inline
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::~SeededColoredIsosurfaceExtractor(
+	void)
+	{
+	}
+
+template <class DataSetWrapperParam>
+inline
+GLMotif::Widget*
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::createSettingsDialog(
+	GLMotif::WidgetManager* widgetManager)
+	{
+	/* Get the style sheet: */
+	const GLMotif::StyleSheet* ss=widgetManager->getStyleSheet();
+	
+	/* Create the settings dialog window: */
+	GLMotif::PopupWindow* settingsDialogPopup=new GLMotif::PopupWindow("SeededColoredIsosurfaceExtractorSettingsDialogPopup",widgetManager,"Seeded Colored Isosurface Extractor Settings");
+	settingsDialogPopup->setResizableFlags(true,false);
+	
+	GLMotif::RowColumn* settingsDialog=new GLMotif::RowColumn("SettingsDialog",settingsDialogPopup,false);
+	settingsDialog->setNumMinorWidgets(2);
+	
+	new GLMotif::Label("MaxNumTrianglesLabel",settingsDialog,"Maximum Number of Triangles");
+	
+	maxNumTrianglesSlider=new GLMotif::TextFieldSlider("MaxNumTrianglesSlider",settingsDialog,9,ss->fontHeight*10.0f);
+	maxNumTrianglesSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	maxNumTrianglesSlider->setValueType(GLMotif::TextFieldSlider::UINT);
+	maxNumTrianglesSlider->setValueRange(1000.0,10000000.0,0.1);
+	maxNumTrianglesSlider->setValue(parameters.maxNumTriangles);
+	maxNumTrianglesSlider->getValueChangedCallbacks().add(this,&SeededColoredIsosurfaceExtractor::maxNumTrianglesCallback);
+	
+	new GLMotif::Label("ColorScalarVariableLabel",settingsDialog,"Color Scalar");
+	
+	GLMotif::Margin* colorScalarVariableMargin=new GLMotif::Margin("ColorScalarVariableMargin",settingsDialog,false);
+	colorScalarVariableMargin->setAlignment(GLMotif::Alignment::LEFT);
+	
+	std::vector<std::string> scalarVariables;
+	for(int i=0;i<getVariableManager()->getNumScalarVariables();++i)
+		scalarVariables.push_back(getVariableManager()->getScalarVariableName(i));
+	colorScalarVariableBox=new GLMotif::DropdownBox("ColorScalarVariableBox",colorScalarVariableMargin,scalarVariables);
+	colorScalarVariableBox->setSelectedItem(parameters.colorScalarVariableIndex);
+	colorScalarVariableBox->getValueChangedCallbacks().add(this,&SeededColoredIsosurfaceExtractor::colorScalarVariableBoxCallback);
+	
+	colorScalarVariableMargin->manageChild();
+	
+	new GLMotif::Label("ExtractionModeLabel",settingsDialog,"Extraction Mode");
+	
+	GLMotif::RowColumn* surfaceModeBox=new GLMotif::RowColumn("SurfaceModeBox",settingsDialog,false);
+	surfaceModeBox->setOrientation(GLMotif::RowColumn::HORIZONTAL);
+	surfaceModeBox->setPacking(GLMotif::RowColumn::PACK_TIGHT);
+	surfaceModeBox->setAlignment(GLMotif::Alignment::LEFT);
+	surfaceModeBox->setNumMinorWidgets(1);
+	
+	extractionModeBox=new GLMotif::RadioBox("ExtractionModeBox",surfaceModeBox,false);
+	extractionModeBox->setOrientation(GLMotif::RowColumn::HORIZONTAL);
+	extractionModeBox->setPacking(GLMotif::RowColumn::PACK_GRID);
+	extractionModeBox->setSelectionMode(GLMotif::RadioBox::ALWAYS_ONE);
+	
+	extractionModeBox->addToggle("Flat Shading");
+	extractionModeBox->addToggle("Smooth Shading");
+	
+	extractionModeBox->setSelectedToggle(parameters.smoothShading?1:0);
+	extractionModeBox->getValueChangedCallbacks().add(this,&SeededColoredIsosurfaceExtractor::extractionModeBoxCallback);
+	
+	extractionModeBox->manageChild();
+	
+	lightingToggle=new GLMotif::ToggleButton("LightingToggle",surfaceModeBox,"Lighting");
+	lightingToggle->setBorderWidth(0.0f);
+	lightingToggle->setHAlignment(GLFont::Left);
+	lightingToggle->setToggle(parameters.lighting);
+	lightingToggle->getValueChangedCallbacks().add(this,&SeededColoredIsosurfaceExtractor::lightingToggleCallback);
+	
+	surfaceModeBox->manageChild();
+	
+	new GLMotif::Label("CurrentValueLabel",settingsDialog,"Current Isovalue");
+	
+	GLMotif::Margin* currentValueMargin=new GLMotif::Margin("CurrentValueMargin",settingsDialog,false);
+	currentValueMargin->setAlignment(GLMotif::Alignment::LEFT);
+	
+	currentValue=new GLMotif::TextField("CurrentValue",currentValueMargin,16);
+	currentValue->setPrecision(10);
+	currentValue->setString("");
+	
+	currentValueMargin->manageChild();
+	
+	settingsDialog->manageChild();
+	
+	return settingsDialogPopup;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::readParameters(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read the current parameters: */
+	parameters.read(source);
+	
+	/* Update extractor state: */
+	cise.update(getDs(getVariableManager(),parameters.scalarVariableIndex,parameters.colorScalarVariableIndex),getSe(getVariableManager()->getScalarExtractor(parameters.scalarVariableIndex)));
+	cise.setColorScalarExtractor(getSe(getVariableManager()->getScalarExtractor(parameters.scalarVariableIndex)));
+	cise.setExtractionMode(parameters.smoothShading?CISE::SMOOTH:CISE::FLAT);
+	
+	/* Update the GUI: */
+	if(maxNumTrianglesSlider!=0)
+		maxNumTrianglesSlider->setValue(parameters.maxNumTriangles);
+	if(colorScalarVariableBox!=0)
+		colorScalarVariableBox->setSelectedItem(parameters.colorScalarVariableIndex);
+	if(extractionModeBox!=0)
+		extractionModeBox->setSelectedToggle(parameters.smoothShading?1:0);
+	if(lightingToggle!=0)
+		lightingToggle->setToggle(parameters.lighting);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::setSeedLocator(
+	const Visualization::Abstract::DataSet::Locator* seedLocator)
+	{
+	/* Get a pointer to the locator wrapper: */
+	const Locator* myLocator=dynamic_cast<const Locator*>(seedLocator);
+	if(myLocator==0)
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::setSeedLocator: Mismatching locator type");
+	
+	/* Calculate the seeding point: */
+	parameters.seedPoint=seedLocator->getPosition();
+	
+	/* Copy the locator: */
+	parameters.dsl=myLocator->getDsl();
+	parameters.locatorValid=myLocator->isValid();
+	
+	if(parameters.locatorValid)
+		{
+		/* Calculate the isovalue: */
+		parameters.isovalue=VScalar(parameters.dsl.calcValue(cise.getScalarExtractor()));
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::createElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::createElement: Mismatching parameter object type");
+	int svi=myParameters->scalarVariableIndex;
+	int csvi=myParameters->colorScalarVariableIndex;
+	
+	/* Update the GUI: */
+	if(currentValue!=0)
+		currentValue->setValue(double(myParameters->isovalue));
+	
+	/* Create a new colored isosurface visualization element: */
+	ColoredIsosurface* result=new ColoredIsosurface(myParameters,myParameters->lighting,getVariableManager()->getColorMap(csvi),getPipe());
+	
+	/* Update the colored isosurface extractor: */
+	cise.update(getDs(getVariableManager(),svi,csvi),getSe(getVariableManager()->getScalarExtractor(svi)));
+	cise.setColorScalarExtractor(getSe(getVariableManager()->getScalarExtractor(csvi)));
+	cise.setExtractionMode(myParameters->smoothShading?CISE::SMOOTH:CISE::FLAT);
+	
+	/* Extract the colored isosurface into the visualization element: */
+	cise.startSeededIsosurface(myParameters->dsl,result->getSurface());
+	ElementSizeLimit<ColoredIsosurface> esl(*result,myParameters->maxNumTriangles);
+	cise.continueSeededIsosurface(esl);
+	cise.finishSeededIsosurface();
+	
+	/* Return the result: */
+	return result;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::startElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::createElement: Mismatching parameter object type");
+	int svi=myParameters->scalarVariableIndex;
+	int csvi=myParameters->colorScalarVariableIndex;
+	
+	/* Update the GUI: */
+	if(currentValue!=0)
+		currentValue->setValue(double(myParameters->isovalue));
+	
+	/* Create a new colored isosurface visualization element: */
+	currentColoredIsosurface=new ColoredIsosurface(myParameters,myParameters->lighting,getVariableManager()->getColorMap(csvi),getPipe());
+	
+	/* Update the colored isosurface extractor: */
+	cise.update(getDs(getVariableManager(),svi,csvi),getSe(getVariableManager()->getScalarExtractor(svi)));
+	cise.setColorScalarExtractor(getSe(getVariableManager()->getScalarExtractor(csvi)));
+	cise.setExtractionMode(myParameters->smoothShading?CISE::SMOOTH:CISE::FLAT);
+	
+	/* start extracting the colored isosurface into the visualization element: */
+	cise.startSeededIsosurface(myParameters->dsl,currentColoredIsosurface->getSurface());
+	
+	/* Return the result: */
+	return currentColoredIsosurface.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+bool
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::continueElement(
+	const Realtime::AlarmTimer& alarm)
+	{
+	/* Continue extracting the colored isosurface into the visualization element: */
+	size_t maxNumTriangles=dynamic_cast<Parameters*>(currentColoredIsosurface->getParameters())->maxNumTriangles;
+	AlarmTimerElement<ColoredIsosurface> atcf(alarm,*currentColoredIsosurface,maxNumTriangles);
+	return cise.continueSeededIsosurface(atcf)||currentColoredIsosurface->getElementSize()>=maxNumTriangles;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::finishElement(
+	void)
+	{
+	cise.finishSeededIsosurface();
+	currentColoredIsosurface=0;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::startSlaveElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	if(isMaster())
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::startSlaveElement: Cannot be called on master node");
+	
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::startSlaveElement: Mismatching parameter object type");
+	
+	/* Update the GUI: */
+	if(currentValue!=0)
+		currentValue->setValue(double(myParameters->isovalue));
+	
+	/* Create a new colored isosurface visualization element: */
+	currentColoredIsosurface=new ColoredIsosurface(myParameters,myParameters->lighting,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	
+	return currentColoredIsosurface.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::continueSlaveElement(
+	void)
+	{
+	if(isMaster())
+		Misc::throwStdErr("SeededColoredIsosurfaceExtractor::continueSlaveElement: Cannot be called on master node");
+	
+	currentColoredIsosurface->getSurface().receive();
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::maxNumTrianglesCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Update the parameters structure: */
+	parameters.maxNumTriangles=size_t(cbData->value+0.5);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::colorScalarVariableBoxCallback(
+	GLMotif::DropdownBox::ValueChangedCallbackData* cbData)
+	{
+	/* Get the new selected item: */
+	parameters.colorScalarVariableIndex=cbData->newSelectedItem;
+	
+	/* Set the color isosurface extractor's color scalar variable: */
+	cise.setColorScalarExtractor(getSe(getVariableManager()->getScalarExtractor(parameters.colorScalarVariableIndex)));
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::extractionModeBoxCallback(
+	GLMotif::RadioBox::ValueChangedCallbackData* cbData)
+	{
+	switch(cbData->radioBox->getToggleIndex(cbData->newSelectedToggle))
+		{
+		case 0:
+			parameters.smoothShading=false;
+			cise.setExtractionMode(CISE::FLAT);
+			break;
+		
+		case 1:
+			parameters.smoothShading=true;
+			cise.setExtractionMode(CISE::SMOOTH);
+			break;
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::lightingToggleCallback(
+	GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
+	{
+	/* Set the surface lighting flag: */
+	parameters.lighting=cbData->set;
+	}
+
+}
+
+}

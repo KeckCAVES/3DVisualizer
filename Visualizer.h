@@ -1,7 +1,7 @@
 /***********************************************************************
 Visualizer - Test application for the new visualization component
 framework.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -118,7 +118,10 @@ class Visualizer:public Vrui::Application
 	ElementList* elementList; // List of previously extracted visualization elements
 	int algorithm; // The currently selected algorithm
 	GLMotif::PopupMenu* mainMenu; // The main menu widget
+	GLMotif::ToggleButton* showColorBarToggle; // Toggle button to show the color bar
+	GLMotif::ToggleButton* showPaletteEditorToggle; // Toggle button to show the palette editor
 	GLMotif::ToggleButton* showElementListToggle; // Toggle button to show the element list dialog
+	GLMotif::ToggleButton* showClientDialogToggle; // Toggle button to show the collaboration client dialog
 	
 	/* Lock flags for modal dialogs: */
 	bool inLoadPalette; // Flag whether the user is currently selecting a palette to load
@@ -146,6 +149,7 @@ class Visualizer:public Vrui::Application
 	virtual void toolDestructionCallback(Vrui::ToolManager::ToolDestructionCallbackData* cbData);
 	virtual void frame();
 	virtual void display(GLContextData& contextData) const;
+	virtual void sound(ALContextData& contextData) const;
 	
 	/* New methods: */
 	void changeRenderingModeCallback(GLMotif::RadioBox::ValueChangedCallbackData* cbData);
@@ -156,15 +160,20 @@ class Visualizer:public Vrui::Application
 	void loadPaletteOKCallback(GLMotif::FileSelectionDialog::OKCallbackData* cbData);
 	void loadPaletteCancelCallback(GLMotif::FileSelectionDialog::CancelCallbackData* cbData);
 	void showColorBarCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	void colorBarClosedCallback(Misc::CallbackData* cbData);
 	void showPaletteEditorCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	void paletteEditorClosedCallback(Misc::CallbackData* cbData);
 	void createStandardLuminancePaletteCallback(GLMotif::Menu::EntrySelectCallbackData* cbData);
 	void createStandardSaturationPaletteCallback(GLMotif::Menu::EntrySelectCallbackData* cbData);
 	void showElementListCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	void elementListClosedCallback(Misc::CallbackData* cbData);
 	void loadElementsCallback(Misc::CallbackData* cbData);
 	void loadElementsOKCallback(GLMotif::FileSelectionDialog::OKCallbackData* cbData);
 	void loadElementsCancelCallback(GLMotif::FileSelectionDialog::CancelCallbackData* cbData);
 	void saveElementsCallback(Misc::CallbackData* cbData);
 	void clearElementsCallback(Misc::CallbackData* cbData);
+	void showClientDialogCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	void clientDialogClosedCallback(Misc::CallbackData* cbData);
 	void centerDisplayCallback(Misc::CallbackData* cbData);
 	};
 

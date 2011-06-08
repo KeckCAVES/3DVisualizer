@@ -70,4 +70,19 @@
 3D Visualizer 1.7:
 - Adapted shared visualization protocol to collaboration infrastructure
   version 1.3.
-- Fixed regression bug in non-shader version of volume renderer.
+
+3D Visualizer 1.8:
+- Fixed regression bug in volume renderer when using old slice-based
+  implementation.
+- Adapted 3D Visualizer to Vrui release 2.0-xxx and bumped required Vrui
+  version number to same.
+- Reimplemented locator algorithms in many grid classes yet again.
+- Fixed DICOM image stack module to properly handle more DICOM file
+  flavors.
+- Added new (experimental) module for multi-valued Cartesian data sets
+  read from multiple binary grid files in made-up simple .vol format.
+- Forgot updating the HISTORY file, so there are probably a ton more. ;)
+- Adapted 3D Visualizer to Vrui release 2.1-xxx and bumped required Vrui
+  version number to same.
+- Moved template implementation files to .icpp file extension for
+  consistency with Vrui library and other packages.

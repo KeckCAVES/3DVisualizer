@@ -27,9 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iostream>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/HashTable.h>
-#include <Misc/File.h>
-#include <Misc/FileCharacterSource.h>
-#include <Misc/ValueSource.h>
+#include <IO/File.h>
+#include <IO/OpenFile.h>
+#include <IO/ValueSource.h>
 #include <Plugins/FactoryManager.h>
 #include <Math/Math.h>
 
@@ -43,7 +43,7 @@ namespace {
 Helper functions:
 ****************/
 
-void skipValues(Misc::ValueSource& source,int numValues)
+void skipValues(IO::ValueSource& source,int numValues)
 	{
 	for(int i=0;i<numValues;++i)
 		source.skipString();
@@ -53,14 +53,14 @@ template <class ScalarParam>
 inline
 void
 readVector(
-	Misc::ValueSource& source,
+	IO::ValueSource& source,
 	ScalarParam vector[])
 	{
 	for(int i=0;i<3;++i)
 		vector[i]=ScalarParam(source.readNumber());
 	}
 
-double readLength(Misc::ValueSource& source)
+double readLength(IO::ValueSource& source)
 	{
 	double length=0.0;
 	for(int i=0;i<3;++i)
@@ -115,8 +115,8 @@ Visualization::Abstract::DataSet* GocadVoxetFile::load(const std::vector<std::st
 	dataValue.initialize(&dataSet,0);
 	
 	/* Open the voxet file: */
-	Misc::FileCharacterSource voxetFile(fileName.c_str());
-	Misc::ValueSource voxet(voxetFile);
+	IO::AutoFile voxetFile(IO::openFile(fileName.c_str()));
+	IO::ValueSource voxet(*voxetFile);
 	voxet.setPunctuation("{}");
 	voxet.setQuotes("\"");
 	voxet.skipWs();
@@ -257,7 +257,8 @@ Visualization::Abstract::DataSet* GocadVoxetFile::load(const std::vector<std::st
 			
 			/* Read the property values from the property file: */
 			std::cout<<"Reading property from file "<<propertyFileName<<"..."<<std::flush;
-			Misc::File file(propertyFileName.c_str(),"r",Misc::File::BigEndian);
+			IO::AutoFile propertyFile(IO::openFile(propertyFileName.c_str()));
+			propertyFile->setEndianness(IO::File::BigEndian);
 			Value* slicePtr=dataSet.getSliceArray(sliceIndex);
 			Value* tempArray=new Value[numVertices[0]];
 			DS::Index index;
@@ -267,7 +268,7 @@ Visualization::Abstract::DataSet* GocadVoxetFile::load(const std::vector<std::st
 				for(index[1]=0;index[1]<numVertices[1];++index[1])
 					{
 					/* Read a span of data from the file: */
-					file.read<Value>(tempArray,numVertices[0]);
+					propertyFile->read<Value>(tempArray,numVertices[0]);
 					
 					/* Copy the data span into the data set: */
 					Value* sPtr=tempArray;

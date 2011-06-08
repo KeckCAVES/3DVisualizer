@@ -2,7 +2,7 @@
 SharedVisualizationClient - Client for collaborative data exploration in
 spatially distributed VR environments, implemented as a plug-in of the
 Vrui remote collaboration infrastructure.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -143,10 +143,11 @@ class SharedVisualizationClient:public ProtocolClient,public SharedVisualization
 	virtual void sendConnectRequest(CollaborationPipe& pipe);
 	virtual void sendClientUpdate(CollaborationPipe& pipe);
 	virtual ProtocolClient::RemoteClientState* receiveClientConnect(CollaborationPipe& pipe);
+	virtual void receiveServerUpdate(CollaborationPipe& pipe);
 	virtual void receiveServerUpdate(ProtocolClient::RemoteClientState* rcs,CollaborationPipe& pipe);
 	virtual void rejectedByServer(void);
 	virtual void frame(ProtocolClient::RemoteClientState* rcs);
-	virtual void display(const ProtocolClient::RemoteClientState* rcs,GLContextData& contextData) const;
+	virtual void glRenderAction(const ProtocolClient::RemoteClientState* rcs,GLContextData& contextData) const;
 	
 	/* New methods: */
 	void createLocator(ExtractorLocator* locator); // Registers a newly created extractor locator

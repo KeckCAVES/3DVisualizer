@@ -5,7 +5,7 @@ visualization algorithm. Mostly used to read/write visualization
 elements to files, and to transmit them over networks.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 /* Forward declarations: */
 namespace Misc {
-class File;
+class BufferedFile;
 }
 namespace Comm {
 class MulticastPipe;
@@ -38,6 +38,8 @@ class ClusterPipe;
 namespace Visualization {
 namespace Abstract {
 class VariableManager;
+class ParametersSink;
+class ParametersSource;
 }
 }
 
@@ -55,13 +57,9 @@ class Parameters
 	
 	/* Methods: */
 	virtual bool isValid(void) const =0; // Returns true if the parameter object can be used to extract a valid visualization element
-	virtual void read(Misc::File& file,bool ascii,VariableManager* variableManager) =0; // Reads parameters from a binary or text file
-	virtual void read(Comm::MulticastPipe& pipe,VariableManager* variableManager) =0; // Reads parameters from a multicast pipe
-	virtual void read(Comm::ClusterPipe& pipe,VariableManager* variableManager) =0; // Reads parameters from a cluster pipe
-	virtual void write(Misc::File& file,bool ascii,const VariableManager* variableManager) const =0; // Writes parameters to a binary or text file
-	virtual void write(Comm::MulticastPipe& pipe,const VariableManager* variableManager) const =0; // Writes parameters to a multicast pipe
-	virtual void write(Comm::ClusterPipe& pipe,const VariableManager* variableManager) const =0; // Writes parameters to a cluster pipe
 	virtual Parameters* clone(void) const =0; // Returns an exact copy of the parameter object
+	virtual void write(ParametersSink& sink) const =0; // Writes parameters to a parameter sink
+	virtual void read(ParametersSource& source) =0; // Reads parameters from a parameter source
 	};
 
 }

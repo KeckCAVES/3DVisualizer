@@ -1,7 +1,7 @@
 /***********************************************************************
 StructuredGridVTK - Class reading curvilinear grids from files in legacy
 VTK format.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLColorTemplates.h>
 #include <GL/GLContextData.h>
 #include <GL/GLModels.h>
+#include <Images/Config.h>
 #include <Images/RGBImage.h>
 #include <Images/ReadImageFile.h>
 
@@ -289,7 +290,7 @@ void EarthRenderer::initContext(GLContextData& contextData) const
 	
 	/* Create the default topography file name: */
 	std::string topographyFileName=EARTHRENDERER_IMAGEDIR;
-	#ifdef IMAGES_HAVE_PNG
+	#if IMAGES_CONFIG_HAVE_PNG
 	topographyFileName.append("/EarthTopography.png");
 	#else
 	topographyFileName.append("/EarthTopography.ppm");

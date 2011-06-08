@@ -1,7 +1,7 @@
 /***********************************************************************
 VectorEvaluationLocator - Class for locators evaluating vector
 properties of data sets.
-Copyright (c) 2008-2009 Oliver Kreylos
+Copyright (c) 2008-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include "VectorEvaluationLocator.h"
 
+#include <Misc/StandardValueCoders.h>
+#include <Misc/ConfigurationFile.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
 #include <Geometry/Vector.h>
@@ -34,8 +36,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/StyleSheet.h>
 #include <GLMotif/WidgetManager.h>
 #include <GLMotif/Label.h>
-#include <GLMotif/TextField.h>
 #include <GLMotif/RowColumn.h>
+#include <GLMotif/WidgetStateHelper.h>
 #include <Vrui/Vrui.h>
 
 #include <Abstract/DataSet.h>
@@ -48,19 +50,49 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 Methods of class VectorEvaluationLocator:
 ****************************************/
 
-VectorEvaluationLocator::VectorEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication)
+VectorEvaluationLocator::VectorEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg)
 	:EvaluationLocator(sLocatorTool,sApplication,"Vector Evaluation Dialog"),
-	 vectorExtractor(application->variableManager->getCurrentVectorExtractor()),
-	 scalarExtractor(application->variableManager->getCurrentScalarExtractor()),
+	 vectorExtractor(0),
+	 scalarExtractor(0),
 	 colorMap(application->variableManager->getCurrentColorMap()),
 	 valueValid(false),
 	 arrowLengthScale(1)
 	{
+	Visualization::Abstract::VariableManager* vm=application->variableManager;
+	
+	/* Get the vector and scalar extractors: */
+	if(cfg!=0)
+		{
+		/* Read the vector variable from the configuration file: */
+		std::string vectorVariableName=vm->getVectorVariableName(vm->getCurrentVectorVariable());
+		vectorVariableName=cfg->retrieveValue<std::string>("./vectorVariableName",vectorVariableName);
+		vectorExtractor=vm->getVectorExtractor(vm->getVectorVariable(vectorVariableName.c_str()));
+		
+		/* Read the scalar variable from the configuration file: */
+		std::string scalarVariableName=vm->getScalarVariableName(vm->getCurrentScalarVariable());
+		scalarVariableName=cfg->retrieveValue<std::string>("./scalarVariableName",scalarVariableName);
+		scalarExtractor=vm->getScalarExtractor(vm->getScalarVariable(scalarVariableName.c_str()));
+		}
+	else
+		{
+		/* Get extractors for the current vector and scalar variables: */
+		vectorExtractor=vm->getCurrentVectorExtractor();
+		scalarExtractor=vm->getCurrentScalarExtractor();
+		}
+	
+	/* Get the color map for the scalar extractor: */
+	colorMap=vm->getColorMap(vm->getScalarVariable(scalarExtractor));
+	
 	/* Get the style sheet: */
 	const GLMotif::StyleSheet* ss=Vrui::getWidgetManager()->getStyleSheet();
 	
+	/* Set the dialog's title string: */
+	std::string title="Evaluate Vectors -- ";
+	title.append(vm->getVectorVariableName(vm->getVectorVariable(vectorExtractor)));
+	evaluationDialogPopup->setTitleString(title.c_str());
+	
 	/* Add to the evaluation dialog: */
-	new GLMotif::Label("ValueLabel",evaluationDialog,application->variableManager->getVectorVariableName(application->variableManager->getCurrentVectorVariable()));
+	new GLMotif::Label("ValueLabel",evaluationDialog,vm->getVectorVariableName(vm->getVectorVariable(vectorExtractor)));
 	
 	GLMotif::RowColumn* valueBox=new GLMotif::RowColumn("ValueBox",evaluationDialog,false);
 	valueBox->setOrientation(GLMotif::RowColumn::HORIZONTAL);
@@ -82,25 +114,46 @@ VectorEvaluationLocator::VectorEvaluationLocator(Vrui::LocatorTool* sLocatorTool
 	arrowScaleBox->setOrientation(GLMotif::RowColumn::HORIZONTAL);
 	arrowScaleBox->setPacking(GLMotif::RowColumn::PACK_TIGHT);
 	
-	arrowScaleValue=new GLMotif::TextField("ArrowScaleValue",arrowScaleBox,12);
-	arrowScaleValue->setPrecision(6);
-	arrowScaleValue->setValue(arrowLengthScale);
-	
-	arrowScaleSlider=new GLMotif::Slider("ArrowScaleSlider",arrowScaleBox,GLMotif::Slider::HORIZONTAL,ss->fontHeight*10.0f);
-	arrowScaleSlider->setValueRange(-4.0,4.0,0.1);
-	arrowScaleSlider->setValue(Math::log10(arrowLengthScale));
-	arrowScaleSlider->getValueChangedCallbacks().add(this,&VectorEvaluationLocator::arrowScaleSliderCallback);
+	GLMotif::TextFieldSlider* arrowScaleSlider=new GLMotif::TextFieldSlider("ArrowScaleSlider",evaluationDialog,12,ss->fontHeight*10.0f);
+	arrowScaleSlider->getTextField()->setPrecision(6);
+	arrowScaleSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	arrowScaleSlider->setValueRange(1.0e-4,1.0e4,0.1);
+	arrowScaleSlider->setValue(arrowLengthScale);
+	arrowScaleSlider->getValueChangedCallbacks().add(this,&VectorEvaluationLocator::arrowScaleCallback);
 	
 	arrowScaleBox->manageChild();
 	
 	evaluationDialog->manageChild();
 	
 	/* Pop up the evaluation dialog: */
-	Vrui::popupPrimaryWidget(evaluationDialogPopup,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
+	Vrui::popupPrimaryWidget(evaluationDialogPopup);
+	
+	if(cfg!=0)
+		{
+		/* Read the evaluation dialog's position: */
+		GLMotif::readTopLevelPosition(evaluationDialogPopup,*cfg);
+		}
 	}
 
 VectorEvaluationLocator::~VectorEvaluationLocator(void)
 	{
+	}
+
+void VectorEvaluationLocator::storeState(Misc::ConfigurationFileSection& configFileSection) const
+	{
+	Visualization::Abstract::VariableManager* vm=application->variableManager;
+	
+	/* Write the algorithm type: */
+	configFileSection.storeString("./algorithm","Evaluate Vectors");
+	
+	/* Write the vector variable name: */
+	configFileSection.storeValue<std::string>("./vectorVariableName",vm->getVectorVariableName(vm->getVectorVariable(vectorExtractor)));
+	
+	/* Write the scalar variable name: */
+	configFileSection.storeValue<std::string>("./scalarVariableName",vm->getScalarVariableName(vm->getScalarVariable(scalarExtractor)));
+	
+	/* Write the evaluation dialog's position: */
+	GLMotif::writeTopLevelPosition(evaluationDialogPopup,configFileSection);
 	}
 
 void VectorEvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
@@ -126,7 +179,7 @@ void VectorEvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackDa
 			{
 			valueValid=false;
 			for(int i=0;i<3;++i)
-				values[i]->setLabel("");
+				values[i]->setString("");
 			}
 		}
 	}
@@ -165,11 +218,8 @@ void VectorEvaluationLocator::highlightLocator(GLContextData& contextData) const
 		}
 	}
 
-void VectorEvaluationLocator::arrowScaleSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData)
+void VectorEvaluationLocator::arrowScaleCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
 	{
 	/* Get the new slider value and convert to step size: */
-	arrowLengthScale=Scalar(Math::pow(10.0,double(cbData->value)));
-	
-	/* Update the text field: */
-	arrowScaleValue->setValue(arrowLengthScale);
+	arrowLengthScale=Scalar(cbData->value);
 	}

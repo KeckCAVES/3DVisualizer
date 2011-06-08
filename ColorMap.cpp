@@ -592,6 +592,14 @@ void ColorMap::exportColorMap(GLColorMap& glColorMap) const
 	int numEntries=glColorMap.getNumEntries();
 	GLColorMap::Color* entries=new GLColorMap::Color[numEntries];
 	
+	/* Find the leftmost and rightmost "valid" control points: */
+	const ControlPoint* left=&first;
+	while(left->value==left->right->value)
+		left=left->right;
+	const ControlPoint* right=&last;
+	while(right->value==right->left->value)
+		right=right->left;
+	
 	/* Interpolate all colors in the color array: */
 	for(int i=0;i<numEntries;++i)
 		{
@@ -599,9 +607,9 @@ void ColorMap::exportColorMap(GLColorMap& glColorMap) const
 		double value=double(i)*(valueRange.second-valueRange.first)/double(numEntries-1)+valueRange.first;
 		
 		/* Find the two control points on either side of the value: */
-		const ControlPoint* cpPtr1=&first;
+		const ControlPoint* cpPtr1=left;
 		const ControlPoint* cpPtr2;
-		for(cpPtr2=cpPtr1->right;cpPtr2!=&last&&cpPtr2->value<value;cpPtr1=cpPtr2,cpPtr2=cpPtr2->right)
+		for(cpPtr2=cpPtr1->right;cpPtr2!=right&&cpPtr2->value<value;cpPtr1=cpPtr2,cpPtr2=cpPtr2->right)
 			;
 		
 		/* Interpolate the new control point: */

@@ -1,7 +1,7 @@
 /***********************************************************************
 StructuredGridVTK - Class reading curvilinear grids from files in legacy
 VTK format.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,14 +20,13 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#include <ctype.h>
-#include <string.h>
-#include <stdio.h>
+#include <string>
 #include <iostream>
 #include <iomanip>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
-#include <Misc/File.h>
+#include <IO/OpenFile.h>
+#include <IO/ValueSource.h>
 #include <Plugins/FactoryManager.h>
 
 #include <Concrete/StructuredGridVTK.h>
@@ -49,88 +48,114 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 	{
 	/* Create the result data set: */
 	Misc::SelfDestructPointer<DataSet> result(new DataSet);
+	DS& dataSet=result->getDs();
 	
 	/* Open the input file: */
-	Misc::File dataFile(args[0].c_str(),"rb");
+	IO::AutoFile file(IO::openFile(args[0].c_str()));
+	
+	/* Attach a value source to the file to read the header: */
+	DS::Index numVertices;
+	bool binary=false;
+	std::string gridPointDataType;
+	{
+	IO::ValueSource headerSource(*file);
+	headerSource.setPunctuation('\n',true);
 	
 	/* Read the header line: */
-	char line[258];
-	dataFile.gets(line,sizeof(line));
-	int vtkVersionMajor,vtkVersionMinor;
-	if(sscanf(line,"# vtk DataFile Version %d.%d",&vtkVersionMajor,&vtkVersionMinor)!=2)
+	if(headerSource.readString()!="#"||headerSource.readString()!="vtk"||headerSource.readString()!="DataFile"||headerSource.readString()!="Version")
+		Misc::throwStdErr("StructuredGridVTK::load: Input file %s is not a VTK data file",args[0].c_str());
+	
+	/* Read the file version: */
+	int vtkVersionMajor=headerSource.readInteger();
+	if(headerSource.readChar()!='.')
+		Misc::throwStdErr("StructuredGridVTK::load: Input file %s is not a VTK data file",args[0].c_str());
+	int vtkVersionMinor=headerSource.readInteger();
+	if(headerSource.readChar()!='\n')
 		Misc::throwStdErr("StructuredGridVTK::load: Input file %s is not a VTK data file",args[0].c_str());
 	if(vtkVersionMajor>3||(vtkVersionMajor==3&&vtkVersionMinor>0))
 		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s is unsupported version %d.%d",args[0].c_str(),vtkVersionMajor,vtkVersionMinor);
 	
-	/* Ignore the comment line: */
-	dataFile.gets(line,sizeof(line));
+	/* Skip the comment line: */
+	headerSource.skipLine();
+	headerSource.skipWs();
 	
-	/* Read the file storage format: */
-	bool binary=false;
-	dataFile.gets(line,sizeof(line));
-	if(strncasecmp(line,"BINARY",6)==0&&isspace(line[6]))
+	/* Read the data storage type: */
+	std::string storageType=headerSource.readString();
+	if(headerSource.readChar()!='\n')
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has malformed storage type definition",args[0].c_str());
+	if(storageType=="BINARY")
 		binary=true;
-	else if(strncasecmp(line,"ASCII",5)!=0||!isspace(line[5]))
-		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has unrecognized storage type",args[0].c_str());
+	else if(storageType!="ASCII")
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has unrecognized storage type %s",args[0].c_str(),storageType.c_str());
 	
-	/* Read the grid type: */
-	dataFile.gets(line,sizeof(line));
-	if(strncasecmp(line,"DATASET",7)==0&&isspace(line[7]))
-		{
-		char* typeStart;
-		for(typeStart=line+8;*typeStart!='\0'&&isspace(*typeStart);++typeStart)
-			;
-		char* typeEnd;
-		for(typeEnd=typeStart;*typeEnd!='\0'&&!isspace(*typeEnd);++typeEnd)
-			;
-		*typeEnd='\0';
-		if(strcasecmp(typeStart,"STRUCTURED_GRID")!=0)
-			Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s contains wrong grid type %s",args[0].c_str(),typeStart);
-		}
-	else
-		Misc::throwStdErr("StructuredGridVTK::load: invalid grid type in VTK data file %s",args[0].c_str());
+	/* Read the data set descriptor: */
+	if(headerSource.readString()!="DATASET")
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s does not have a data set definition",args[0].c_str());
+	std::string dataSetType=headerSource.readString();
+	if(dataSetType!="STRUCTURED_GRID")
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has data set type %s instead of STRUCTURED_GRID",args[0].c_str(),dataSetType.c_str());
+	if(headerSource.readChar()!='\n')
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has malformed data set definition",args[0].c_str());
 	
 	/* Read the grid size: */
-	DS::Index numVertices;
-	dataFile.gets(line,sizeof(line));
-	if(sscanf(line,"DIMENSIONS %d %d %d",&numVertices[0],&numVertices[1],&numVertices[2])!=3)
-		Misc::throwStdErr("StructuredGridVTK::load: invalid grid dimension in VTK data file %s",args[0].c_str());
+	if(headerSource.readString()!="DIMENSIONS")
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s does not define data set dimensions",args[0].c_str());
+	for(int i=0;i<3;++i)
+		{
+		if(headerSource.peekc()=='\n')
+			Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has too few data set dimensions",args[0].c_str());
+		numVertices[i]=headerSource.readInteger();
+		}
+	if(headerSource.readChar()!='\n')
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has malformed data set dimensions",args[0].c_str());
+	if(numVertices[0]<1||numVertices[1]<1||numVertices[2]<1)
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has invalid data set dimensions",args[0].c_str());
+	
+	/* Read the grid point data type: */
+	if(headerSource.readString()!="POINTS")
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s does not define grid points",args[0].c_str());
+	if(headerSource.readInteger()!=numVertices.calcIncrement(-1))
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s defines wrong number of grid points",args[0].c_str());
+	gridPointDataType=headerSource.readString();
+	if(headerSource.getChar()!='\n')
+		Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has malformed grid point definition",args[0].c_str());
+	}
 	
 	/* Initialize the data set: */
-	DS& dataSet=result->getDs();
 	dataSet.setGrid(numVertices);
 	
-	/* Read the grid vertices: */
-	dataFile.gets(line,sizeof(line));
-	int totalNumVertices;
-	char vertexScalarType[10];
-	if(sscanf(line,"POINTS %d %10s",&totalNumVertices,vertexScalarType)!=2)
-		Misc::throwStdErr("StructuredGridVTK::load: invalid grid point definition in VTK data file %s",args[0].c_str());
-	if(totalNumVertices!=numVertices.calcIncrement(-1))
-		Misc::throwStdErr("StructuredGridVTK::load: mismatching number of grid points in VTK data file %s",args[0].c_str());
-	if(strcasecmp(vertexScalarType,"float")!=0&&strcasecmp(vertexScalarType,"double")!=0)
-		Misc::throwStdErr("StructuredGridVTK::load: unsupported grid point scalar type %s in VTK data file %s",vertexScalarType,args[0].c_str());
-	std::cout<<"Reading grid vertices...   0%"<<std::flush;
-	DS::Index index(0);
-	while(index[2]<numVertices[2])
+	/* Read the grid points: */
+	if(binary)
 		{
-		/* Read the next line: */
-		dataFile.gets(line,sizeof(line));
-		
-		/* Parse the line: */
-		DS::Point& vertex=dataSet.getVertexPosition(index);
-		if(sscanf(line,"%f %f %f",&vertex[0],&vertex[1],&vertex[2])!=3)
-			Misc::throwStdErr("StructuredGridVTK::load: Invalid vertex position in VTK data file %s",args[0].c_str());
-		
-		/* Go to the next vertex: */
-		int incDim;
-		for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
-			index[incDim]=0;
-		++index[incDim];
-		if(incDim==2)
-			std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
 		}
-	std::cout<<"\b\b\b\bdone"<<std::endl;
+	else
+		{
+		/* Attach another data source to the file to read grid points: */
+		IO::ValueSource gridSource(*file);
+		gridSource.setPunctuation('\n',true);
+		
+		std::cout<<"Reading grid vertices...   0%"<<std::flush;
+		DS::Index index(0);
+		while(index[2]<numVertices[2])
+			{
+			/* Read the next vertex: */
+			gridSource.skipWs();
+			DS::Point& vertex=dataSet.getVertexPosition(index);
+			for(int i=0;i<3;++i)
+				vertex[i]=DS::Scalar(gridSource.readNumber());
+			if(gridSource.getChar()!='\n')
+				Misc::throwStdErr("StructuredGridVTK::load: Invalid vertex position in VTK data file %s",args[0].c_str());
+			
+			/* Go to the next vertex: */
+			int incDim;
+			for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
+				index[incDim]=0;
+			++index[incDim];
+			if(incDim==2)
+				std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
+			}
+		std::cout<<"\b\b\b\bdone"<<std::endl;
+		}
 	
 	/* Finalize the grid structure: */
 	std::cout<<"Finalizing grid structure..."<<std::flush;
@@ -144,98 +169,120 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 	/* Read all point attributes stored in the file: */
 	while(true)
 		{
-		/* Read the attribute header line: */
-		dataFile.gets(line,sizeof(line));
-		
-		/* Check if there is another attribute: */
-		int totalNumAttributes;
-		if(sscanf(line,"POINT_DATA %d",&totalNumAttributes)!=1)
+		/* Attach a data source to the file to read an attribute header: */
+		std::string attributeType,attributeName,attributeScalarType;
+		int attributeNumScalars=1;
+		{
+		IO::ValueSource attributeSource(*file);
+		attributeSource.setPunctuation('\n',true);
+		attributeSource.skipWs();
+		if(attributeSource.readString()!="POINT_DATA")
+			{
+			/* No more attributes: */
 			break;
-		if(totalNumAttributes!=numVertices.calcIncrement(-1))
-			Misc::throwStdErr("StructuredGridVTK::load: mismatching number of point attributes in VTK data file %s",args[0].c_str());
+			}
 		
-		/* Read the attribute type and name: */
-		dataFile.gets(line,sizeof(line));
-		char attributeType[40];
-		char attributeName[80];
-		char attributeScalarType[10];
-		if(sscanf(line,"%40s %80s %10s",attributeType,attributeName,attributeScalarType)!=3)
-			Misc::throwStdErr("StructuredGridVTK::load: invalid point attribute definition in VTK data file %s",args[0].c_str());
+		/* Check the number of attributes: */
+		if(attributeSource.readInteger()!=numVertices.calcIncrement(-1))
+			Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s defines wrong number of point attributes",args[0].c_str());
+		if(attributeSource.readChar()!='\n')
+			Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has malformed point attribute definition",args[0].c_str());
 		
-		bool vectorAttribute=false;
-		if(strcasecmp(attributeType,"VECTORS")==0)
-			vectorAttribute=true;
-		else if(strcasecmp(attributeType,"SCALARS")!=0)
-			Misc::throwStdErr("StructuredGridVTK::load: unsupported point attribute type %s in VTK data file %s",attributeType,args[0].c_str());
-		if(strcasecmp(attributeScalarType,"float")!=0&&strcasecmp(attributeScalarType,"double")!=0)
-			Misc::throwStdErr("StructuredGridVTK::load: unsupported point attribute scalar type %s in VTK data file %s",attributeScalarType,args[0].c_str());
+		/* Read the attribute type, name, and data type: */
+		attributeType=attributeSource.readString();
+		attributeName=attributeSource.readString();
+		attributeScalarType=attributeSource.readString();
+		if(attributeSource.peekc()!='\n')
+			attributeNumScalars=attributeSource.readInteger();
+		if(attributeSource.getChar()!='\n')
+			Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has malformed point attribute definition",args[0].c_str());
+		}
 		
 		/* Create the new attribute: */
+		bool attributeVectors=false;
 		int sliceIndex=dataSet.getNumSlices();
-		if(vectorAttribute)
-			{
-			/* Add another vector variable to the data value: */
-			int vectorVariableIndex=dataValue.getNumVectorVariables();
-			dataValue.addVectorVariable(attributeName);
-
-			/* Add four new slices to the data set (3 components plus magnitude): */
-			char variableName[256];
-			for(int i=0;i<3;++i)
-				{
-				dataSet.addSlice();
-				snprintf(variableName,sizeof(variableName),"%s %c",attributeName,'X'+i);
-				dataValue.addScalarVariable(variableName);
-				dataValue.setVectorVariableScalarIndex(vectorVariableIndex,i,sliceIndex+i);
-				}
-			dataSet.addSlice();
-			snprintf(variableName,sizeof(variableName),"%s Magnitude",attributeName);
-			dataValue.addScalarVariable(variableName);
-			}
-		else
+		if(attributeType=="SCALARS")
 			{
 			/* Add another slice to the data set: */
 			dataSet.addSlice();
 			
 			/* Add another scalar variable to the data value: */
-			dataValue.addScalarVariable(attributeName);
+			dataValue.addScalarVariable(attributeName.c_str());
 			}
-		
-		/* Read all vertex attributes: */
-		std::cout<<"Reading "<<attributeName<<" point attributes...   0%"<<std::flush;
-		DS::Index index(0);
-		while(index[2]<numVertices[2])
+		else if(attributeType=="VECTORS")
 			{
-			/* Read the next line: */
-			dataFile.gets(line,sizeof(line));
+			/* Add another vector variable to the data value: */
+			attributeVectors=true;
+			int vectorVariableIndex=dataValue.getNumVectorVariables();
+			dataValue.addVectorVariable(attributeName.c_str());
 			
-			/* Parse the line: */
-			if(vectorAttribute)
+			/* Add four new slices to the data set (3 components plus magnitude): */
+			for(int i=0;i<3;++i)
 				{
-				/* Read the vector attribute in Cartesian coordinates: */
-				DataValue::VVector vector;
-				if(sscanf(line,"%lf %lf %lf",&vector[0],&vector[1],&vector[2])!=3)
-					Misc::throwStdErr("StructuredGridVTK::load: Invalid vector attribute in in VTK data file %s",args[0].c_str());
-				
-				/* Store the vector's components and magnitude: */
-				for(int i=0;i<3;++i)
-					dataSet.getVertexValue(sliceIndex+i,index)=vector[i];
-				dataSet.getVertexValue(sliceIndex+3,index)=DataValue::VScalar(Geometry::mag(vector));
+				dataSet.addSlice();
+				std::string variableName=attributeName;
+				variableName.push_back(' ');
+				variableName.push_back('X'+i);
+				dataValue.addScalarVariable(variableName.c_str());
+				dataValue.setVectorVariableScalarIndex(vectorVariableIndex,i,sliceIndex+i);
 				}
-			else
-				{
-				if(sscanf(line,"%lf",&dataSet.getVertexValue(sliceIndex,index))!=1)
-					Misc::throwStdErr("StructuredGridVTK::load: Invalid scalar attribute in in VTK data file %s",args[0].c_str());
-				}
-			
-			/* Go to the next vertex: */
-			int incDim;
-			for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
-				index[incDim]=0;
-			++index[incDim];
-			if(incDim==2)
-				std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
+			dataSet.addSlice();
+			std::string variableName=attributeName;
+			variableName.append(" Magnitude");
+			dataValue.addScalarVariable(variableName.c_str());
 			}
-		std::cout<<"\b\b\b\bdone"<<std::endl;
+		else
+			Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has unknown point attribute type %s",args[0].c_str(),attributeType.c_str());
+		
+		/* Read the vertex attributes: */
+		if(binary)
+			{
+			}
+		else
+			{
+			/* Attach another data source to the file to read grid points: */
+			IO::ValueSource attributeSource(*file);
+			attributeSource.setPunctuation('\n',true);
+			
+			std::cout<<"Reading "<<attributeName<<" point attributes...   0%"<<std::flush;
+			DS::Index index(0);
+			while(index[2]<numVertices[2])
+				{
+				/* Read the next attribute: */
+				attributeSource.skipWs();
+				if(attributeVectors)
+					{
+					/* Read the vector value in Cartesian coordinates: */
+					DataValue::VVector vector;
+					for(int i=0;i<3;++i)
+						vector[i]=DataValue::VVector::Scalar(attributeSource.readNumber());
+					if(attributeSource.getChar()!='\n')
+						Misc::throwStdErr("StructuredGridVTK::load: Invalid vector attribute in in VTK data file %s",args[0].c_str());
+					
+					/* Store the vector's components and magnitude: */
+					for(int i=0;i<3;++i)
+						dataSet.getVertexValue(sliceIndex+i,index)=vector[i];
+					dataSet.getVertexValue(sliceIndex+3,index)=DataValue::VScalar(Geometry::mag(vector));
+					}
+				else
+					{
+					/* Read the first scalar attribute from the line: */
+					dataSet.getVertexValue(sliceIndex,index)=DS::ValueScalar(attributeSource.readNumber());
+					
+					/* Skip the rest of the line: */
+					attributeSource.skipLine();
+					}
+				
+				/* Go to the next vertex: */
+				int incDim;
+				for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
+					index[incDim]=0;
+				++index[incDim];
+				if(incDim==2)
+					std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
+				}
+			std::cout<<"\b\b\b\bdone"<<std::endl;
+			}
 		}
 	
 	/* Return the result data set: */

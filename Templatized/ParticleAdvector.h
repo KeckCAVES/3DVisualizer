@@ -1,6 +1,6 @@
 /***********************************************************************
 ParticleAdvector - Generic class to advect particles in data sets.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -119,7 +119,7 @@ class ParticleAdvector
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_PARTICLEADVECTOR_IMPLEMENTATION
-#include <Templatized/ParticleAdvector.cpp>
+#include <Templatized/ParticleAdvector.icpp>
 #endif
 
 #endif

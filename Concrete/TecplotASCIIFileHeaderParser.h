@@ -25,13 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <string>
 #include <vector>
-#include <Misc/ValueSource.h>
+#include <IO/ValueSource.h>
 
 namespace Visualization {
 
 namespace Concrete {
 
-class TecplotASCIIFileHeaderParser:public Misc::ValueSource
+class TecplotASCIIFileHeaderParser:public IO::ValueSource
 	{
 	/* Embedded classes: */
 	public:
@@ -71,7 +71,7 @@ class TecplotASCIIFileHeaderParser:public Misc::ValueSource
 	
 	/* Constructors and destructors: */
 	public:
-	TecplotASCIIFileHeaderParser(Misc::CharacterSource& source); // Creates a parser for the given character source
+	TecplotASCIIFileHeaderParser(IO::File& source); // Creates a parser for the given character source
 	
 	/* Methods: */
 	std::string getTitle(void) const // Returns the file's title

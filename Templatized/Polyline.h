@@ -1,6 +1,6 @@
 /***********************************************************************
 Polyline - Class to represent arbitrary-length polylines.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -127,7 +127,7 @@ class Polyline:public GLObject
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_POLYLINE_IMPLEMENTATION
-#include <Templatized/Polyline.cpp>
+#include <Templatized/Polyline.icpp>
 #endif
 
 #endif

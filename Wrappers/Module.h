@@ -1,7 +1,7 @@
 /***********************************************************************
 Module - Wrapper class to combine templatized data set representations
 and templatized algorithms into a polymorphic visualization module.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -98,7 +98,7 @@ class Module:public Visualization::Abstract::Module
 }
 
 #ifndef VISUALIZATION_WRAPPERS_MODULE_IMPLEMENTATION
-#include <Wrappers/Module.cpp>
+#include <Wrappers/Module.icpp>
 #endif
 
 #endif

@@ -1,7 +1,7 @@
 /***********************************************************************
 EvaluationLocator - Base class for locators evaluating properties of
 data sets.
-Copyright (c) 2006-2009 Oliver Kreylos
+Copyright (c) 2006-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

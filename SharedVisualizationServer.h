@@ -100,11 +100,38 @@ class SharedVisualizationServer:public ProtocolServer,public SharedVisualization
 	
 	typedef std::vector<LocatorAction> LocatorActionList; // Type for lists of locator actions
 	
+	struct Element // Structure to store previously extracted visualization elements
+		{
+		/* Elements: */
+		public:
+		std::string algorithmName; // Name of the algorithm which created the element
+		size_t parametersSize; // Size of element parameter blob in bytes
+		unsigned char* parameters; // Element parameter blob
+		bool enabled; // Flag whether the element is currently enabled (visible)
+		
+		/* Constructors and destructors: */
+		Element(const LocatorState& ls); // Creates a visualization element from the final seed request of a locator state
+		private:
+		Element(const Element& source); // Prohibit copy constructor
+		Element& operator=(const Element& source); // Prohibit assignment operator
+		public:
+		~Element(void) // Destroys a seed request
+			{
+			delete[] parameters;
+			}
+		
+		/* Methods: */
+		void send(CollaborationPipe& pipe) const; // Writes visualization element to pipe
+		};
+	
+	typedef Misc::HashTable<unsigned int,Element*> ElementHash; // Type for hash tables mapping element IDs to element objects
+	
 	class ClientState:public ProtocolServer::ClientState
 		{
 		friend class SharedVisualizationServer;
 		
 		/* Elements: */
+		bool firstUpdate; // Flag to indicate that the client has not yet received a server update packet
 		LocatorHash locators; // Hash table containing locators currently registered by the client
 		LocatorActionList actions; // List of locator actions queued up since the last server update
 		
@@ -113,6 +140,11 @@ class SharedVisualizationServer:public ProtocolServer,public SharedVisualization
 		ClientState(void);
 		virtual ~ClientState(void);
 		};
+	
+	/* Elements: */
+	Threads::Mutex elementListMutex; // Mutex serializing access to the element list
+	unsigned int nextElementID; // ID number to assign to next created visualization element
+	ElementHash elements; // Hash table containing all current visualization elements
 	
 	/* Constructors and destructors: */
 	public:
@@ -125,6 +157,7 @@ class SharedVisualizationServer:public ProtocolServer,public SharedVisualization
 	virtual ProtocolServer::ClientState* receiveConnectRequest(unsigned int protocolMessageLength,CollaborationPipe& pipe);
 	virtual void receiveClientUpdate(ProtocolServer::ClientState* cs,CollaborationPipe& pipe);
 	virtual void sendClientConnect(ProtocolServer::ClientState* sourceCs,ProtocolServer::ClientState* destCs,CollaborationPipe& pipe);
+	virtual void sendServerUpdate(ProtocolServer::ClientState* destCs,CollaborationPipe& pipe);
 	virtual void sendServerUpdate(ProtocolServer::ClientState* sourceCs,ProtocolServer::ClientState* destCs,CollaborationPipe& pipe);
 	virtual void afterServerUpdate(ProtocolServer::ClientState* cs);
 	};

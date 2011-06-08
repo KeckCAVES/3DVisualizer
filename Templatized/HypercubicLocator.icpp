@@ -1,0 +1,233 @@
+/***********************************************************************
+HypercubicLocator - Helper class to perform cell location in data sets
+consisting of hypercubic cells.
+Copyright (c) 2010-2011 Oliver Kreylos
+
+This file is part of the 3D Data Visualizer (Visualizer).
+
+The 3D Data Visualizer is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+The 3D Data Visualizer is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with the 3D Data Visualizer; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+***********************************************************************/
+
+#define VISUALIZATION_TEMPLATIZED_HYPERCUBICLOCATOR_IMPLEMENTATION
+
+#include <Templatized/HypercubicLocator.h>
+
+#include <Geometry/Matrix.h>
+
+namespace Visualization {
+
+namespace Templatized {
+
+template <class DataSetParam>
+inline
+bool
+HypercubicLocator<DataSetParam>::newtonRaphsonStep(
+	typename HypercubicLocator<DataSetParam>::Locator& loc,
+	const typename HypercubicLocator<DataSetParam>::Point& position)
+	{
+	typedef Geometry::Matrix<Scalar,dimension,dimension> Matrix;
+	
+	/* Transform the current cell position to domain space: */
+	
+	/* Perform multilinear interpolation: */
+	Point p[CellTopology::numVertices>>1]; // Array of intermediate interpolation points
+	int interpolationDimension=dimension-1;
+	int numSteps=CellTopology::numVertices>>1;
+	for(int pi=0;pi<numSteps;++pi)
+		{
+		const Point& v0=loc.getVertexPosition(pi);
+		const Point& v1=loc.getVertexPosition(pi+numSteps);
+		p[pi]=Geometry::affineCombination(v0,v1,loc.cellPos[interpolationDimension]);
+		}
+	for(int i=1;i<dimension;++i)
+		{
+		--interpolationDimension;
+		numSteps>>=1;
+		for(int pi=0;pi<numSteps;++pi)
+			p[pi]=Geometry::affineCombination(p[pi],p[pi+numSteps],loc.cellPos[interpolationDimension]);
+		}
+	
+	/* Calculate f(x_i): */
+	Vector fi=p[0]-position;
+	
+	/* Check for convergence: */
+	if(fi.sqr()<loc.epsilon2)
+		return true;
+	
+	/* Calculate f'(x_i): */
+	Matrix fpi=Matrix::zero;
+	for(int i=0;i<dimension;++i)
+		{
+		/* Calculate cell's edge vectors for current dimension: */
+		int iMask=1<<i;
+		for(int v0=0;v0<CellTopology::numVertices;++v0)
+			if((v0&iMask)==0)
+				{
+				/* Calculate edge vector and convex combination weight: */
+				int v1=v0|iMask;
+				Vector d=loc.getVertexPosition(v1)-loc.getVertexPosition(v0);
+				Scalar weight=Scalar(1);
+				for(int j=0;j<dimension;++j)
+					if(j!=i)
+						{
+						int jMask=1<<j;
+						if(v0&jMask)
+							weight*=loc.cellPos[j];
+						else
+							weight*=Scalar(1)-loc.cellPos[j];
+						}
+				
+				/* Add weighted vector to Jacobian matrix: */
+				for(int j=0;j<dimension;++j)
+					fpi(j,i)+=d[j]*weight;
+				}
+		}
+	
+	/* Calculate the step vector as f(x_i) / f'(x_i): */
+	CellPosition stepi=fi/fpi;
+	
+	/* Adjust the locator's cell position: */
+	for(int i=0;i<dimension;++i)
+		loc.cellPos[i]-=stepi[i];
+	
+	return false;
+	}
+
+template <class DataSetParam>
+inline
+bool
+HypercubicLocator<DataSetParam>::locatePoint(
+	typename HypercubicLocator<DataSetParam>::Locator& loc,
+	const typename HypercubicLocator<DataSetParam>::Point& position,
+	bool traceHint)
+	{
+	/*********************************************************************
+	If the locator is not in a good state, or the caller doesn't want
+	tracing, find the initial cell from which to start tracing globally.
+	*********************************************************************/
+	
+	if(!(traceHint&&loc.canTrace))
+		{
+		/* Get the ID of the cell whose center is closest to the target position: */
+		CellID nearestCellID=loc.ds->findClosestCell(position);
+		
+		/* Trivially reject if there is no close-by cell: */
+		if(!nearestCellID.isValid())
+			return false;
+		
+		/* Move the locator to the center of the found cell: */
+		loc.Cell::operator=(loc.ds->getCell(nearestCellID));
+		for(int i=0;i<dimension;++i)
+			loc.cellPos[i]=Scalar(0.5);
+		
+		/* Enable tracing for future location requests: */
+		loc.canTrace=true;
+		}
+	
+	/*********************************************************************
+	Find the cell containing the target position in the locator's current
+	neighborhood by traversing from cell to cell, guided by the target
+	position's tentative local cell position.
+	*********************************************************************/
+	
+	/* Traverse cells: */
+	Scalar maxOut;
+	for(int traversalStep=0;traversalStep<10;++traversalStep)
+		{
+		/* Calculate the target position's local coordinates in the current cell: */
+		int maxOutDim,maxOutDir;
+		int iteration;
+		for(iteration=0;iteration<10;++iteration)
+			{
+			/* Perform a single Newton-Raphson step: */
+			bool converged=newtonRaphsonStep(loc,position);
+			
+			/* Find the largest out-of-cell component of the current local coordinate: */
+			maxOut=Scalar(0);
+			maxOutDim=-1;
+			maxOutDir=0;
+			for(int i=0;i<dimension;++i)
+				{
+				if(maxOut<-loc.cellPos[i])
+					{
+					maxOut=-loc.cellPos[i];
+					maxOutDim=i;
+					maxOutDir=-1;
+					}
+				if(maxOut<loc.cellPos[i]-Scalar(1))
+					{
+					maxOut=loc.cellPos[i]-Scalar(1);
+					maxOutDim=i;
+					maxOutDir=1;
+					}
+				}
+			
+			/* Stop iteration on convergence, or if the tentative local coordinates are too far outside the current cell: */
+			if(converged||maxOut>Scalar(1)) // Tolerate at most one cell out
+				break;
+			}
+		
+		/* Stop searching if the current cell contains the query position: */
+		if(maxOut<Scalar(1.0e-4))
+			return true;
+		
+		/* Check for a tracing failure on the first step, which indicates that the caller was too optimistic: */
+		if(traversalStep==0&&maxOut>Scalar(5))
+			{
+			/* Get the ID of the cell whose center is closest to the target position: */
+			CellID nearestCellID=loc.ds->findClosestCell(position);
+			
+			/* Trivially reject if there is no close-by cell: */
+			if(!nearestCellID.isValid())
+				{
+				/* Disable tracing until further notice: */
+				loc.canTrace=false;
+				
+				return false;
+				}
+			
+			/* Move the locator to the center of the found cell: */
+			loc.Cell::operator=(loc.ds->getCell(nearestCellID));
+			for(int i=0;i<dimension;++i)
+				loc.cellPos[i]=Scalar(0.5);
+			}
+		else
+			{
+			/* Try moving to the current cell's neighbour in the direction of the largest out-of-cell component: */
+			if(!loc.traverse(maxOutDim,maxOutDir))
+				{
+				/* Disable tracing until further notice: */
+				loc.canTrace=false;
+				
+				return false;
+				}
+			}
+		}
+	
+	/* Check if the final cell contains the target position: */
+	if(maxOut<Scalar(1.0e-4))
+		return true;
+	else
+		{
+		/* Disable tracing until further notice: */
+		loc.canTrace=false;
+		
+		return false;
+		}
+	}
+
+}
+
+}

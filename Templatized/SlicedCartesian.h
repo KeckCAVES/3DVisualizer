@@ -1,7 +1,7 @@
 /***********************************************************************
 SlicedCartesian - Base class for vertex-centered cartesian data sets
 containing multiple scalar-valued slices.
-Copyright (c) 2006-2009 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -357,7 +357,7 @@ class SlicedCartesian
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_SLICEDCARTESIAN_IMPLEMENTATION
-#include <Templatized/SlicedCartesian.cpp>
+#include <Templatized/SlicedCartesian.icpp>
 #endif
 
 #endif

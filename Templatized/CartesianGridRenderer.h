@@ -1,6 +1,6 @@
 /***********************************************************************
 CartesianGridRenderer - Helper class to render Cartesian grids.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -69,7 +69,7 @@ class CartesianGridRenderer
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_CARTESIANGRIDRENDERER_IMPLEMENTATION
-#include <Templatized/CartesianGridRenderer.cpp>
+#include <Templatized/CartesianGridRenderer.icpp>
 #endif
 
 #endif

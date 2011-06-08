@@ -2,7 +2,7 @@
 StreamsurfaceExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized stream surface
 extractor implementation.
-Copyright (c) 2006-2007 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -154,7 +154,7 @@ class StreamsurfaceExtractor:public Visualization::Abstract::Algorithm
 }
 
 #ifndef VISUALIZATION_WRAPPERS_STREAMSURFACEEXTRACTOR_IMPLEMENTATION
-#include <Wrappers/StreamsurfaceExtractor.cpp>
+#include <Wrappers/StreamsurfaceExtractor.icpp>
 #endif
 
 #endif

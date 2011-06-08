@@ -20,11 +20,11 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/TecplotASCIIFileHeaderParser.h>
+
 #include <string.h>
 #include <stdlib.h>
 #include <Misc/ThrowStdErr.h>
-
-#include <Concrete/TecplotASCIIFileHeaderParser.h>
 
 namespace Visualization {
 
@@ -146,8 +146,8 @@ void TecplotASCIIFileHeaderParser::parseZone(void)
 		}
 	}
 
-TecplotASCIIFileHeaderParser::TecplotASCIIFileHeaderParser(Misc::CharacterSource& source)
-	:Misc::ValueSource(source)
+TecplotASCIIFileHeaderParser::TecplotASCIIFileHeaderParser(IO::File& source)
+	:IO::ValueSource(source)
 	{
 	/* Set the punctuation characters: */
 	setPunctuation("#,=");

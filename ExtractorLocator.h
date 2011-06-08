@@ -1,7 +1,7 @@
 /***********************************************************************
 ExtractorLocator - Class for locators applying visualization algorithms
 to data sets.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -29,6 +29,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include "Extractor.h"
 
 /* Forward declarations: */
+namespace Misc {
+class ConfigurationFileSection;
+}
 namespace GLMotif {
 class Widget;
 class PopupWindow;
@@ -57,10 +60,12 @@ class ExtractorLocator:public BaseLocator,public Extractor
 	
 	/* Constructors and destructors: */
 	public:
-	ExtractorLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,Algorithm* sExtractor);
+	ExtractorLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,Algorithm* sExtractor,Misc::ConfigurationFileSection* cfg =0);
 	virtual ~ExtractorLocator(void);
 	
 	/* Methods from Vrui::LocatorToolAdapter: */
+	virtual void storeState(Misc::ConfigurationFileSection& configFileSection) const;
+	virtual void getName(std::string& name) const;
 	virtual void motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData);
 	virtual void buttonPressCallback(Vrui::LocatorTool::ButtonPressCallbackData* cbData);
 	virtual void buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCallbackData* cbData);

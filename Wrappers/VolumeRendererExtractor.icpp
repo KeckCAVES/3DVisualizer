@@ -1,0 +1,191 @@
+/***********************************************************************
+VolumeRendererExtractor - Wrapper class to map from the abstract
+visualization algorithm interface to a templatized volume renderer
+implementation.
+Copyright (c) 2005-2011 Oliver Kreylos
+
+This file is part of the 3D Data Visualizer (Visualizer).
+
+The 3D Data Visualizer is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+The 3D Data Visualizer is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with the 3D Data Visualizer; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+***********************************************************************/
+
+#define VISUALIZATION_WRAPPERS_VOLUMERENDEREREXTRACTOR_IMPLEMENTATION
+
+#include <Wrappers/VolumeRendererExtractor.h>
+
+#include <Misc/ThrowStdErr.h>
+#include <Misc/StandardMarshallers.h>
+#include <Misc/StandardValueCoders.h>
+#include <Geometry/GeometryMarshallers.h>
+#include <Geometry/GeometryValueCoders.h>
+#include <GLMotif/StyleSheet.h>
+#include <GLMotif/WidgetManager.h>
+#include <GLMotif/PopupWindow.h>
+#include <GLMotif/RowColumn.h>
+#include <GLMotif/Label.h>
+#include <GLMotif/TextFieldSlider.h>
+
+#include <Abstract/VariableManager.h>
+#include <Abstract/ParametersSink.h>
+#include <Abstract/ParametersSource.h>
+#include <Wrappers/ScalarExtractor.h>
+
+namespace Visualization {
+
+namespace Wrappers {
+
+/****************************************************
+Methods of class VolumeRendererExtractor::Parameters:
+****************************************************/
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::write(
+	Visualization::Abstract::ParametersSink& sink) const
+	{
+	/* Write all parameters: */
+	sink.writeScalarVariable("scalarVariable",scalarVariableIndex);
+	sink.write("outOfDomainValue",Visualization::Abstract::Writer<VScalar>(outOfDomainValue));
+	sink.write("sliceFactor",Visualization::Abstract::Writer<Scalar>(sliceFactor));
+	sink.write("transparencyGamma",Visualization::Abstract::Writer<float>(transparencyGamma));
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::Parameters::read(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read all parameters: */
+	source.readScalarVariable("scalarVariable",scalarVariableIndex);
+	source.read("outOfDomainValue",Visualization::Abstract::Reader<VScalar>(outOfDomainValue));
+	source.read("sliceFactor",Visualization::Abstract::Reader<Scalar>(sliceFactor));
+	source.read("transparencyGamma",Visualization::Abstract::Reader<float>(transparencyGamma));
+	}
+
+/************************************************
+Static elements of class VolumeRendererExtractor:
+************************************************/
+
+template <class DataSetWrapperParam>
+const char* VolumeRendererExtractor<DataSetWrapperParam>::name="Volume Renderer";
+
+/****************************************
+Methods of class VolumeRendererExtractor:
+****************************************/
+
+template <class DataSetWrapperParam>
+inline
+VolumeRendererExtractor<DataSetWrapperParam>::VolumeRendererExtractor(
+	Visualization::Abstract::VariableManager* sVariableManager,
+	 Comm::MulticastPipe* sPipe)
+	:Abstract::Algorithm(sVariableManager,sPipe),
+	 parameters(sVariableManager->getCurrentScalarVariable()),
+	 outOfDomainValueSlider(0)
+	{
+	/* Initialize parameters: */
+	parameters.outOfDomainValue=sVariableManager->getScalarValueRange(parameters.scalarVariableIndex).first;
+	parameters.sliceFactor=Scalar(1);
+	parameters.transparencyGamma=1.0f;
+	}
+
+template <class DataSetWrapperParam>
+inline
+VolumeRendererExtractor<DataSetWrapperParam>::~VolumeRendererExtractor(
+	void)
+	{
+	}
+
+template <class DataSetWrapperParam>
+inline
+GLMotif::Widget*
+VolumeRendererExtractor<DataSetWrapperParam>::createSettingsDialog(
+	GLMotif::WidgetManager* widgetManager)
+	{
+	/* Get the style sheet: */
+	const GLMotif::StyleSheet* ss=widgetManager->getStyleSheet();
+	
+	/* Create the settings dialog window: */
+	GLMotif::PopupWindow* settingsDialogPopup=new GLMotif::PopupWindow("VolumeRendererExtractorSettingsDialogPopup",widgetManager,"Volume Renderer Extractor Settings");
+	settingsDialogPopup->setResizableFlags(true,false);
+	
+	GLMotif::RowColumn* settingsDialog=new GLMotif::RowColumn("SettingsDialog",settingsDialogPopup,false);
+	settingsDialog->setNumMinorWidgets(2);
+	
+	new GLMotif::Label("OutOfDomainValueLabel",settingsDialog,"Out-of-domain Value");
+	
+	outOfDomainValueSlider=new GLMotif::TextFieldSlider("OutOfDomainValueSlider",settingsDialog,12,ss->fontHeight*20.0f);
+	outOfDomainValueSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
+	const Abstract::DataSet::VScalarRange& scalarRange=getVariableManager()->getScalarValueRange(parameters.scalarVariableIndex);
+	outOfDomainValueSlider->setValueRange(scalarRange.first,scalarRange.second,0.0);
+	outOfDomainValueSlider->setValue(parameters.outOfDomainValue);
+	outOfDomainValueSlider->getValueChangedCallbacks().add(this,&VolumeRendererExtractor::outOfDomainValueCallback);
+	
+	settingsDialog->manageChild();
+	
+	return settingsDialogPopup;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::readParameters(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read the current parameters: */
+	parameters.read(source);
+	
+	/* Update the GUI: */
+	if(outOfDomainValueSlider!=0)
+		outOfDomainValueSlider->setValue(parameters.outOfDomainValue);
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+VolumeRendererExtractor<DataSetWrapperParam>::createElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Create a new volume renderer visualization element: */
+	return new VolumeRenderer(this,extractParameters);
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+VolumeRendererExtractor<DataSetWrapperParam>::startSlaveElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	if(isMaster())
+		Misc::throwStdErr("VolumeRendererExtractor::startSlaveElement: Cannot be called on master node");
+	
+	/* Create a new volume renderer visualization element: */
+	return new VolumeRenderer(this,extractParameters);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+VolumeRendererExtractor<DataSetWrapperParam>::outOfDomainValueCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Update the parameters structure: */
+	parameters.outOfDomainValue=VScalar(cbData->value);
+	}
+
+}
+
+}

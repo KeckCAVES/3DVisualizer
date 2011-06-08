@@ -1,7 +1,7 @@
 /***********************************************************************
 IndexedTriangleSet - Class to represent surfaces as sets of triangles
 sharing vertices.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -176,7 +176,7 @@ class IndexedTriangleSet:public GLObject
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_INDEXEDTRIANGLESET_IMPLEMENTATION
-#include <Templatized/IndexedTriangleSet.cpp>
+#include <Templatized/IndexedTriangleSet.icpp>
 #endif
 
 #endif

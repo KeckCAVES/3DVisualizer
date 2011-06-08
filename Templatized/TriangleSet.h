@@ -1,7 +1,7 @@
 /***********************************************************************
 TriangleSet - Class to represent surfaces as sets of unconnected
 triangles.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -128,7 +128,7 @@ class TriangleSet:public GLObject
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_TRIANGLESET_IMPLEMENTATION
-#include <Templatized/TriangleSet.cpp>
+#include <Templatized/TriangleSet.icpp>
 #endif
 
 #endif

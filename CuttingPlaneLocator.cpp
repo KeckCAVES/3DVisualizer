@@ -1,6 +1,6 @@
 /***********************************************************************
 CuttingPlaneLocator - Class for locators rendering cutting planes.
-Copyright (c) 2006-2009 Oliver Kreylos
+Copyright (c) 2006-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -21,6 +21,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include "CuttingPlaneLocator.h"
 
+#include <Misc/StandardValueCoders.h>
+#include <Misc/ConfigurationFile.h>
 #include <Geometry/Point.h>
 #include <Geometry/Vector.h>
 #include <Geometry/OrthogonalTransformation.h>
@@ -32,7 +34,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 Methods of class CuttingPlaneLocator:
 ************************************/
 
-CuttingPlaneLocator::CuttingPlaneLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication)
+CuttingPlaneLocator::CuttingPlaneLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg)
 	:BaseLocator(sLocatorTool,sApplication),
 	 cuttingPlane(0)
 	{
@@ -60,6 +62,12 @@ CuttingPlaneLocator::~CuttingPlaneLocator(void)
 		cuttingPlane->active=false;
 		cuttingPlane->allocated=false;
 		}
+	}
+
+void CuttingPlaneLocator::storeState(Misc::ConfigurationFileSection& configFileSection) const
+	{
+	/* Write the algorithm name: */
+	configFileSection.storeString("./algorithm","Cutting Plane");
 	}
 
 void CuttingPlaneLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)

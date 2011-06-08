@@ -50,16 +50,21 @@ class ScalarExtractor<ScalarParam,SlicedDataValue<SourceValueScalarParam> >
 	
 	/* Elements: */
 	private:
+	int sliceIndex; // Index of the value slice from which this extractor reads
 	const SourceValueScalar* valueArray; // Pointer to the used slice value array
 	
 	/* Constructors and destructors: */
 	public:
-	ScalarExtractor(const SourceValueScalar* sValueArray) // Creates extractor for given value array
-		:valueArray(sValueArray)
+	ScalarExtractor(int sSliceIndex,const SourceValueScalar* sValueArray) // Creates extractor for given value array
+		:sliceIndex(sSliceIndex),valueArray(sValueArray)
 		{
 		}
 	
 	/* Methods: */
+	int getSliceIndex(void) const // Returns this extractor's slice index
+		{
+		return sliceIndex;
+		}
 	DestValue getValue(ptrdiff_t linearIndex) const // Extracts scalar from given linear index in slice value array
 		{
 		return DestValue(valueArray[linearIndex]);

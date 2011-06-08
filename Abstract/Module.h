@@ -4,7 +4,7 @@ types and algorithms. A module corresponds to a dynamically-linkable
 unit of functionality in a 3D visualization application.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -70,6 +70,7 @@ class Module:public Plugins::Factory
 	virtual int getNumVectorAlgorithms(void) const; // Returns number of available visualization algorithms
 	virtual const char* getVectorAlgorithmName(int vectorAlgorithmIndex) const; // Returns the name of the given algorithm
 	virtual Algorithm* getVectorAlgorithm(int vectorAlgorithmIndex,VariableManager* variableManager,Comm::MulticastPipe* pipe) const; // Returns the given visualization algorithm
+	Algorithm* getAlgorithm(const char* algorithmName,VariableManager* variableManager,Comm::MulticastPipe* pipe) const; // Convenience function to retrieve a scalar or vector algorithm by name
 	};
 
 }

@@ -1,7 +1,7 @@
 /***********************************************************************
 ArrowRakeExtractor - Wrapper class extract rakes of arrows from vector
 fields.
-Copyright (c) 2008-2009 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #define VISUALIZATION_WRAPPERS_ARROWRAKEEXTRACTOR_INCLUDED
 
 #include <Misc/Autopointer.h>
-#include <GLMotif/Slider.h>
+#include <GLMotif/TextFieldSlider.h>
 
 #include <Abstract/DataSet.h>
 #include <Abstract/Parameters.h>
@@ -33,9 +33,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Wrappers/ArrowRake.h>
 
 /* Forward declarations: */
-namespace GLMotif {
-class TextField;
-}
 namespace Visualization {
 namespace Abstract {
 class VectorExtractor;
@@ -106,12 +103,6 @@ class ArrowRakeExtractor:public Visualization::Abstract::Algorithm
 		DSL dsl; // Templatized data set locator following the seed point
 		bool locatorValid; // Flag if the locator has been properly initialized, and is inside the data set's domain
 		
-		/* Private methods: */
-		template <class DataSourceParam>
-		void readBinary(DataSourceParam& dataSource,bool raw,const Visualization::Abstract::VariableManager* variableManager); // Reads parameters from a binary data source
-		template <class DataSourceParam>
-		void writeBinary(DataSourceParam& dataSink,bool raw,const Visualization::Abstract::VariableManager* variableManager) const; // Writes parameters to a binary data source
-		
 		/* Constructors and destructors: */
 		public:
 		Parameters(Visualization::Abstract::VariableManager* variableManager);
@@ -121,16 +112,12 @@ class ArrowRakeExtractor:public Visualization::Abstract::Algorithm
 			{
 			return locatorValid;
 			}
-		virtual void read(Misc::File& file,bool ascii,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::MulticastPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::ClusterPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void write(Misc::File& file,bool ascii,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::MulticastPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::ClusterPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
 		virtual Visualization::Abstract::Parameters* clone(void) const
 			{
 			return new Parameters(*this);
 			}
+		virtual void write(Visualization::Abstract::ParametersSink& sink) const;
+		virtual void read(Visualization::Abstract::ParametersSource& source);
 		
 		/* New methods: */
 		void update(Visualization::Abstract::VariableManager* variableManager,bool track); // Updates derived parameters after a read operation
@@ -145,12 +132,9 @@ class ArrowRakeExtractor:public Visualization::Abstract::Algorithm
 	Parameters* currentParameters; // Pointer to parameter object for current extraction
 	
 	/* UI components: */
-	GLMotif::TextField* rakeSizeValues[2]; // Text fields to display the current rake size
-	GLMotif::Slider* rakeSizeSliders[2]; // Sliders to adjust the current rake size
-	GLMotif::TextField* cellSizeValues[2]; // Text fields to display the current grid size
-	GLMotif::Slider* cellSizeSliders[2]; // Sliders to adjust the current grid size
-	GLMotif::TextField* lengthScaleValue; // Text field to display the current arrow length scaling factor
-	GLMotif::Slider* lengthScaleSlider; // Sliders to adjust the current arrow length scaling factor
+	GLMotif::TextFieldSlider* rakeSizeSliders[2]; // Sliders to adjust the current rake size
+	GLMotif::TextFieldSlider* cellSizeSliders[2]; // Sliders to adjust the current grid size
+	GLMotif::TextFieldSlider* lengthScaleSlider;
 	
 	/* Constructors and destructors: */
 	public:
@@ -171,6 +155,7 @@ class ArrowRakeExtractor:public Visualization::Abstract::Algorithm
 		return true;
 		}
 	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager);
+	virtual void readParameters(Visualization::Abstract::ParametersSource& source);
 	virtual Visualization::Abstract::Parameters* cloneParameters(void) const
 		{
 		return new Parameters(parameters);
@@ -188,9 +173,9 @@ class ArrowRakeExtractor:public Visualization::Abstract::Algorithm
 		{
 		return name;
 		}
-	void rakeSizeSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
-	void cellSizeSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
-	void lengthScaleSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
+	void rakeSizeCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void cellSizeCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void lengthScaleCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	};
 
 }
@@ -198,7 +183,7 @@ class ArrowRakeExtractor:public Visualization::Abstract::Algorithm
 }
 
 #ifndef VISUALIZATION_WRAPPERS_ARROWRAKEEXTRACTOR_IMPLEMENTATION
-#include <Wrappers/ArrowRakeExtractor.cpp>
+#include <Wrappers/ArrowRakeExtractor.icpp>
 #endif
 
 #endif

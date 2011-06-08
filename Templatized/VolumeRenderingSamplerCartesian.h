@@ -1,7 +1,7 @@
 /***********************************************************************
 VolumeRenderingSamplerCartesian - Specialized volume rendering sampler
 class for Cartesian data sets.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -36,6 +36,8 @@ class Algorithm;
 namespace Templatized {
 template <class ScalarParam,int dimensionParam,class ValueParam>
 class Cartesian;
+template <class ScalarParam,int dimensionParam,class ValueScalarParam>
+class SlicedCartesian;
 }
 }
 
@@ -69,7 +71,36 @@ class VolumeRenderingSampler<Cartesian<ScalarParam,3,ValueParam> >
 		return samplerSize;
 		}
 	template <class ScalarExtractorParam,class VoxelParam>
-	void sample(const ScalarExtractorParam& scalarExtractor,VoxelParam* voxels,const ptrdiff_t voxelStrides[3],Comm::MulticastPipe* pipe,float percentageScale,float percentageOffset,Visualization::Abstract::Algorithm* algorithm) const; // Samples scalar values from the given scalar extractor into the given voxel block
+	void sample(const ScalarExtractorParam& scalarExtractor,typename ScalarExtractorParam::Scalar minValue,typename ScalarExtractorParam::Scalar maxValue,typename ScalarExtractorParam::Scalar outOfDomainValue,VoxelParam* voxels,const ptrdiff_t voxelStrides[3],Comm::MulticastPipe* pipe,float percentageScale,float percentageOffset,Visualization::Abstract::Algorithm* algorithm) const; // Samples scalar values from the given scalar extractor into the given voxel block
+	};
+
+template <class ScalarParam,class ValueScalarParam>
+class VolumeRenderingSampler<SlicedCartesian<ScalarParam,3,ValueScalarParam> >
+	{
+	/* Embedded classes: */
+	public:
+	typedef SlicedCartesian<ScalarParam,3,ValueScalarParam> DataSet; // Type of data sets on which the sampler works
+	typedef typename DataSet::Scalar Scalar; // Scalar type of domain
+	typedef typename DataSet::Point Point; // Type for domain points
+	typedef typename DataSet::Box Box; // Type for domain boxes
+	typedef typename Box::Size Size; // Type for domain sizes
+	
+	/* Elements: */
+	private:
+	const DataSet& dataSet; // The data set from which the sampler samples
+	unsigned int samplerSize[3]; // Size of the Cartesian volume
+	
+	/* Constructors and destructors: */
+	public:
+	VolumeRenderingSampler(const DataSet& sDataSet); // Creates a sampler for the given data set
+	
+	/* Methods: */
+	const unsigned int* getSamplerSize(void) const // Returns the size of the Cartesian volume
+		{
+		return samplerSize;
+		}
+	template <class ScalarExtractorParam,class VoxelParam>
+	void sample(const ScalarExtractorParam& scalarExtractor,typename ScalarExtractorParam::Scalar minValue,typename ScalarExtractorParam::Scalar maxValue,typename ScalarExtractorParam::Scalar outOfDomainValue,VoxelParam* voxels,const ptrdiff_t voxelStrides[3],Comm::MulticastPipe* pipe,float percentageScale,float percentageOffset,Visualization::Abstract::Algorithm* algorithm) const; // Samples scalar values from the given scalar extractor into the given voxel block
 	};
 
 }
@@ -77,7 +108,7 @@ class VolumeRenderingSampler<Cartesian<ScalarParam,3,ValueParam> >
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_VOLUMERENDERINGSAMPLERCARTESIAN_IMPLEMENTATION
-#include <Templatized/VolumeRenderingSamplerCartesian.cpp>
+#include <Templatized/VolumeRenderingSamplerCartesian.icpp>
 #endif
 
 #endif

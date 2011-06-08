@@ -1,0 +1,384 @@
+/***********************************************************************
+StreamlineExtractor - Wrapper class to map from the abstract
+visualization algorithm interface to a templatized streamline extractor
+implementation.
+Copyright (c) 2006-2011 Oliver Kreylos
+
+This file is part of the 3D Data Visualizer (Visualizer).
+
+The 3D Data Visualizer is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+The 3D Data Visualizer is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with the 3D Data Visualizer; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+***********************************************************************/
+
+#define VISUALIZATION_WRAPPERS_STREAMLINEEXTRACTOR_IMPLEMENTATION
+
+#include <Wrappers/StreamlineExtractor.h>
+
+#include <Misc/ThrowStdErr.h>
+#include <Misc/StandardMarshallers.h>
+#include <Misc/StandardValueCoders.h>
+#include <Math/Math.h>
+#include <Geometry/GeometryMarshallers.h>
+#include <Geometry/GeometryValueCoders.h>
+#include <GLMotif/StyleSheet.h>
+#include <GLMotif/WidgetManager.h>
+#include <GLMotif/PopupWindow.h>
+#include <GLMotif/RowColumn.h>
+#include <GLMotif/Label.h>
+
+#include <Abstract/VariableManager.h>
+#include <Abstract/ParametersSink.h>
+#include <Abstract/ParametersSource.h>
+#include <Templatized/StreamlineExtractor.h>
+#include <Wrappers/VectorExtractor.h>
+#include <Wrappers/ScalarExtractor.h>
+#include <Wrappers/ElementSizeLimit.h>
+#include <Wrappers/AlarmTimerElement.h>
+
+namespace Visualization {
+
+namespace Wrappers {
+
+/************************************************
+Methods of class StreamlineExtractor::Parameters:
+************************************************/
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::write(
+	Visualization::Abstract::ParametersSink& sink) const
+	{
+	/* Write all parameters: */
+	sink.writeVectorVariable("vectorVariable",vectorVariableIndex);
+	sink.writeScalarVariable("colorScalarVariable",colorScalarVariableIndex);
+	sink.write("maxNumVertices",Visualization::Abstract::Writer<unsigned int>((unsigned int)maxNumVertices));
+	sink.write("epsilon",Visualization::Abstract::Writer<Scalar>(epsilon));
+	sink.write("seedPoint",Visualization::Abstract::Writer<Point>(seedPoint));
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::read(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read all parameters: */
+	source.readVectorVariable("vectorVariable",vectorVariableIndex);
+	source.readScalarVariable("colorScalarVariable",colorScalarVariableIndex);
+	unsigned int mnt;
+	source.read("maxNumVertices",Visualization::Abstract::Reader<unsigned int>(mnt));
+	maxNumVertices=size_t(mnt);
+	source.read("epsilon",Visualization::Abstract::Reader<Scalar>(epsilon));
+	source.read("seedPoint",Visualization::Abstract::Reader<Point>(seedPoint));
+	
+	/* Update derived state: */
+	update(source.getVariableManager(),true);
+	}
+
+template <class DataSetWrapperParam>
+inline
+StreamlineExtractor<DataSetWrapperParam>::Parameters::Parameters(
+	Visualization::Abstract::VariableManager* variableManager)
+	:vectorVariableIndex(variableManager->getCurrentVectorVariable()),
+	 colorScalarVariableIndex(variableManager->getCurrentScalarVariable()),
+	 locatorValid(false)
+	{
+	update(variableManager,false);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::Parameters::update(
+	Visualization::Abstract::VariableManager* variableManager,
+	bool track)
+	{
+	/* Get the abstract data set pointer: */
+	const Visualization::Abstract::DataSet* ds1=variableManager->getDataSetByVectorVariable(vectorVariableIndex);
+	const Visualization::Abstract::DataSet* ds2=variableManager->getDataSetByScalarVariable(colorScalarVariableIndex);
+	if(ds1!=ds2)
+		Misc::throwStdErr("StreamlineExtractor::Parameters::update: Incompatible vector and scalar variables");
+	
+	/* Get a pointer to the data set wrapper: */
+	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(ds1);
+	if(myDataSet==0)
+		Misc::throwStdErr("StreamlineExtractor::Parameters::update: Mismatching data set type");
+	ds=&myDataSet->getDs();
+	
+	/* Get a pointer to the vector extractor wrapper: */
+	const VectorExtractor* myVectorExtractor=dynamic_cast<const VectorExtractor*>(variableManager->getVectorExtractor(vectorVariableIndex));
+	if(myVectorExtractor==0)
+		Misc::throwStdErr("StreamlineExtractor::Parameters::update: Mismatching vector extractor type");
+	ve=&myVectorExtractor->getVe();
+	
+	/* Get a pointer to the color scalar extractor wrapper: */
+	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(variableManager->getScalarExtractor(colorScalarVariableIndex));
+	if(myScalarExtractor==0)
+		Misc::throwStdErr("StreamlineExtractor::Parameters::update: Mismatching scalar extractor type");
+	cse=&myScalarExtractor->getSe();
+	
+	/* Get a templatized locator: */
+	dsl=ds->getLocator();
+	if(track)
+		{
+		/* Locate the seed point: */
+		locatorValid=dsl.locatePoint(seedPoint);
+		}
+	}
+
+/********************************************
+Static elements of class StreamlineExtractor:
+********************************************/
+
+template <class DataSetWrapperParam>
+const char* StreamlineExtractor<DataSetWrapperParam>::name="Streamline";
+
+/************************************
+Methods of class StreamlineExtractor:
+************************************/
+
+template <class DataSetWrapperParam>
+inline
+StreamlineExtractor<DataSetWrapperParam>::StreamlineExtractor(
+	Visualization::Abstract::VariableManager* sVariableManager,
+	Comm::MulticastPipe* sPipe)
+	:Abstract::Algorithm(sVariableManager,sPipe),
+	 parameters(sVariableManager),
+	 sle(parameters.ds,*parameters.ve,*parameters.cse),
+	 currentStreamline(0),
+	 maxNumVerticesSlider(0),epsilonSlider(0)
+	{
+	/* Initialize parameters: */
+	parameters.maxNumVertices=100000;
+	parameters.epsilon=Scalar(sle.getEpsilon());
+	}
+
+template <class DataSetWrapperParam>
+inline
+StreamlineExtractor<DataSetWrapperParam>::~StreamlineExtractor(
+	void)
+	{
+	}
+
+template <class DataSetWrapperParam>
+inline
+GLMotif::Widget*
+StreamlineExtractor<DataSetWrapperParam>::createSettingsDialog(
+	GLMotif::WidgetManager* widgetManager)
+	{
+	/* Get the style sheet: */
+	const GLMotif::StyleSheet* ss=widgetManager->getStyleSheet();
+	
+	/* Create the settings dialog window: */
+	GLMotif::PopupWindow* settingsDialogPopup=new GLMotif::PopupWindow("StreamlineExtractorSettingsDialogPopup",widgetManager,"Streamline Extractor Settings");
+	settingsDialogPopup->setResizableFlags(true,false);
+	
+	GLMotif::RowColumn* settingsDialog=new GLMotif::RowColumn("settingsDialog",settingsDialogPopup,false);
+	settingsDialog->setNumMinorWidgets(2);
+	
+	new GLMotif::Label("MaxNumVerticesLabel",settingsDialog,"Maximum Number of Steps");
+	
+	maxNumVerticesSlider=new GLMotif::TextFieldSlider("MaxNumVerticesSlider",settingsDialog,12,ss->fontHeight*10.0f);
+	maxNumVerticesSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	maxNumVerticesSlider->setValueType(GLMotif::TextFieldSlider::UINT);
+	maxNumVerticesSlider->setValueRange(10.0e3,10.0e7,0.1);
+	maxNumVerticesSlider->setValue(double(parameters.maxNumVertices));
+	maxNumVerticesSlider->getValueChangedCallbacks().add(this,&StreamlineExtractor::maxNumVerticesCallback);
+	
+	new GLMotif::Label("EpsilonLabel",settingsDialog,"Error Threshold");
+	
+	epsilonSlider=new GLMotif::TextFieldSlider("EpsilonSlider",settingsDialog,12,ss->fontHeight*10.0f);
+	epsilonSlider->getTextField()->setPrecision(6);
+	epsilonSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	epsilonSlider->setValueRange(1.0e-16,1.0e-4,0.1);
+	epsilonSlider->setValue(double(parameters.epsilon));
+	epsilonSlider->getValueChangedCallbacks().add(this,&StreamlineExtractor::epsilonCallback);
+	
+	settingsDialog->manageChild();
+	
+	return settingsDialogPopup;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::readParameters(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read the current parameters: */
+	parameters.read(source);
+	
+	/* Update extractor state: */
+	sle.update(parameters.ds,*parameters.ve,*parameters.cse);
+	
+	/* Update the GUI: */
+	if(maxNumVerticesSlider!=0)
+		maxNumVerticesSlider->setValue(parameters.maxNumVertices);
+	if(epsilonSlider!=0)
+		epsilonSlider->setValue(parameters.epsilon);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::setSeedLocator(
+	const Visualization::Abstract::DataSet::Locator* seedLocator)
+	{
+	/* Get a pointer to the locator wrapper: */
+	const Locator* myLocator=dynamic_cast<const Locator*>(seedLocator);
+	if(myLocator==0)
+		Misc::throwStdErr("StreamlineExtractor::setSeedLocator: Mismatching locator type");
+	
+	/* Update the seed point: */
+	parameters.seedPoint=Point(seedLocator->getPosition());
+	
+	/* Copy the locator: */
+	parameters.dsl=myLocator->getDsl();
+	parameters.locatorValid=myLocator->isValid();
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+StreamlineExtractor<DataSetWrapperParam>::createElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("StreamlineExtractor::createElement: Mismatching parameter object type");
+	int csvi=myParameters->colorScalarVariableIndex;
+	
+	/* Create a new streamline visualization element: */
+	Streamline* result=new Streamline(myParameters,getVariableManager()->getColorMap(csvi),getPipe());
+	
+	/* Update the streamline extractor: */
+	sle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
+	
+	/* Extract the streamline into the visualization element: */
+	sle.startStreamline(myParameters->seedPoint,myParameters->dsl,typename SLE::Scalar(0.1),result->getPolyline());
+	ElementSizeLimit<Streamline> esl(*result,myParameters->maxNumVertices);
+	sle.continueStreamline(esl);
+	sle.finishStreamline();
+	
+	/* Return the result: */
+	return result;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+StreamlineExtractor<DataSetWrapperParam>::startElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("StreamlineExtractor::createElement: Mismatching parameter object type");
+	int csvi=myParameters->colorScalarVariableIndex;
+	
+	/* Create a new streamline visualization element: */
+	currentStreamline=new Streamline(myParameters,getVariableManager()->getColorMap(csvi),getPipe());
+	
+	/* Update the streamline extractor: */
+	sle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
+	
+	/* Extract the streamline into the visualization element: */
+	sle.startStreamline(myParameters->seedPoint,myParameters->dsl,typename SLE::Scalar(0.1),currentStreamline->getPolyline());
+	
+	/* Return the result: */
+	return currentStreamline.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+bool
+StreamlineExtractor<DataSetWrapperParam>::continueElement(
+	const Realtime::AlarmTimer& alarm)
+	{
+	/* Continue extracting the streamline into the visualization element: */
+	size_t maxNumVertices=dynamic_cast<Parameters*>(currentStreamline->getParameters())->maxNumVertices;
+	AlarmTimerElement<Streamline> atcf(alarm,*currentStreamline,maxNumVertices);
+	return sle.continueStreamline(atcf)||currentStreamline->getElementSize()>=maxNumVertices;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::finishElement(
+	void)
+	{
+	sle.finishStreamline();
+	currentStreamline=0;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+StreamlineExtractor<DataSetWrapperParam>::startSlaveElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	if(isMaster())
+		Misc::throwStdErr("StreamlineExtractor::startSlaveElement: Cannot be called on master node");
+	
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("StreamlineExtractor::startSlaveElement: Mismatching parameter object type");
+	
+	/* Create a new streamline visualization element: */
+	currentStreamline=new Streamline(myParameters,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	
+	return currentStreamline.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::continueSlaveElement(
+	void)
+	{
+	if(isMaster())
+		Misc::throwStdErr("StreamlineExtractor::continueSlaveElement: Cannot be called on master node");
+	
+	currentStreamline->getPolyline().receive();
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::maxNumVerticesCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Update the parameters structure: */
+	parameters.maxNumVertices=size_t(cbData->value+0.5);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+StreamlineExtractor<DataSetWrapperParam>::epsilonCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Update the parameters structure: */
+	parameters.epsilon=Scalar(cbData->value);
+	
+	/* Update the streamline extractor's error threshold: */
+	sle.setEpsilon(typename SLE::Scalar(cbData->value));
+	}
+
+}
+
+}

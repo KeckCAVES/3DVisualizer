@@ -1,7 +1,7 @@
 /***********************************************************************
 PaletteEditor - Class to represent a GLMotif popup window to edit
 one-dimensional transfer functions with RGB color and opacity.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -71,6 +71,7 @@ class PaletteEditor:public GLMotif::PopupWindow
 	/* Private methods: */
 	void selectedControlPointChangedCallback(Misc::CallbackData* cbData);
 	void colorMapChangedCallback(Misc::CallbackData* cbData);
+	void controlPointValueChangedCallback(Misc::CallbackData* cbData);
 	void colorSliderValueChangedCallback(Misc::CallbackData* cbData);
 	void removeControlPointCallback(Misc::CallbackData* cbData);
 	void savePaletteCallback(Misc::CallbackData* cbData);

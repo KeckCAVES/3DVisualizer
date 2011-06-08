@@ -2,7 +2,7 @@
 DicomImageStack - Class to encapsulate operations on scalar-valued
 cartesian data sets stored in stacks of DICOM medical interchange
 images.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -21,16 +21,18 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/DicomImageStack.h>
+
 #include <string.h>
-#include <sys/types.h>
 #include <dirent.h>
 #include <stdexcept>
+#include <iostream>
 #include <vector>
+#include <Misc/SelfDestructPointer.h>
+#include <Misc/FileTests.h>
 #include <Plugins/FactoryManager.h>
 
-#include <Concrete/DicomImageFile.h>
-
-#include <Concrete/DicomImageStack.h>
+#include <Concrete/DicomFile.h>
 
 namespace Visualization {
 
@@ -47,105 +49,86 @@ DicomImageStack::DicomImageStack(void)
 
 Visualization::Abstract::DataSet* DicomImageStack::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
 	{
-	/* Extract the image metadata from all DICOM images inside the given directory: */
-	DIR* directory=opendir(args[0].c_str());
-	if(directory==0)
-		Misc::throwStdErr("DicomImageStack::load: Could not read directory \"%s\"",args[0].c_str());
-	
-	char dicomFileName[1024];
-	strcpy(dicomFileName,args[0].c_str());
-	char* dicomFileNameStart=dicomFileName+strlen(args[0].c_str());
-	std::vector<DicomImageInformation> images;
-	while(true)
+	/* Parse the command line: */
+	const char* fileName=0;
+	int seriesNumber=-1;
+	bool flip=false;
+	for(std::vector<std::string>::const_iterator aIt=args.begin();aIt!=args.end();++aIt)
 		{
-		/* Read the next directory entry: */
-		struct dirent* dirEntry=readdir(directory);
-		if(dirEntry==0)
-			break;
-		
-		/* Try extracting DICOM image metadata from the directory entry: */
-		strcpy(dicomFileNameStart,dirEntry->d_name);
-		try
+		if((*aIt)[0]=='-')
 			{
-			images.push_back(readDicomImageInformation(dicomFileName));
+			if(strcasecmp(aIt->c_str()+1,"series")==0)
+				{
+				++aIt;
+				seriesNumber=atoi(aIt->c_str());
+				}
+			else if(strcasecmp(aIt->c_str()+1,"flip")==0)
+				flip=true;
 			}
-		catch(std::runtime_error)
-			{
-			/* Ignore this file */
-			}
+		else if(fileName==0)
+			fileName=aIt->c_str();
 		}
+	if(fileName==0)
+		Misc::throwStdErr("DicomImageStack::load: No DICOM file name provided");
 	
-	closedir(directory);
+	/* Create a stack descriptor for the given stack of DICOM images: */
+	Misc::SelfDestructPointer<DicomFile::ImageStackDescriptor> isd;
 	
-	/* Check if the slices form a consistent image stack: */
-	std::vector<DicomImageInformation>::const_iterator iIt=images.begin();
-	if(iIt==images.end())
-		Misc::throwStdErr("DicomImageStack::load: directory \"%s\" does not contain slices",args[0].c_str());
-	int stackIndexMin=iIt->stackIndex;
-	int stackIndexMax=iIt->stackIndex;
-	float slicePosMin=iIt->imagePos[2];
-	int stackImageSize[2];
-	stackImageSize[0]=iIt->imageSize[0];
-	stackImageSize[1]=iIt->imageSize[1];
-	float stackPixelSize[2];
-	stackPixelSize[0]=iIt->pixelSize[0];
-	stackPixelSize[1]=iIt->pixelSize[1];
-	float stackSliceThickness=iIt->sliceThickness;
-	bool stackValid=true;
-	for(++iIt;iIt!=images.end();++iIt)
+	/* Check if the given DICOM file name is a directory containing DICOM image files, or a DICOM directory file: */
+	if(Misc::isPathDirectory(args[0].c_str()))
 		{
-		if(stackIndexMin>iIt->stackIndex)
-			stackIndexMin=iIt->stackIndex;
-		else if(stackIndexMax<iIt->stackIndex)
-			stackIndexMax=iIt->stackIndex;
-		if(slicePosMin>iIt->imagePos[2])
-			slicePosMin=iIt->imagePos[2];
+		/* Create a stack descriptor from all DICOM images in the given directory: */
+		isd.setTarget(DicomFile::readImageStackDescriptor(args[0].c_str()));
+		if(!isd.isValid())
+			Misc::throwStdErr("DicomImageStack::load: Directory %s does not contain a valid image series",args[0].c_str());
+		}
+	else
+		{
+		/* Open the DICOM directory file: */
+		DicomFile dcmDirectory(args[0].c_str());
 		
-		if(iIt->imageSize[0]!=stackImageSize[0]||iIt->imageSize[1]!=stackImageSize[1])
-			stackValid=false;
-		if(iIt->pixelSize[0]!=stackPixelSize[0]||iIt->pixelSize[1]!=stackPixelSize[1])
-			stackValid=false;
-		if(iIt->sliceThickness!=stackSliceThickness)
-			stackValid=false;
+		/* Extract the series number from the command line: */
+		int seriesNumber=-1; // Read the first series
+		if(args.size()>=2)
+			seriesNumber=atoi(args[1].c_str());
+		
+		/* Read the image stack descriptor for the selected series: */
+		Misc::SelfDestructPointer<DicomFile::Directory> directory(dcmDirectory.readDirectory());
+		isd.setTarget(directory->getImageStackDescriptor(seriesNumber));
+		if(!isd.isValid())
+			{
+			if(seriesNumber==-1)
+				Misc::throwStdErr("DicomImageStack::load: Directory file %s does not contain a valid image series",args[0].c_str());
+			else
+				Misc::throwStdErr("DicomImageStack::load: Directory file %s does not contain a valid image series %d",args[0].c_str(),seriesNumber);
+			}
 		}
-	int numSlices=stackIndexMax-stackIndexMin+1;
-	bool* haveSlices=new bool[numSlices];
-	for(int i=0;i<numSlices;++i)
-		haveSlices[i]=false;
-	for(iIt=images.begin();iIt!=images.end();++iIt)
-		{
-		haveSlices[iIt->stackIndex-stackIndexMin]=true;
-		#if 0
-		float slicePos=slicePosMin+float(iIt->stackIndex-stackIndexMin)*stackSliceThickness;
-		if(Math::abs(slicePos-iIt->imagePos[2])>stackSliceThickness*0.125f)
-			stackValid=false;
-		#endif
-		}
-	for(int i=0;i<numSlices;++i)
-		if(!haveSlices[i])
-			stackValid=false;
-	delete[] haveSlices;
-	
-	if(!stackValid)
-		Misc::throwStdErr("DicomImageStack::load: slice images in \"%s\" do not form a consistent image stack",args[0].c_str());
 	
 	/* Create the data set: */
-	DS::Index numVertices(numSlices,stackImageSize[1],stackImageSize[0]);
-	DS::Size cellSize(stackSliceThickness,stackPixelSize[1],stackPixelSize[0]);
-	DataSet* result=new DataSet;
+	Misc::SelfDestructPointer<DataSet> result(new DataSet);
+	
+	DS::Index numVertices(isd->numImages,isd->imageSize[1],isd->imageSize[0]);
+	DS::Size cellSize(isd->sliceThickness,isd->pixelSize[1],isd->pixelSize[0]);
 	result->getDs().setData(numVertices,cellSize);
 	
 	/* Read each slice: */
 	ptrdiff_t increments[2];
 	increments[0]=result->getDs().getVertices().getIncrement(2);
 	increments[1]=result->getDs().getVertices().getIncrement(1);
-	for(iIt=images.begin();iIt!=images.end();++iIt)
+	for(int i=0;i<isd->numImages;++i)
 		{
-		unsigned short* sliceBase=result->getDs().getVertices().getAddress(iIt->stackIndex-stackIndexMin,0,0);
-		readDicomImage(*iIt,sliceBase,increments);
+		/* Open the slice DICOM file: */
+		DicomFile dcm(isd->imageFileNames[i]);
+		
+		/* Read the slice image descriptor: */
+		Misc::SelfDestructPointer<DicomFile::ImageDescriptor> id(dcm.readImageDescriptor());
+		
+		/* Read the slice image: */
+		Value* sliceBase=result->getDs().getVertices().getAddress(flip?isd->numImages-i-1:i,0,0);
+		dcm.readImage(*id,sliceBase,increments);
 		}
 	
-	return result;
+	return result.releaseTarget();
 	}
 
 }

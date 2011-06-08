@@ -1,7 +1,7 @@
 /***********************************************************************
 SingleChannelRaycaster - Class for volume renderers with a single scalar
 channel.
-Copyright (c) 2007-2009 Oliver Kreylos
+Copyright (c) 2007-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

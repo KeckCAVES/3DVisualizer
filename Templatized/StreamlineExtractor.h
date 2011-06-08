@@ -1,7 +1,7 @@
 /***********************************************************************
 StreamlineExtractor - Generic class to extract stream lines from data
 sets.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -117,7 +117,7 @@ class StreamlineExtractor
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_STREAMLINEEXTRACTOR_IMPLEMENTATION
-#include <Templatized/StreamlineExtractor.cpp>
+#include <Templatized/StreamlineExtractor.icpp>
 #endif
 
 #endif

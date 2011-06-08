@@ -2,7 +2,7 @@
 SlicedCurvilinear - Base class for vertex-centered curvilinear data sets
 containing arbitrary numbers of independent scalar fields, combined into
 vector and/or tensor fields using special value extractors.
-Copyright (c) 2008-2009 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -225,7 +225,7 @@ class SlicedCurvilinear
 		using Cell::baseVertexIndex;
 		CellPosition cellPos; // Local coordinates of last located point inside its cell
 		Scalar epsilon,epsilon2; // Accuracy threshold of point location algorithm
-		bool cantTrace; // Flag if the locator cannot trace on the next locatePoint call
+		bool canTrace; // Flag if the locator can trace on the next locatePoint call
 		
 		/* Private methods: */
 		bool newtonRaphsonStep(const Point& position); // Performs one Newton-Raphson step while tracing the given position
@@ -402,7 +402,7 @@ class SlicedCurvilinear
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_SLICEDCURVILINEAR_IMPLEMENTATION
-#include <Templatized/SlicedCurvilinear.cpp>
+#include <Templatized/SlicedCurvilinear.icpp>
 #endif
 
 #endif

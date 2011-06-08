@@ -1,7 +1,7 @@
 /***********************************************************************
 ColoredIsosurfaceExtractor - Generic class to extract isosurfaces color-
 mapped by a secondary scalar extractor from data sets.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -135,7 +135,7 @@ class ColoredIsosurfaceExtractor
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_COLOREDISOSURFACEEXTRACTOR_IMPLEMENTATION
-#include <Templatized/ColoredIsosurfaceExtractor.cpp>
+#include <Templatized/ColoredIsosurfaceExtractor.icpp>
 #endif
 
 #endif

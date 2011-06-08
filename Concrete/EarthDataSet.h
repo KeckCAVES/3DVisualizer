@@ -1,7 +1,7 @@
 /***********************************************************************
 EarthDataSet - Wrapper class to add an Earth renderer to an arbitrary
 visualization module working on whole-Earth grids.
-Copyright (c) 2007 Oliver Kreylos
+Copyright (c) 2007-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/gl.h>
 #include <GL/GLColor.h>
 
+#include <Abstract/DataSet.h>
 #include <Concrete/EarthRenderer.h>
 
 /* Forward declarations: */
@@ -64,8 +65,11 @@ class EarthDataSet:public DataSetBaseParam // Data set class
 	EarthDataSet(const std::vector<std::string>& args); // Creates a data set by parsing the given argument list
 	virtual ~EarthDataSet(void);
 	
-	/* Methods: */
+	/* Methods from Abstract::DataSet: */
 	virtual Visualization::Abstract::CoordinateTransformer* getCoordinateTransformer(void) const;
+	virtual Abstract::DataSet::Unit getUnit(void) const;
+	
+	/* New methods: */
 	void setFlatteningFactor(double newFlatteningFactor); // Sets the flattening factor to use for the Earth renderer
 	double getFlatteningFactor(void) const // Returns the flattening factor to use for the Earth renderer
 		{
@@ -152,7 +156,7 @@ class EarthDataSetRenderer:public DataSetRendererBaseParam // Data set renderer 
 }
 
 #ifndef VISUALIZATION_CONCRETE_EARTHDATASET_IMPLEMENTATION
-#include <Concrete/EarthDataSet.cpp>
+#include <Concrete/EarthDataSet.icpp>
 #endif
 
 #endif

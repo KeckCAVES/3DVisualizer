@@ -3,7 +3,7 @@ TripleChannelVolumeRenderer - Wrapper class for triple-channel volume
 renderers as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,16 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_WRAPPERS_TRIPLECHANNELVOLUMERENDERER_INCLUDED
 #define VISUALIZATION_WRAPPERS_TRIPLECHANNELVOLUMERENDERER_INCLUDED
 
-#include <GLMotif/Slider.h>
 #include <GLMotif/ToggleButton.h>
+#include <GLMotif/TextFieldSlider.h>
 
 #include <Abstract/Element.h>
 
 /* Forward declarations: */
 class GLColorMap;
-namespace GLMotif {
-class TextField;
-}
 class TripleChannelRaycaster;
 
 namespace Visualization {
@@ -58,11 +55,8 @@ class TripleChannelVolumeRenderer:public Visualization::Abstract::Element
 	TripleChannelRaycaster* raycaster; // A raycasting volume renderer
 	
 	/* UI components: */
-	GLMotif::TextField* sliceFactorValue; // Text field to display current slice factor
-	GLMotif::Slider* sliceFactorSlider; // Slider to change current slice factor value
 	GLMotif::ToggleButton* channelEnabledToggles[3]; // Toggle buttons to enable/disable individual channels
-	GLMotif::TextField* transparencyGammaValues[3]; // Text fields to display current gamma correction factor for each channel
-	GLMotif::Slider* transparencyGammaSliders[3]; // Slider to change current gamma correction factor for each channel
+	GLMotif::TextFieldSlider* transparencyGammaSliders[3]; // Slider to change current gamma correction factor for each channel
 	
 	/* Constructors and destructors: */
 	public:
@@ -84,8 +78,9 @@ class TripleChannelVolumeRenderer:public Visualization::Abstract::Element
 	virtual void glRenderAction(GLContextData& contextData) const;
 	
 	/* New methods: */
-	void sliderValueChangedCallback(GLMotif::Slider::ValueChangedCallbackData* cbData); // Callback when the sliders in the settings dialog change value
-	void toggleButtonValueChangedCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData); // Callback when a toggle button in the settings dialog changes value
+	void sliceFactorCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void channelEnabledCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	void transparencyGammaCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	};
 
 }
@@ -93,7 +88,7 @@ class TripleChannelVolumeRenderer:public Visualization::Abstract::Element
 }
 
 #ifndef VISUALIZATION_WRAPPERS_TRIPLECHANNELVOLUMERENDERER_IMPLEMENTATION
-#include <Wrappers/TripleChannelVolumeRenderer.cpp>
+#include <Wrappers/TripleChannelVolumeRenderer.icpp>
 #endif
 
 #endif

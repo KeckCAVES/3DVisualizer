@@ -1,7 +1,7 @@
 /***********************************************************************
 SliceExtractorIndexedTriangleSet - Specialized version of SliceExtractor
 class for indexed triangle sets.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -122,7 +122,7 @@ class SliceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<Vertex
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_SLICEEXTRACTORINDEXEDTRIANGLESET_IMPLEMENTATION
-#include <Templatized/SliceExtractorIndexedTriangleSet.cpp>
+#include <Templatized/SliceExtractorIndexedTriangleSet.icpp>
 #endif
 
 #endif

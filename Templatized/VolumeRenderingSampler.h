@@ -1,7 +1,7 @@
 /***********************************************************************
 VolumeRenderingSampler - Helper class to create shader- or texture-based
 volume renderers for arbitrary data set types.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -65,7 +65,7 @@ class VolumeRenderingSampler
 		return samplerSize;
 		}
 	template <class ScalarExtractorParam,class VoxelParam>
-	void sample(const ScalarExtractorParam& scalarExtractor,VoxelParam* voxels,const ptrdiff_t voxelStrides[3],Comm::MulticastPipe* pipe,float percentageScale,float percentageOffset,Visualization::Abstract::Algorithm* algorithm) const; // Samples scalar values from the given scalar extractor into the given voxel block
+	void sample(const ScalarExtractorParam& scalarExtractor,typename ScalarExtractorParam::Scalar minValue,typename ScalarExtractorParam::Scalar maxValue,typename ScalarExtractorParam::Scalar outOfDomainValue,VoxelParam* voxels,const ptrdiff_t voxelStrides[3],Comm::MulticastPipe* pipe,float percentageScale,float percentageOffset,Visualization::Abstract::Algorithm* algorithm) const; // Samples scalar values from the given scalar extractor into the given voxel block
 	};
 
 }
@@ -73,7 +73,7 @@ class VolumeRenderingSampler
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_VOLUMERENDERINGSAMPLER_IMPLEMENTATION
-#include <Templatized/VolumeRenderingSampler.cpp>
+#include <Templatized/VolumeRenderingSampler.icpp>
 #endif
 
 #endif

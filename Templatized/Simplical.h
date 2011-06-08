@@ -2,7 +2,7 @@
 Simplical - Base class for vertex-centered simplical (unstructured)
 data sets containing arbitrary value types (scalars, vectors, tensors,
 etc.).
-Copyright (c) 2004-2007 Oliver Kreylos
+Copyright (c) 2004-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -478,7 +478,7 @@ class Simplical
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_SIMPLICAL_IMPLEMENTATION
-#include <Templatized/Simplical.cpp>
+#include <Templatized/Simplical.icpp>
 #endif
 
 #endif

@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iostream>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
-#include <Threads/GzippedFileCharacterSource.h>
+#include <IO/OpenFile.h>
 #include <Plugins/FactoryManager.h>
 
 #include <Concrete/TecplotASCIIFileHeaderParser.h>
@@ -104,8 +104,8 @@ Visualization::Abstract::DataSet* UnstructuredHexahedralTecplotASCIIFile::load(c
 		Misc::throwStdErr("UnstructuredHexahedralTecplotASCIIFile::load: No scalar or vector variables specified");
 	
 	/* Create a parser and open the input file: */
-	Threads::GzippedFileCharacterSource dataFile(dataFileName);
-	TecplotASCIIFileHeaderParser parser(dataFile);
+	IO::AutoFile dataFile(IO::openFile(dataFileName));
+	TecplotASCIIFileHeaderParser parser(*dataFile);
 	
 	/* Create an array of ignore flags for the file's columns: */
 	int numVariables=int(parser.getNumVariables());

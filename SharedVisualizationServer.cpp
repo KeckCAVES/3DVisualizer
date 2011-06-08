@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <SharedVisualizationServer.h>
 
-#if VERBOSE
+#ifdef VERBOSE
 #include <iostream>
 #endif
 #include <Misc/ThrowStdErr.h>
@@ -66,12 +66,34 @@ SharedVisualizationServer::LocatorState::LocatorState(const std::string& sAlgori
 	{
 	}
 
+/***************************************************
+Methods of class SharedVisualizationServer::Element:
+***************************************************/
+
+SharedVisualizationServer::Element::Element(const SharedVisualizationServer::LocatorState& ls)
+	:algorithmName(ls.algorithmName),
+	 parametersSize(ls.seedRequest.parametersSize),parameters(new unsigned char[parametersSize]),
+	 enabled(true)
+	{
+	/* Copy the seed request's parameters blob: */
+	memcpy(parameters,ls.seedRequest.parameters,parametersSize);
+	}
+
+void SharedVisualizationServer::Element::send(CollaborationPipe& pipe) const
+	{
+	pipe.write<std::string>(algorithmName);
+	pipe.write<unsigned int>(parametersSize);
+	pipe.write<unsigned char>(parameters,parametersSize);
+	pipe.write<unsigned char>(enabled?1:0);
+	}
+
 /*******************************************************
 Methods of class SharedVisualizationServer::ClientState:
 *******************************************************/
 
 SharedVisualizationServer::ClientState::ClientState(void)
-	:locators(17)
+	:firstUpdate(true),
+	 locators(17)
 	{
 	}
 
@@ -87,11 +109,16 @@ Methods of class SharedVisualizationServer:
 ******************************************/
 
 SharedVisualizationServer::SharedVisualizationServer(void)
+	:nextElementID(0),elements(31)
 	{
 	}
 
 SharedVisualizationServer::~SharedVisualizationServer(void)
 	{
+	/* Delete all elements: */
+	Threads::Mutex::Lock elementListLock(elementListMutex);
+	for(ElementHash::Iterator eIt=elements.begin();!eIt.isFinished();++eIt)
+		delete eIt->getDest();
 	}
 
 const char* SharedVisualizationServer::getName(void) const
@@ -137,7 +164,7 @@ void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState*
 				LocatorState* newLocator=new LocatorState(algorithmName);
 				myCs->locators.setEntry(LocatorHash::Entry(locatorID,newLocator));
 				
-				#if VERBOSE
+				#ifdef VERBOSE
 				std::cout<<"SharedVisualizationServer: Creating "<<algorithmName<<" locator with ID "<<locatorID<<std::endl;
 				#endif
 				
@@ -164,7 +191,7 @@ void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState*
 				/* Store the seed request parameters: */
 				locatorIt->getDest()->seedRequest.receive(pipe);
 				
-				#if VERBOSE
+				#ifdef VERBOSE
 				std::cout<<"SharedVisualizationServer: Received seed request "<<locatorIt->getDest()->seedRequest.requestID<<" from locator "<<locatorID<<std::endl;
 				#endif
 				
@@ -191,7 +218,7 @@ void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState*
 				/* Store the final seed request ID: */
 				locatorIt->getDest()->finalSeedRequestID=pipe.read<unsigned int>();
 				
-				#if VERBOSE
+				#ifdef VERBOSE
 				std::cout<<"SharedVisualizationServer: Received finalization request "<<locatorIt->getDest()->finalSeedRequestID<<" from locator "<<locatorID<<std::endl;
 				#endif
 				
@@ -215,7 +242,7 @@ void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState*
 					Misc::throwStdErr("SharedVisualizationServer::handleMessage: Locator ID %u not found",locatorID);
 					}
 				
-				#if VERBOSE
+				#ifdef VERBOSE
 				std::cout<<"SharedVisualizationServer: Destroying locator "<<locatorID<<std::endl;
 				#endif
 				
@@ -237,7 +264,7 @@ void SharedVisualizationServer::sendClientConnect(ProtocolServer::ClientState* s
 	if(mySourceCs==0||myDestCs==0)
 		Misc::throwStdErr("SharedVisualizationServer::sendClientConnect: Mismatching client state object type");
 	
-	/* Here is where we send the existing locators of the source client to the destination client: */
+	/* Send the existing locators of the source client to the destination client: */
 	unsigned int numLocators=mySourceCs->locators.getNumEntries();
 	pipe.write<unsigned int>(numLocators);
 	for(LocatorHash::Iterator lIt=mySourceCs->locators.begin();!lIt.isFinished();++lIt)
@@ -246,6 +273,30 @@ void SharedVisualizationServer::sendClientConnect(ProtocolServer::ClientState* s
 		pipe.write<unsigned int>(lIt->getSource());
 		pipe.write<std::string>(lIt->getDest()->algorithmName);
 		}
+	}
+
+void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* destCs,CollaborationPipe& pipe)
+	{
+	ClientState* myDestCs=dynamic_cast<ClientState*>(destCs);
+	if(myDestCs==0)
+		Misc::throwStdErr("SharedVisualizationServer::sendServerUpdate: Mismatching client state object type");
+	
+	if(myDestCs->firstUpdate)
+		{
+		/* Send all existing visualization elements to the newly-connected client: */
+		Threads::Mutex::Lock elementListLock(elementListMutex);
+		for(ElementHash::Iterator eIt=elements.begin();!eIt.isFinished();++eIt)
+			{
+			pipe.writeMessage(CREATE_ELEMENT);
+			pipe.write<unsigned int>(eIt->getSource());
+			eIt->getDest()->send(pipe);
+			}
+		
+		myDestCs->firstUpdate=false;
+		}
+	
+	/* Terminate the per-server action list: */
+	pipe.writeMessage(UPDATE_END);
 	}
 
 void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* sourceCs,ProtocolServer::ClientState* destCs,CollaborationPipe& pipe)

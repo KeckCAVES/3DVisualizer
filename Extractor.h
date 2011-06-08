@@ -55,7 +55,7 @@ class Extractor
 	
 	/* Persisten extractor thread state: */
 	private:
-	#ifdef __DARWIN__
+	#ifdef __APPLE__
 	volatile bool terminate; // Flag to tell the extractor thread to shut itself down
 	#endif
 	Threads::Thread extractorThread; // The visualization element extractor thread

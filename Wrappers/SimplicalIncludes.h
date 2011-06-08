@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_WRAPPERS_SIMPLICALINCLUDES_INCLUDED
 #define VISUALIZATION_WRAPPERS_SIMPLICALINCLUDES_INCLUDED
 
-#define NONSTANDARD_GLVERTEX_TEMPLATES
+#define GLVERTEX_NONSTANDARD_TEMPLATES
 #include <Templatized/Simplical.h>
 #include <Templatized/SimplicalRenderer.h>
 #include <Templatized/SliceCaseTableSimplex.h>

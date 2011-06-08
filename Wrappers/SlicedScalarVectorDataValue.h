@@ -118,7 +118,7 @@ class SlicedScalarVectorDataValue:public SlicedScalarVectorDataValueBase,public 
 	using SlicedScalarVectorDataValueBase::getVectorVariableName;
 	SE getScalarExtractor(int scalarVariableIndex) const
 		{
-		return SE(dataSet->getSliceArray(scalarVariableIndex));
+		return SE(scalarVariableIndex,dataSet->getSliceArray(scalarVariableIndex));
 		}
 	VE getVectorExtractor(int vectorVariableIndex) const
 		{

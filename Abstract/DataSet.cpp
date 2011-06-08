@@ -2,7 +2,7 @@
 DataSet - Abstract base class to represent data sets.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -21,9 +21,9 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#include <Misc/ThrowStdErr.h>
-
 #include <Abstract/DataSet.h>
+
+#include <Misc/ThrowStdErr.h>
 
 namespace Visualization {
 
@@ -64,6 +64,12 @@ bool DataSet::Locator::setOrientation(const DataSet::Orientation& newOrientation
 /************************
 Methods of class DataSet:
 ************************/
+
+DataSet::Unit DataSet::getUnit(void) const
+	{
+	/* Return a default unit: */
+	return Unit();
+	}
 
 int DataSet::getNumScalarVariables(void) const
 	{

@@ -2,7 +2,7 @@
 Slice - Wrapper class for slices as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #define VISUALIZATION_WRAPPERS_SLICE_INCLUDED
 
 #include <Geometry/Plane.h>
-#define NONSTANDARD_GLVERTEX_TEMPLATES
+#define GLVERTEX_NONSTANDARD_TEMPLATES
 #include <GL/GLVertex.h>
 #include <GL/GLMaterial.h>
 
@@ -92,7 +92,7 @@ class Slice:public Visualization::Abstract::Element
 }
 
 #ifndef VISUALIZATION_WRAPPERS_SLICE_IMPLEMENTATION
-#include <Wrappers/Slice.cpp>
+#include <Wrappers/Slice.icpp>
 #endif
 
 #endif

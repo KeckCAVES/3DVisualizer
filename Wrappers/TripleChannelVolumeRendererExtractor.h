@@ -2,7 +2,7 @@
 TripleChannelVolumeRendererExtractor - Wrapper class to map from the
 abstract visualization algorithm interface to a templatized volume
 renderer implementation.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Misc/Autopointer.h>
 #include <GLMotif/DropdownBox.h>
+#include <GLMotif/TextFieldSlider.h>
 
 #include <Abstract/DataSet.h>
 #include <Abstract/Parameters.h>
@@ -60,6 +61,7 @@ class TripleChannelVolumeRendererExtractor:public Visualization::Abstract::Algor
 	typedef DataSetWrapperParam DataSetWrapper; // Compatible data set type
 	typedef typename DataSetWrapper::DS DS; // Type of templatized data set
 	typedef typename DS::Scalar Scalar; // Scalar type of data set's domain
+	typedef typename DataSetWrapper::VScalar VScalar; // Scalar value type
 	typedef typename DataSetWrapper::SE SE; // Type of templatized scalar extractor
 	typedef typename DataSetWrapper::ScalarExtractor ScalarExtractor; // Compatible scalar extractor wrapper class
 	typedef Visualization::Wrappers::TripleChannelVolumeRenderer<DataSetWrapper> TripleChannelVolumeRenderer; // Type of created visualization elements
@@ -74,31 +76,22 @@ class TripleChannelVolumeRendererExtractor:public Visualization::Abstract::Algor
 		/* Elements: */
 		private:
 		int scalarVariableIndices[3]; // Indices of the scalar variables for direct volume rendering
+		VScalar outOfDomainValues[3]; // Values to assign to volume renderer voxels that are outside the data set's domain
 		Scalar sliceFactor; // Slice distance for texture- or raycasting-based volume rendering
 		bool channelEnableds[3]; // Enable flags for each channel
 		float transparencyGammas[3]; // Overall transparency adjustment factors for each channel
-		
-		/* Private methods: */
-		template <class DataSourceParam>
-		void readBinary(DataSourceParam& dataSource,bool raw,const Visualization::Abstract::VariableManager* variableManager); // Reads parameters from a binary data source
-		template <class DataSourceParam>
-		void writeBinary(DataSourceParam& dataSink,bool raw,const Visualization::Abstract::VariableManager* variableManager) const; // Writes parameters to a binary data source
 		
 		/* Methods from Abstract::Parameters: */
 		virtual bool isValid(void) const
 			{
 			return true;
 			}
-		virtual void read(Misc::File& file,bool ascii,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::MulticastPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::ClusterPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void write(Misc::File& file,bool ascii,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::MulticastPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::ClusterPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
 		virtual Visualization::Abstract::Parameters* clone(void) const
 			{
 			return new Parameters(*this);
 			}
+		virtual void write(Visualization::Abstract::ParametersSink& sink) const;
+		virtual void read(Visualization::Abstract::ParametersSource& source);
 		};
 	
 	/* Elements: */
@@ -108,6 +101,7 @@ class TripleChannelVolumeRendererExtractor:public Visualization::Abstract::Algor
 	
 	/* UI components: */
 	GLMotif::DropdownBox* scalarVariableBoxes[3]; // Dropdown boxes to select the scalar variables for each channel
+	GLMotif::TextFieldSlider* outOfDomainValueSliders[3]; // Sliders to select out-of-domain values for each channel
 	
 	/* Constructors and destructors: */
 	public:
@@ -124,6 +118,7 @@ class TripleChannelVolumeRendererExtractor:public Visualization::Abstract::Algor
 		return true;
 		}
 	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager);
+	virtual void readParameters(Visualization::Abstract::ParametersSource& source);
 	virtual Visualization::Abstract::Parameters* cloneParameters(void) const
 		{
 		return new Parameters(parameters);
@@ -137,6 +132,7 @@ class TripleChannelVolumeRendererExtractor:public Visualization::Abstract::Algor
 		return name;
 		}
 	void scalarVariableBoxCallback(GLMotif::DropdownBox::ValueChangedCallbackData* cbData);
+	void outOfDomainValueCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	};
 
 }
@@ -144,7 +140,7 @@ class TripleChannelVolumeRendererExtractor:public Visualization::Abstract::Algor
 }
 
 #ifndef VISUALIZATION_WRAPPERS_TRIPLECHANNELVOLUMERENDEREREXTRACTOR_IMPLEMENTATION
-#include <Wrappers/TripleChannelVolumeRendererExtractor.cpp>
+#include <Wrappers/TripleChannelVolumeRendererExtractor.icpp>
 #endif
 
 #endif

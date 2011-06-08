@@ -2,7 +2,7 @@
 SlicedHypercubic - Base class for vertex-centered unstructured
 hypercubic data sets containing multiple scalar-valued slices.
 etc.).
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -400,7 +400,7 @@ class SlicedHypercubic
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_SLICEDHYPERCUBIC_IMPLEMENTATION
-#include <Templatized/SlicedHypercubic.cpp>
+#include <Templatized/SlicedHypercubic.icpp>
 #endif
 
 #endif

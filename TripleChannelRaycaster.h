@@ -1,7 +1,7 @@
 /***********************************************************************
 TripleChannelRaycaster - Class for volume renderers with three
 independent scalar channels.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

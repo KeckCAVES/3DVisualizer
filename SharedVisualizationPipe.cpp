@@ -29,6 +29,6 @@ Static elements of class SharedVisualizationPipe:
 ************************************************/
 
 const char* SharedVisualizationPipe::protocolName="SharedVisualizer";
-const unsigned int SharedVisualizationPipe::protocolVersion=1*65536+0; // Version 1.0
+const unsigned int SharedVisualizationPipe::protocolVersion=2*65536+0; // Version 2.0
 
 }

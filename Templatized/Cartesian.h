@@ -1,7 +1,7 @@
 /***********************************************************************
 Cartesian - Base class for vertex-centered cartesian data sets
 containing arbitrary value types (scalars, vectors, tensors, etc.).
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -347,7 +347,7 @@ class Cartesian
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_CARTESIAN_IMPLEMENTATION
-#include <Templatized/Cartesian.cpp>
+#include <Templatized/Cartesian.icpp>
 #endif
 
 #endif

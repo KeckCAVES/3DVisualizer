@@ -28,6 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Vrui/Vrui.h>
 
 #include <Abstract/Parameters.h>
+#include <Abstract/BinaryParametersSink.h>
+#include <Abstract/BinaryParametersSource.h>
 #include <Abstract/Algorithm.h>
 #include <Abstract/Element.h>
 
@@ -41,6 +43,9 @@ void* Extractor::masterExtractorThreadMethod(void)
 	Threads::Thread::setCancelState(Threads::Thread::CANCEL_ENABLE);
 	Threads::Thread::setCancelType(Threads::Thread::CANCEL_ASYNCHRONOUS);
 	
+	/* Create a data sink for the multicast pipe: */
+	Visualization::Abstract::BinaryParametersSink<Comm::MulticastPipe> sink(extractor->getVariableManager(),*extractor->getPipe(),true);
+	
 	/* Handle extraction requests until interrupted: */
 	Realtime::AlarmTimer alarm;
 	Misc::Time expirationTime(0.1);
@@ -51,7 +56,7 @@ void* Extractor::masterExtractorThreadMethod(void)
 		unsigned int requestID;
 		{
 		Threads::Mutex::Lock seedRequestLock(seedRequestMutex);
-		#ifdef __DARWIN__
+		#ifdef __APPLE__
 		if(terminate)
 			return 0;
 		while(seedParameters==0)
@@ -87,7 +92,7 @@ void* Extractor::masterExtractorThreadMethod(void)
 				extractor->getPipe()->write<unsigned int>(requestID);
 				
 				/* Send the extraction parameters to the slaves: */
-				parameters->write(*extractor->getPipe(),extractor->getVariableManager());
+				parameters->write(sink);
 				extractor->getPipe()->finishMessage();
 				}
 			
@@ -175,16 +180,19 @@ void* Extractor::slaveExtractorThreadMethod(void)
 	Threads::Thread::setCancelState(Threads::Thread::CANCEL_ENABLE);
 	Threads::Thread::setCancelType(Threads::Thread::CANCEL_ASYNCHRONOUS);
 	
+	/* Create a data source for the multicast pipe: */
+	Visualization::Abstract::BinaryParametersSource<Comm::MulticastPipe> source(extractor->getVariableManager(),*extractor->getPipe(),true);
+	
 	/* Receive visualization elements from master until interrupted: */
 	while(true)
 		{
 		/* Wait for a new visualization element: */
-		#ifdef __DARWIN__
+		#ifdef __APPLE__
 		if(terminate)
 			return 0;
 		#endif
 		unsigned int requestID=extractor->getPipe()->read<unsigned int>();
-		#ifdef __DARWIN__
+		#ifdef __APPLE__
 		if(terminate)
 			return 0;
 		#endif
@@ -198,7 +206,7 @@ void* Extractor::slaveExtractorThreadMethod(void)
 			{
 			/* Receive the new element's parameters from the master: */
 			Parameters* parameters=extractor->cloneParameters();
-			parameters->read(*extractor->getPipe(),extractor->getVariableManager());
+			parameters->read(source);
 			
 			/* Start receiving the visualization element from the master: */
 			trackedElements[nextIndex]=extractor->startSlaveElement(parameters);
@@ -235,7 +243,7 @@ void* Extractor::slaveExtractorThreadMethod(void)
 
 Extractor::Extractor(Extractor::Algorithm* sExtractor)
 	:extractor(sExtractor),
-	 #ifdef __DARWIN__
+	 #ifdef __APPLE__
 	 terminate(false),
 	 #endif
 	 finalElementPending(false),finalSeedRequestID(0),
@@ -265,7 +273,7 @@ Extractor::Extractor(Extractor::Algorithm* sExtractor)
 Extractor::~Extractor(void)
 	{
 	/* Stop the extraction thread: */
-	#ifdef __DARWIN__
+	#ifdef __APPLE__
 	if(extractor->isMaster())
 		{
 		if(extractor->getPipe()!=0)

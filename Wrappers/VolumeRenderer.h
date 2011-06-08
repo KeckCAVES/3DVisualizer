@@ -3,7 +3,7 @@ VolumeRenderer - Wrapper class for volume renderers as visualization
 elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,15 +25,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_WRAPPERS_VOLUMERENDERER_INCLUDED
 #define VISUALIZATION_WRAPPERS_VOLUMERENDERER_INCLUDED
 
-#include <GLMotif/Slider.h>
+#include <GLMotif/TextFieldSlider.h>
 
 #include <Abstract/Element.h>
 
 /* Forward declarations: */
 class GLColorMap;
-namespace GLMotif {
-class TextField;
-}
 #ifdef VISUALIZATION_USE_SHADERS
 class SingleChannelRaycaster;
 #else
@@ -66,12 +63,6 @@ class VolumeRenderer:public Visualization::Abstract::Element
 	float transparencyGamma; // A gamma correction factor to apply to color map opacities
 	#endif
 	
-	/* UI components: */
-	GLMotif::TextField* sliceFactorValue; // Text field to display current slice factor
-	GLMotif::Slider* sliceFactorSlider; // Slider to change current slice factor value
-	GLMotif::TextField* transparencyGammaValue; // Text field to display current gamma correction factor
-	GLMotif::Slider* transparencyGammaSlider; // Slider to change current gamma correction factor value
-	
 	/* Constructors and destructors: */
 	public:
 	VolumeRenderer(Visualization::Abstract::Algorithm* algorithm,Visualization::Abstract::Parameters* sParameters); // Creates a volume renderer for the given algorithm and parameters
@@ -92,7 +83,8 @@ class VolumeRenderer:public Visualization::Abstract::Element
 	virtual void glRenderAction(GLContextData& contextData) const;
 	
 	/* New methods: */
-	void sliderValueChangedCallback(GLMotif::Slider::ValueChangedCallbackData* cbData); // Callback when the sliders in the settings dialog change value
+	void sliceFactorCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void transparencyGammaCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	};
 
 }
@@ -100,7 +92,7 @@ class VolumeRenderer:public Visualization::Abstract::Element
 }
 
 #ifndef VISUALIZATION_WRAPPERS_VOLUMERENDERER_IMPLEMENTATION
-#include <Wrappers/VolumeRenderer.cpp>
+#include <Wrappers/VolumeRenderer.icpp>
 #endif
 
 #endif

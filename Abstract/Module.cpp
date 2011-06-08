@@ -4,7 +4,7 @@ types and algorithms. A module corresponds to a dynamically-linkable
 unit of functionality in a 3D visualization application.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,9 +23,10 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#include <Misc/ThrowStdErr.h>
-
 #include <Abstract/Module.h>
+
+#include <string.h>
+#include <Misc/ThrowStdErr.h>
 
 namespace Visualization {
 
@@ -75,6 +76,24 @@ const char* Module::getVectorAlgorithmName(int vectorAlgorithmIndex) const
 Algorithm* Module::getVectorAlgorithm(int vectorAlgorithmIndex,VariableManager* variableManager,Comm::MulticastPipe* pipe) const
 	{
 	Misc::throwStdErr("Module::getVectorAlgorithm: invalid algorithm index %d",vectorAlgorithmIndex);
+	return 0;
+	}
+
+Algorithm* Module::getAlgorithm(const char* algorithmName,VariableManager* variableManager,Comm::MulticastPipe* pipe) const
+	{
+	/* Try all scalar algorithms: */
+	int numScalarAlgorithms=getNumScalarAlgorithms();
+	for(int i=0;i<numScalarAlgorithms;++i)
+		if(strcmp(algorithmName,getScalarAlgorithmName(i))==0)
+			return getScalarAlgorithm(i,variableManager,pipe);
+	
+	/* Try all vector algorithms: */
+	int numVectorAlgorithms=getNumVectorAlgorithms();
+	for(int i=0;i<numVectorAlgorithms;++i)
+		if(strcmp(algorithmName,getVectorAlgorithmName(i))==0)
+			return getVectorAlgorithm(i,variableManager,pipe);
+	
+	/* Return an invalid algorithm: */
 	return 0;
 	}
 

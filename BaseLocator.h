@@ -1,6 +1,6 @@
 /***********************************************************************
 BaseLocator - Base class for locators in visualizer application.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

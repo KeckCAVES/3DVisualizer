@@ -2,7 +2,7 @@
 VolumeRendererExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized volume renderer
 implementation.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #define VISUALIZATION_WRAPPERS_VOLUMERENDEREREXTRACTOR_INCLUDED
 
 #include <Misc/Autopointer.h>
+#include <GLMotif/TextFieldSlider.h>
 
 #include <Abstract/DataSet.h>
 #include <Abstract/Parameters.h>
@@ -59,6 +60,7 @@ class VolumeRendererExtractor:public Visualization::Abstract::Algorithm
 	typedef DataSetWrapperParam DataSetWrapper; // Compatible data set type
 	typedef typename DataSetWrapper::DS DS; // Type of templatized data set
 	typedef typename DS::Scalar Scalar; // Scalar type of data set's domain
+	typedef typename DataSetWrapper::VScalar VScalar; // Scalar value type
 	typedef typename DataSetWrapper::SE SE; // Type of templatized scalar extractor
 	typedef typename DataSetWrapper::ScalarExtractor ScalarExtractor; // Compatible scalar extractor wrapper class
 	typedef Visualization::Wrappers::VolumeRenderer<DataSetWrapper> VolumeRenderer; // Type of created visualization elements
@@ -73,14 +75,9 @@ class VolumeRendererExtractor:public Visualization::Abstract::Algorithm
 		/* Elements: */
 		private:
 		int scalarVariableIndex; // Index of the scalar variable for direct volume rendering
+		VScalar outOfDomainValue; // Value to assign to volume renderer voxels that are outside the data set's domain
 		Scalar sliceFactor; // Slice distance for texture- or raycasting-based volume rendering
 		float transparencyGamma; // Overall transparency adjustment factor
-		
-		/* Private methods: */
-		template <class DataSourceParam>
-		void readBinary(DataSourceParam& dataSource,bool raw,const Visualization::Abstract::VariableManager* variableManager); // Reads parameters from a binary data source
-		template <class DataSourceParam>
-		void writeBinary(DataSourceParam& dataSink,bool raw,const Visualization::Abstract::VariableManager* variableManager) const; // Writes parameters to a binary data source
 		
 		/* Constructors and destructors: */
 		public:
@@ -94,22 +91,19 @@ class VolumeRendererExtractor:public Visualization::Abstract::Algorithm
 			{
 			return true;
 			}
-		virtual void read(Misc::File& file,bool ascii,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::MulticastPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::ClusterPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void write(Misc::File& file,bool ascii,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::MulticastPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::ClusterPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
 		virtual Visualization::Abstract::Parameters* clone(void) const
 			{
 			return new Parameters(*this);
 			}
+		virtual void write(Visualization::Abstract::ParametersSink& sink) const;
+		virtual void read(Visualization::Abstract::ParametersSource& source);
 		};
 	
 	/* Elements: */
 	private:
 	static const char* name; // Identifying name of this algorithm
 	Parameters parameters; // The volume renderer extraction parameters used by this extractor
+	GLMotif::TextFieldSlider* outOfDomainValueSlider;
 	
 	/* Constructors and destructors: */
 	public:
@@ -125,6 +119,8 @@ class VolumeRendererExtractor:public Visualization::Abstract::Algorithm
 		{
 		return true;
 		}
+	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager);
+	virtual void readParameters(Visualization::Abstract::ParametersSource& source);
 	virtual Visualization::Abstract::Parameters* cloneParameters(void) const
 		{
 		return new Parameters(parameters);
@@ -137,6 +133,7 @@ class VolumeRendererExtractor:public Visualization::Abstract::Algorithm
 		{
 		return name;
 		}
+	void outOfDomainValueCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	};
 
 }
@@ -144,7 +141,7 @@ class VolumeRendererExtractor:public Visualization::Abstract::Algorithm
 }
 
 #ifndef VISUALIZATION_WRAPPERS_VOLUMERENDEREREXTRACTOR_IMPLEMENTATION
-#include <Wrappers/VolumeRendererExtractor.cpp>
+#include <Wrappers/VolumeRendererExtractor.icpp>
 #endif
 
 #endif

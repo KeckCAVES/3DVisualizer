@@ -1,7 +1,7 @@
 /***********************************************************************
 DataSet - Wrapper class to map from the abstract data set interface to
 its templatized data set implementation.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -165,7 +165,7 @@ class DataSet:public Visualization::Abstract::DataSet
 }
 
 #ifndef VISUALIZATION_WRAPPERS_DATASET_IMPLEMENTATION
-#include <Wrappers/DataSet.cpp>
+#include <Wrappers/DataSet.icpp>
 #endif
 
 #endif

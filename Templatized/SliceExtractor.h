@@ -1,6 +1,6 @@
 /***********************************************************************
 SliceExtractor - Generic class to extract slices from data sets.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -114,7 +114,7 @@ class SliceExtractor
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_SLICEEXTRACTOR_IMPLEMENTATION
-#include <Templatized/SliceExtractor.cpp>
+#include <Templatized/SliceExtractor.icpp>
 #endif
 
 #endif

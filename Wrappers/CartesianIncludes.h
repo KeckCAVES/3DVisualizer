@@ -23,10 +23,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_WRAPPERS_CARTESIANINCLUDES_INCLUDED
 #define VISUALIZATION_WRAPPERS_CARTESIANINCLUDES_INCLUDED
 
-#define NONSTANDARD_GLVERTEX_TEMPLATES
+#define GLVERTEX_NONSTANDARD_TEMPLATES
 #include <Templatized/Cartesian.h>
 #include <Templatized/CartesianRenderer.h>
 #include <Templatized/SliceCaseTableTesseract.h>
 #include <Templatized/IsosurfaceCaseTableTesseract.h>
+#include <Templatized/VolumeRenderingSamplerCartesian.h>
 
 #endif

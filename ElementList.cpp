@@ -1,7 +1,7 @@
 /***********************************************************************
 ElementList - Class to manage a list of previously extracted
 visualization elements.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -22,13 +22,19 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include "ElementList.h"
 
+#include <Misc/StandardMarshallers.h>
 #include <Misc/File.h>
+#include <IO/File.h>
 #include <GLMotif/PopupWindow.h>
 #include <GLMotif/RowColumn.h>
 #include <GLMotif/Margin.h>
 #include <GLMotif/Separator.h>
 #include <GLMotif/ScrolledListBox.h>
+#include <Vrui/Vrui.h>
+#include <Vrui/OpenFile.h>
 
+#include <Abstract/BinaryParametersSink.h>
+#include <Abstract/FileParametersSink.h>
 #include <Abstract/Element.h>
 
 /****************************
@@ -110,6 +116,24 @@ void ElementList::showElementSettingsToggleValueChangedCallback(GLMotif::ToggleB
 		}
 	else
 		cbData->toggle->setToggle(false);
+	}
+
+void ElementList::elementSettingsCloseCallback(Misc::CallbackData* cbData)
+	{
+	GLMotif::PopupWindow::CloseCallbackData* myCbData=dynamic_cast<GLMotif::PopupWindow::CloseCallbackData*>(cbData);
+	if(myCbData!=0)
+		{
+		/* Find the element whose settings dialog was closed: */
+		ListElementList::iterator eIt;
+		for(eIt=elements.begin();eIt!=elements.end();++eIt)
+			if(myCbData->popupWindow==eIt->settingsDialog)
+				{
+				/* Update the element and the UI: */
+				eIt->settingsDialogVisible=false;
+				updateUiState();
+				break;
+				}
+		}
 	}
 
 void ElementList::deleteElementSelectedCallback(Misc::CallbackData* cbData)
@@ -217,57 +241,57 @@ void ElementList::addElement(Element* newElement,const char* elementName)
 	/* Update the toggle buttons: */
 	showElementToggle->setToggle(true);
 	showElementSettingsToggle->setToggle(false);
+	
+	/* Check if the element's settings dialog is a dialog: */
+	GLMotif::PopupWindow* sd=dynamic_cast<GLMotif::PopupWindow*>(le.settingsDialog);
+	if(sd!=0)
+		{
+		/* Add a close button to the settings dialog, and register a close callback: */
+		sd->setCloseButton(true);
+		sd->getCloseCallbacks().add(this,&ElementList::elementSettingsCloseCallback);
+		}
 	}
 
 void ElementList::saveElements(const char* elementFileName,bool ascii,const Visualization::Abstract::VariableManager* variableManager) const
 	{
 	if(ascii)
 		{
-		/* Create the ASCII element file: */
-		Misc::File elementFile(elementFileName,"w",Misc::File::DontCare);
+		/* Create a text element file and a sink to write into it: */
+		Misc::File elementFile(elementFileName,"wt");
+		Visualization::Abstract::FileParametersSink sink(variableManager,elementFile);
 		
 		/* Save all visible visualization elements: */
 		for(ListElementList::const_iterator veIt=elements.begin();veIt!=elements.end();++veIt)
 			if(veIt->show)
 				{
 				/* Write the element's name: */
-				fprintf(elementFile.getFilePtr(),"%s\n",veIt->name.c_str());
+				elementFile.puts(veIt->name.c_str());
+				elementFile.puts("\n");
 				
 				/* Write the element's parameters: */
-				veIt->element->getParameters()->write(elementFile,true,variableManager);
+				elementFile.puts("\t{\n");
+				veIt->element->getParameters()->write(sink);
+				elementFile.puts("\t}\n");
 				}
 		}
 	else
 		{
-		/* Create the binary element file: */
-		Misc::File elementFile(elementFileName,"wb",Misc::File::LittleEndian);
+		/* Create a binary element file and a data sink to write into it: */
+		IO::AutoFile elementFile(Vrui::openFile(elementFileName,IO::File::WriteOnly));
+		elementFile->setEndianness(IO::File::LittleEndian);
+		Visualization::Abstract::BinaryParametersSink<IO::File> sink(variableManager,*elementFile,false);
 		
 		/* Save all visible visualization elements: */
 		for(ListElementList::const_iterator veIt=elements.begin();veIt!=elements.end();++veIt)
 			if(veIt->show)
 				{
 				/* Write the element's name: */
-				elementFile.write<int>(int(veIt->name.length()));
-				elementFile.write<char>(veIt->name.c_str(),veIt->name.length());
+				Misc::Marshaller<std::string>::write(veIt->name,*elementFile);
 				
 				/* Write the element's parameters: */
-				veIt->element->getParameters()->write(elementFile,false,variableManager);
+				veIt->element->getParameters()->write(sink);
 				}
-		
-		/* Finish the file: */
-		elementFile.write<int>(0);
 		}
-	}
-
-void ElementList::showElementList(const GLMotif::WidgetManager::Transformation& transformation)
-	{
-	widgetManager->popupPrimaryWidget(elementListDialogPopup,transformation);
-	}
-
-void ElementList::hideElementList(void)
-	{
-	/* Pop down the element list dialog: */
-	widgetManager->popdownWidget(elementListDialogPopup);
 	}
 
 void ElementList::renderElements(GLContextData& contextData,bool transparent) const

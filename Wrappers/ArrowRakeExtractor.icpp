@@ -1,0 +1,460 @@
+/***********************************************************************
+ArrowRakeExtractor - Wrapper class extract rakes of arrows from vector
+fields.
+Copyright (c) 2008-2011 Oliver Kreylos
+
+This file is part of the 3D Data Visualizer (Visualizer).
+
+The 3D Data Visualizer is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+The 3D Data Visualizer is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with the 3D Data Visualizer; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+***********************************************************************/
+
+#define VISUALIZATION_WRAPPERS_ARROWRAKEEXTRACTOR_IMPLEMENTATION
+
+#include <Wrappers/ArrowRakeExtractor.h>
+
+#include <Misc/ThrowStdErr.h>
+#include <Misc/StandardMarshallers.h>
+#include <Misc/StandardValueCoders.h>
+#include <Math/Math.h>
+#include <Geometry/GeometryMarshallers.h>
+#include <Geometry/GeometryValueCoders.h>
+#include <GLMotif/StyleSheet.h>
+#include <GLMotif/WidgetManager.h>
+#include <GLMotif/PopupWindow.h>
+#include <GLMotif/RowColumn.h>
+#include <GLMotif/Label.h>
+#include <Vrui/Vrui.h>
+
+#include <Abstract/VariableManager.h>
+#include <Abstract/ParametersSink.h>
+#include <Abstract/ParametersSource.h>
+#include <Wrappers/ScalarExtractor.h>
+#include <Wrappers/VectorExtractor.h>
+
+namespace Visualization {
+
+namespace Wrappers {
+
+/***********************************************
+Methods of class ArrowRakeExtractor::Parameters:
+***********************************************/
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::Parameters::write(
+	Visualization::Abstract::ParametersSink& sink) const
+	{
+	/* Write all parameters: */
+	sink.writeVectorVariable("vectorVariable",vectorVariableIndex);
+	sink.writeScalarVariable("colorScalarVariable",colorScalarVariableIndex);
+	sink.write("rakeSize",Visualization::Abstract::ArrayWriter<int>(rakeSize.getComponents(),2));
+	sink.write("cellSize",Visualization::Abstract::ArrayWriter<Scalar>(cellSize,2));
+	sink.write("lengthScale",Visualization::Abstract::Writer<Scalar>(lengthScale));
+	sink.write("shaftRadius",Visualization::Abstract::Writer<Scalar>(shaftRadius));
+	sink.write("numArrowVertices",Visualization::Abstract::Writer<unsigned int>(numArrowVertices));
+	sink.write("base",Visualization::Abstract::Writer<Point>(base));
+	sink.write("frame",Visualization::Abstract::ArrayWriter<Vector>(frame,2));
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::Parameters::read(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read all parameters: */
+	source.readVectorVariable("vectorVariable",vectorVariableIndex);
+	source.readScalarVariable("colorScalarVariable",colorScalarVariableIndex);
+	source.read("rakeSize",Visualization::Abstract::ArrayReader<int>(rakeSize.getComponents(),2));
+	source.read("cellSize",Visualization::Abstract::ArrayReader<Scalar>(cellSize,2));
+	source.read("lengthScale",Visualization::Abstract::Reader<Scalar>(lengthScale));
+	source.read("shaftRadius",Visualization::Abstract::Reader<Scalar>(shaftRadius));
+	source.read("numArrowVertices",Visualization::Abstract::Reader<unsigned int>(numArrowVertices));
+	source.read("base",Visualization::Abstract::Reader<Point>(base));
+	source.read("frame",Visualization::Abstract::ArrayReader<Vector>(frame,2));
+	
+	/* Update derived state: */
+	update(source.getVariableManager(),true);
+	}
+
+template <class DataSetWrapperParam>
+inline
+ArrowRakeExtractor<DataSetWrapperParam>::Parameters::Parameters(
+	Visualization::Abstract::VariableManager* variableManager)
+	:vectorVariableIndex(variableManager->getCurrentVectorVariable()),
+	 colorScalarVariableIndex(variableManager->getCurrentScalarVariable()),
+	 locatorValid(false)
+	{
+	update(variableManager,false);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::Parameters::update(
+	Visualization::Abstract::VariableManager* variableManager,
+	bool track)
+	{
+	/* Get the abstract data set pointer: */
+	const Visualization::Abstract::DataSet* ds1=variableManager->getDataSetByVectorVariable(vectorVariableIndex);
+	const Visualization::Abstract::DataSet* ds2=variableManager->getDataSetByScalarVariable(colorScalarVariableIndex);
+	if(ds1!=ds2)
+		Misc::throwStdErr("ArrowRakeExtractor::Parameters::update: Incompatible vector and scalar variables");
+	
+	/* Get a pointer to the data set wrapper: */
+	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(ds1);
+	if(myDataSet==0)
+		Misc::throwStdErr("ArrowRakeExtractor::Parameters::update: Mismatching data set type");
+	ds=&myDataSet->getDs();
+	
+	/* Get a pointer to the vector extractor wrapper: */
+	const VectorExtractor* myVectorExtractor=dynamic_cast<const VectorExtractor*>(variableManager->getVectorExtractor(vectorVariableIndex));
+	if(myVectorExtractor==0)
+		Misc::throwStdErr("ArrowRakeExtractor::Parameters::update: Mismatching vector extractor type");
+	ve=&myVectorExtractor->getVe();
+	
+	/* Get a pointer to the color scalar extractor wrapper: */
+	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(variableManager->getScalarExtractor(colorScalarVariableIndex));
+	if(myScalarExtractor==0)
+		Misc::throwStdErr("ArrowRakeExtractor::Parameters::update: Mismatching scalar extractor type");
+	cse=&myScalarExtractor->getSe();
+	
+	/* Get a templatized locator: */
+	dsl=ds->getLocator();
+	if(track)
+		{
+		/* Locate the rake base point: */
+		locatorValid=dsl.locatePoint(base);
+		}
+	}
+
+/*******************************************
+Static elements of class ArrowRakeExtractor:
+*******************************************/
+
+template <class DataSetWrapperParam>
+const char* ArrowRakeExtractor<DataSetWrapperParam>::name="Arrow Rake";
+
+/***********************************
+Methods of class ArrowRakeExtractor:
+***********************************/
+
+template <class DataSetWrapperParam>
+inline
+ArrowRakeExtractor<DataSetWrapperParam>::ArrowRakeExtractor(
+	Visualization::Abstract::VariableManager* sVariableManager,
+	Comm::MulticastPipe* sPipe)
+	:Abstract::Algorithm(sVariableManager,sPipe),
+	 parameters(sVariableManager),
+	 currentArrowRake(0),currentParameters(0),
+	 lengthScaleSlider(0)
+	{
+	/* Initialize parameters: */
+	parameters.rakeSize=Index(5,5);
+	baseCellSize=parameters.ds->calcAverageCellSize();
+	for(int i=0;i<2;++i)
+		parameters.cellSize[i]=baseCellSize;
+	parameters.lengthScale=Scalar(1);
+	parameters.shaftRadius=Math::div2(Scalar(Vrui::getUiSize()));
+	parameters.numArrowVertices=16;
+	
+	/* Initialize UI components: */
+	for(int i=0;i<2;++i)
+		{
+		rakeSizeSliders[i]=0;
+		cellSizeSliders[i]=0;
+		}
+	}
+
+template <class DataSetWrapperParam>
+inline
+ArrowRakeExtractor<DataSetWrapperParam>::~ArrowRakeExtractor(
+	void)
+	{
+	}
+
+template <class DataSetWrapperParam>
+inline
+GLMotif::Widget*
+ArrowRakeExtractor<DataSetWrapperParam>::createSettingsDialog(
+	GLMotif::WidgetManager* widgetManager)
+	{
+	/* Get the style sheet: */
+	const GLMotif::StyleSheet* ss=widgetManager->getStyleSheet();
+	
+	/* Create the settings dialog window: */
+	GLMotif::PopupWindow* settingsDialogPopup=new GLMotif::PopupWindow("ArrowRakeExtractorSettingsDialogPopup",widgetManager,"Arrow Rake Extractor Settings");
+	settingsDialogPopup->setResizableFlags(true,false);
+	
+	GLMotif::RowColumn* settingsDialog=new GLMotif::RowColumn("settingsDialog",settingsDialogPopup,false);
+	settingsDialog->setNumMinorWidgets(2);
+	
+	for(int i=0;i<2;++i)
+		{
+		new GLMotif::Label("RakeSizeLabel",settingsDialog,i==0?"Rake Width":"Rake Height");
+		
+		/* Create a slider to adjust the rake size: */
+		rakeSizeSliders[i]=new GLMotif::TextFieldSlider("RakeSizeSlider",settingsDialog,6,ss->fontHeight*10.0f);
+		rakeSizeSliders[i]->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
+		rakeSizeSliders[i]->setValueType(GLMotif::TextFieldSlider::UINT);
+		rakeSizeSliders[i]->setValueRange(1,100,1);
+		rakeSizeSliders[i]->setValue(parameters.rakeSize[i]);
+		rakeSizeSliders[i]->getValueChangedCallbacks().add(this,&ArrowRakeExtractor::rakeSizeCallback);
+		}
+	
+	for(int i=0;i<2;++i)
+		{
+		new GLMotif::Label("CellSizeLabel",settingsDialog,i==0?"Cell Width":"Cell Height");
+		
+		/* Create a slider to adjust the rake cell size: */
+		cellSizeSliders[i]=new GLMotif::TextFieldSlider("CellSizeSlider",settingsDialog,12,ss->fontHeight*10.0f);
+		cellSizeSliders[i]->getTextField()->setPrecision(6);
+		cellSizeSliders[i]->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+		cellSizeSliders[i]->setValueRange(double(baseCellSize)*1.0e-4,double(baseCellSize)*1.0e4,0.1);
+		cellSizeSliders[i]->setValue(double(parameters.cellSize[i]));
+		cellSizeSliders[i]->getValueChangedCallbacks().add(this,&ArrowRakeExtractor::cellSizeCallback);
+		}
+	
+	new GLMotif::Label("LengthScaleLabel",settingsDialog,"Arrow Scale");
+	
+	/* Create a slider to adjust the arrow length scale: */
+	lengthScaleSlider=new GLMotif::TextFieldSlider("LengthScaleSlider",settingsDialog,12,ss->fontHeight*10.0f);
+	lengthScaleSlider->getTextField()->setPrecision(6);
+	lengthScaleSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	lengthScaleSlider->setValueRange(0.0001,10000.0,0.1);
+	lengthScaleSlider->setValue(double(parameters.lengthScale));
+	lengthScaleSlider->getValueChangedCallbacks().add(this,&ArrowRakeExtractor::lengthScaleCallback);
+	
+	settingsDialog->manageChild();
+	
+	return settingsDialogPopup;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::readParameters(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read the current parameters: */
+	parameters.read(source);
+	
+	/* Update extractor state: */
+	baseCellSize=parameters.ds->calcAverageCellSize();
+	
+	/* Update the GUI: */
+	for(int i=0;i<2;++i)
+		{
+		if(rakeSizeSliders[i]!=0)
+			rakeSizeSliders[i]->setValue(parameters.rakeSize[i]);
+		if(cellSizeSliders[i]!=0)
+			{
+			cellSizeSliders[i]->setValueRange(double(baseCellSize)*1.0e-4,double(baseCellSize)*1.0e4,0.1);
+			cellSizeSliders[i]->setValue(parameters.cellSize[i]);
+			}
+		}
+	if(lengthScaleSlider!=0)
+		lengthScaleSlider->setValue(parameters.lengthScale);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::setSeedLocator(
+	const Visualization::Abstract::DataSet::Locator* seedLocator)
+	{
+	/* Get a pointer to the locator wrapper: */
+	const Locator* myLocator=dynamic_cast<const Locator*>(seedLocator);
+	if(myLocator==0)
+		Misc::throwStdErr("ArrowRakeExtractor::setSeedLocator: Mismatching locator type");
+	
+	/* Create the rake frame: */
+	parameters.base=Point(seedLocator->getPosition());
+	for(int i=0;i<2;++i)
+		{
+		Vector dir=Vector(seedLocator->getOrientation().getDirection(i==0?0:2));
+		parameters.frame[i]=dir;
+		parameters.base-=dir*Math::div2(Scalar(parameters.rakeSize[i]))*parameters.cellSize[i];
+		}
+	
+	/* Copy the locator: */
+	parameters.dsl=myLocator->getDsl();
+	parameters.locatorValid=myLocator->isValid();
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+ArrowRakeExtractor<DataSetWrapperParam>::createElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("ArrowRakeExtractor::createElement: Mismatching parameter object type");
+	int csvi=myParameters->colorScalarVariableIndex;
+	
+	/* Create a new arrow rake visualization element: */
+	ArrowRake* result=new ArrowRake(myParameters,myParameters->rakeSize,myParameters->lengthScale,myParameters->shaftRadius,myParameters->numArrowVertices,getVariableManager()->getColorMap(csvi),getPipe());
+	
+	/* Calculate the arrow base points and directions: */
+	for(Index index(0);index[0]<myParameters->rakeSize[0];index.preInc(myParameters->rakeSize))
+		{
+		Arrow& arrow=result->getRake()(index);
+		arrow.base=myParameters->base;
+		for(int i=0;i<2;++i)
+			arrow.base+=myParameters->frame[i]*(Scalar(index[i])*myParameters->cellSize[i]);
+		
+		if((arrow.valid=myParameters->dsl.locatePoint(arrow.base)))
+			{
+			arrow.direction=Vector(myParameters->dsl.calcValue(*myParameters->ve));
+			arrow.scalarValue=Scalar(myParameters->dsl.calcValue(*myParameters->cse));
+			}
+		}
+	result->update();
+	
+	/* Return the result: */
+	return result;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+ArrowRakeExtractor<DataSetWrapperParam>::startElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("ArrowRakeExtractor::startElement: Mismatching parameter object type");
+	int csvi=myParameters->colorScalarVariableIndex;
+	
+	/* Create a new arrow rake visualization element: */
+	currentArrowRake=new ArrowRake(myParameters,myParameters->rakeSize,myParameters->lengthScale,myParameters->shaftRadius,myParameters->numArrowVertices,getVariableManager()->getColorMap(csvi),getPipe());
+	
+	/* Remember the parameter object: */
+	currentParameters=myParameters;
+	
+	/* Return the result: */
+	return currentArrowRake.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+bool
+ArrowRakeExtractor<DataSetWrapperParam>::continueElement(
+	const Realtime::AlarmTimer& alarm)
+	{
+	/* Calculate the arrow base points and directions: */
+	for(Index index(0);index[0]<currentParameters->rakeSize[0];index.preInc(currentParameters->rakeSize))
+		{
+		Arrow& arrow=currentArrowRake->getRake()(index);
+		arrow.base=currentParameters->base;
+		for(int i=0;i<2;++i)
+			arrow.base+=currentParameters->frame[i]*(Scalar(index[i])*currentParameters->cellSize[i]);
+		
+		if((arrow.valid=currentParameters->dsl.locatePoint(arrow.base)))
+			{
+			arrow.direction=Vector(currentParameters->dsl.calcValue(*currentParameters->ve));
+			arrow.scalarValue=Scalar(currentParameters->dsl.calcValue(*currentParameters->cse));
+			}
+		}
+	currentArrowRake->update();
+	
+	return true;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::finishElement(
+	void)
+	{
+	currentArrowRake=0;
+	currentParameters=0;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+ArrowRakeExtractor<DataSetWrapperParam>::startSlaveElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	if(isMaster())
+		Misc::throwStdErr("ArrowRakeExtractor::startSlaveElement: Cannot be called on master node");
+	
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("ArrowRakeExtractor::startElement: Mismatching parameter object type");
+	int csvi=myParameters->colorScalarVariableIndex;
+	
+	/* Create a new arrow rake visualization element: */
+	currentArrowRake=new ArrowRake(myParameters,myParameters->rakeSize,myParameters->lengthScale,myParameters->shaftRadius,myParameters->numArrowVertices,getVariableManager()->getColorMap(csvi),getPipe());
+	
+	return currentArrowRake.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::continueSlaveElement(
+	void)
+	{
+	if(isMaster())
+		Misc::throwStdErr("ArrowRakeExtractor::continueSlaveElement: Cannot be called on master node");
+	
+	/* Receive the new state of the arrow rake from the master: */
+	currentArrowRake->update();
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::rakeSizeCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	int dimension=cbData->slider==rakeSizeSliders[0]?0:1;
+	
+	/* Get the new slider value: */
+	parameters.rakeSize[dimension]=int(cbData->value+0.5);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::cellSizeCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	int dimension=cbData->slider==cellSizeSliders[0]?0:1;
+	
+	/* Get the new slider value and convert to cell size: */
+	parameters.cellSize[dimension]=Scalar(cbData->value);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+ArrowRakeExtractor<DataSetWrapperParam>::lengthScaleCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Get the new slider value and convert to cell size: */
+	parameters.lengthScale=Scalar(cbData->value);
+	}
+
+}
+
+}

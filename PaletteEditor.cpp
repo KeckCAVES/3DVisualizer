@@ -1,7 +1,7 @@
 /***********************************************************************
 PaletteEditor - Class to represent a GLMotif popup window to edit
 one-dimensional transfer functions with RGB color and opacity.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -47,6 +47,9 @@ void PaletteEditor::selectedControlPointChangedCallback(Misc::CallbackData* cbDa
 		{
 		/* Copy the selected control point's data and color value to the color editor: */
 		controlPointValue->setValue(colorMap->getSelectedControlPointValue());
+		controlPointValue->setEditable(true);
+		if(controlPointValue->hasFocus())
+			controlPointValue->setSelection(0,0);
 		GLMotif::ColorMap::ColorMapValue colorValue=colorMap->getSelectedControlPointColorValue();
 		colorPanel->setBackgroundColor(colorValue);
 		for(int i=0;i<4;++i)
@@ -54,7 +57,8 @@ void PaletteEditor::selectedControlPointChangedCallback(Misc::CallbackData* cbDa
 		}
 	else
 		{
-		controlPointValue->setLabel("");
+		controlPointValue->setString("");
+		controlPointValue->setEditable(false);
 		colorPanel->setBackgroundColor(GLMotif::Color(0.5f,0.5f,0.5f));
 		for(int i=0;i<4;++i)
 			colorSliders[i]->setValue(0.5);
@@ -67,7 +71,19 @@ void PaletteEditor::colorMapChangedCallback(Misc::CallbackData* cbData)
 		{
 		/* Copy the updated value of the selected control point to the color editor: */
 		controlPointValue->setValue(colorMap->getSelectedControlPointValue());
+		if(controlPointValue->hasFocus())
+			controlPointValue->setSelection(0,0);
 		colorSliders[3]->setValue(colorMap->getSelectedControlPointColorValue()[3]);
+		}
+	}
+
+void PaletteEditor::controlPointValueChangedCallback(Misc::CallbackData* cbData)
+	{
+	if(colorMap->hasSelectedControlPoint())
+		{
+		/* Update the selected control point's value: */
+		colorMap->setSelectedControlPointValue(atof(controlPointValue->getString()));
+		controlPointValue->setValue(colorMap->getSelectedControlPointValue());
 		}
 	}
 
@@ -132,7 +148,8 @@ PaletteEditor::PaletteEditor(void)
 	
 	controlPointValue=new GLMotif::TextField("ControlPointValue",controlPointData,12);
 	controlPointValue->setPrecision(6);
-	controlPointValue->setLabel("");
+	controlPointValue->setString("");
+	controlPointValue->getValueChangedCallbacks().add(this,&PaletteEditor::controlPointValueChangedCallback);
 	
 	new GLMotif::Label("ColorEditorLabel",controlPointData,"Control Point Color");
 	

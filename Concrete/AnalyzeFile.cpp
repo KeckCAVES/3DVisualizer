@@ -106,17 +106,25 @@ Helper functions:
 template <class ScalarParam>
 void readArray(Misc::File& file,Misc::Array<float,3>& array)
 	{
-	/* Create a temporary array: */
-	Misc::Array<ScalarParam,3> tempArray(array.getSize());
+	/* Create a temporary array to read a slice of source data: */
+	size_t sliceSize=array.getSize(1)*array.getSize(2);
+	ScalarParam* slice=new ScalarParam[sliceSize];
 	
-	/* Read the file into the temporary array: */
-	file.read<ScalarParam>(tempArray.getArray(),tempArray.getNumElements());
+	/* Read the data by slice in negative order to flip data orientation: */
+	float* slicePtr=array.getArray()+(array.getSize(0)-1)*sliceSize;
+	for(int z=array.getSize(0)-1;z>=0;--z,slicePtr-=sliceSize)
+		{
+		/* Read the data slice: */
+		file.read<ScalarParam>(slice,sliceSize);
+		
+		/* Copy and convert the data: */
+		const ScalarParam* sPtr=slice;
+		float* dPtr=slicePtr;
+		for(size_t i=0;i<sliceSize;++i,++sPtr,++dPtr)
+			*dPtr=float(*sPtr);
+		}
 	
-	/* Copy and convert data from the temporary array into the final array: */
-	const ScalarParam* sPtr=tempArray.getArray();
-	float* dPtr=array.getArray();
-	for(int i=array.getNumElements();i>0;--i,++sPtr,++dPtr)
-		*dPtr=float(*sPtr);
+	delete[] slice;
 	}
 
 }
@@ -192,7 +200,7 @@ Visualization::Abstract::DataSet* AnalyzeFile::load(const std::vector<std::strin
 			break;
 		
 		case 16: // float
-			imageFile.read(result->getDs().getVertices().getArray(),result->getDs().getVertices().getNumElements());
+			readArray<float>(imageFile,result->getDs().getVertices());
 			break;
 		
 		case 64: // double

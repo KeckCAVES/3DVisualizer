@@ -1,7 +1,7 @@
 /***********************************************************************
 StreamsurfaceExtractor - Class to extract stream surfaces from data
 sets.
-Copyright (c) 2006-2007 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -133,7 +133,7 @@ class StreamsurfaceExtractor
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_STREAMSURFACEEXTRACTOR_IMPLEMENTATION
-#include <Templatized/StreamsurfaceExtractor.cpp>
+#include <Templatized/StreamsurfaceExtractor.icpp>
 #endif
 
 #endif

@@ -1,0 +1,467 @@
+/***********************************************************************
+MultiStreamlineExtractor - Wrapper class to map from the abstract
+visualization algorithm interface to a templatized multi-streamline
+extractor implementation.
+Copyright (c) 2006-2011 Oliver Kreylos
+
+This file is part of the 3D Data Visualizer (Visualizer).
+
+The 3D Data Visualizer is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+The 3D Data Visualizer is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with the 3D Data Visualizer; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+***********************************************************************/
+
+#define VISUALIZATION_WRAPPERS_MULTISTREAMLINEEXTRACTOR_IMPLEMENTATION
+
+#include <Wrappers/MultiStreamlineExtractor.h>
+
+#include <Misc/ThrowStdErr.h>
+#include <Misc/StandardMarshallers.h>
+#include <Misc/StandardValueCoders.h>
+#include <Math/Math.h>
+#include <Geometry/GeometryMarshallers.h>
+#include <Geometry/GeometryValueCoders.h>
+#include <GLMotif/StyleSheet.h>
+#include <GLMotif/WidgetManager.h>
+#include <GLMotif/PopupWindow.h>
+#include <GLMotif/RowColumn.h>
+#include <GLMotif/Label.h>
+
+#include <Abstract/VariableManager.h>
+#include <Abstract/ParametersSink.h>
+#include <Abstract/ParametersSource.h>
+#include <Templatized/MultiStreamlineExtractor.h>
+#include <Wrappers/VectorExtractor.h>
+#include <Wrappers/ScalarExtractor.h>
+#include <Wrappers/ElementSizeLimit.h>
+#include <Wrappers/AlarmTimerElement.h>
+
+namespace Visualization {
+
+namespace Wrappers {
+
+/*****************************************************
+Methods of class MultiStreamlineExtractor::Parameters:
+*****************************************************/
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::Parameters::write(
+	Visualization::Abstract::ParametersSink& sink) const
+	{
+	/* Write all parameters: */
+	sink.writeVectorVariable("vectorVariable",vectorVariableIndex);
+	sink.writeScalarVariable("colorScalarVariable",colorScalarVariableIndex);
+	sink.write("maxNumVertices",Visualization::Abstract::Writer<unsigned int>((unsigned int)maxNumVertices));
+	sink.write("epsilon",Visualization::Abstract::Writer<Scalar>(epsilon));
+	sink.write("numStreamlines",Visualization::Abstract::Writer<unsigned int>(numStreamlines));
+	sink.write("diskRadius",Visualization::Abstract::Writer<Scalar>(diskRadius));
+	sink.write("base",Visualization::Abstract::Writer<Point>(base));
+	sink.write("frame",Visualization::Abstract::ArrayWriter<Vector>(frame,2));
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::Parameters::read(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read all parameters: */
+	source.readVectorVariable("vectorVariable",vectorVariableIndex);
+	source.readScalarVariable("colorScalarVariable",colorScalarVariableIndex);
+	unsigned int mnt;
+	source.read("maxNumVertices",Visualization::Abstract::Reader<unsigned int>(mnt));
+	maxNumVertices=size_t(mnt);
+	source.read("epsilon",Visualization::Abstract::Reader<Scalar>(epsilon));
+	source.read("numStreamlines",Visualization::Abstract::Reader<unsigned int>(numStreamlines));
+	source.read("diskRadius",Visualization::Abstract::Reader<Scalar>(diskRadius));
+	source.read("base",Visualization::Abstract::Reader<Point>(base));
+	source.read("frame",Visualization::Abstract::ArrayReader<Vector>(frame,2));
+	
+	/* Update derived state: */
+	update(source.getVariableManager(),true);
+	}
+
+template <class DataSetWrapperParam>
+inline
+MultiStreamlineExtractor<DataSetWrapperParam>::Parameters::Parameters(
+	Visualization::Abstract::VariableManager* variableManager)
+	:vectorVariableIndex(variableManager->getCurrentVectorVariable()),
+	 colorScalarVariableIndex(variableManager->getCurrentScalarVariable()),
+	 locatorValid(false)
+	{
+	update(variableManager,false);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::Parameters::update(
+	Visualization::Abstract::VariableManager* variableManager,
+	bool track)
+	{
+	/* Get the abstract data set pointer: */
+	const Visualization::Abstract::DataSet* ds1=variableManager->getDataSetByVectorVariable(vectorVariableIndex);
+	const Visualization::Abstract::DataSet* ds2=variableManager->getDataSetByScalarVariable(colorScalarVariableIndex);
+	if(ds1!=ds2)
+		Misc::throwStdErr("MultiStreamlineExtractor::Parameters::update: Incompatible vector and scalar variables");
+	
+	/* Get a pointer to the data set wrapper: */
+	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(ds1);
+	if(myDataSet==0)
+		Misc::throwStdErr("MultiStreamlineExtractor::Parameters::update: Mismatching data set type");
+	ds=&myDataSet->getDs();
+	
+	/* Get a pointer to the vector extractor wrapper: */
+	const VectorExtractor* myVectorExtractor=dynamic_cast<const VectorExtractor*>(variableManager->getVectorExtractor(vectorVariableIndex));
+	if(myVectorExtractor==0)
+		Misc::throwStdErr("MultiStreamlineExtractor::Parameters::update: Mismatching vector extractor type");
+	ve=&myVectorExtractor->getVe();
+	
+	/* Get a pointer to the color scalar extractor wrapper: */
+	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(variableManager->getScalarExtractor(colorScalarVariableIndex));
+	if(myScalarExtractor==0)
+		Misc::throwStdErr("MultiStreamlineExtractor::Parameters::update: Mismatching scalar extractor type");
+	cse=&myScalarExtractor->getSe();
+	
+	/* Get a templatized locator: */
+	dsl=ds->getLocator();
+	if(track)
+		{
+		/* Locate the base point: */
+		locatorValid=dsl.locatePoint(base);
+		}
+	}
+
+/*************************************************
+Static elements of class MultiStreamlineExtractor:
+*************************************************/
+
+template <class DataSetWrapperParam>
+const char* MultiStreamlineExtractor<DataSetWrapperParam>::name="Streamline Bundle";
+
+/*****************************************
+Methods of class MultiStreamlineExtractor:
+*****************************************/
+
+template <class DataSetWrapperParam>
+inline
+MultiStreamlineExtractor<DataSetWrapperParam>::MultiStreamlineExtractor(
+	Visualization::Abstract::VariableManager* sVariableManager,
+	Comm::MulticastPipe* sPipe)
+	:Abstract::Algorithm(sVariableManager,sPipe),
+	 parameters(sVariableManager),
+	 msle(parameters.ds,*parameters.ve,*parameters.cse),
+	 currentMultiStreamline(0),
+	 maxNumVerticesSlider(0),epsilonSlider(0),numStreamlinesSlider(0),diskRadiusSlider(0)
+	{
+	/* Initialize parameters: */
+	parameters.epsilon=Scalar(msle.getEpsilon());
+	parameters.maxNumVertices=20000;
+	parameters.numStreamlines=8;
+	parameters.diskRadius=parameters.ds->calcAverageCellSize();
+	
+	/* Set the multi-streamline extractor's number of streamlines: */
+	msle.setNumStreamlines(parameters.numStreamlines);
+	}
+
+template <class DataSetWrapperParam>
+inline
+MultiStreamlineExtractor<DataSetWrapperParam>::~MultiStreamlineExtractor(
+	void)
+	{
+	}
+
+template <class DataSetWrapperParam>
+inline
+GLMotif::Widget*
+MultiStreamlineExtractor<DataSetWrapperParam>::createSettingsDialog(
+	GLMotif::WidgetManager* widgetManager)
+	{
+	/* Get the style sheet: */
+	const GLMotif::StyleSheet* ss=widgetManager->getStyleSheet();
+	
+	/* Create the settings dialog window: */
+	GLMotif::PopupWindow* settingsDialogPopup=new GLMotif::PopupWindow("StreamlineExtractorSettingsDialogPopup",widgetManager,"Multistreamline Extractor Settings");
+	settingsDialogPopup->setResizableFlags(true,false);
+	
+	GLMotif::RowColumn* settingsDialog=new GLMotif::RowColumn("settingsDialog",settingsDialogPopup,false);
+	settingsDialog->setNumMinorWidgets(2);
+	
+	new GLMotif::Label("MaxNumVerticesLabel",settingsDialog,"Maximum Number of Steps");
+	
+	maxNumVerticesSlider=new GLMotif::TextFieldSlider("MaxNumVerticesSlider",settingsDialog,12,ss->fontHeight*10.0f);
+	maxNumVerticesSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	maxNumVerticesSlider->setValueType(GLMotif::TextFieldSlider::UINT);
+	maxNumVerticesSlider->setValueRange(10.0e3,10.0e7,0.1);
+	maxNumVerticesSlider->setValue(double(parameters.maxNumVertices));
+	maxNumVerticesSlider->getValueChangedCallbacks().add(this,&MultiStreamlineExtractor::maxNumVerticesCallback);
+	
+	new GLMotif::Label("EpsilonLabel",settingsDialog,"Error Threshold");
+	
+	epsilonSlider=new GLMotif::TextFieldSlider("EpsilonSlider",settingsDialog,12,ss->fontHeight*10.0f);
+	epsilonSlider->getTextField()->setPrecision(6);
+	epsilonSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	epsilonSlider->setValueRange(1.0e-16,1.0e-4,0.1);
+	epsilonSlider->setValue(double(parameters.epsilon));
+	epsilonSlider->getValueChangedCallbacks().add(this,&MultiStreamlineExtractor::epsilonCallback);
+	
+	new GLMotif::Label("NumStreamlinesLabel",settingsDialog,"Number Of Streamlines");
+	
+	numStreamlinesSlider=new GLMotif::TextFieldSlider("NumStreamlinesSlider",settingsDialog,3,ss->fontHeight*10.0f);
+	numStreamlinesSlider->setSliderMapping(GLMotif::TextFieldSlider::LINEAR);
+	numStreamlinesSlider->setValueType(GLMotif::TextFieldSlider::UINT);
+	numStreamlinesSlider->setValueRange(3.0,32.0,1.0);
+	numStreamlinesSlider->setValue(double(parameters.numStreamlines));
+	numStreamlinesSlider->getValueChangedCallbacks().add(this,&MultiStreamlineExtractor::numStreamlinesCallback);
+	
+	new GLMotif::Label("DiskRadiusLabel",settingsDialog,"Seed Disk Radius");
+	
+	diskRadiusSlider=new GLMotif::TextFieldSlider("DiskRadiusSlider",settingsDialog,12,ss->fontHeight*10.0f);
+	diskRadiusSlider->getTextField()->setPrecision(6);
+	diskRadiusSlider->setSliderMapping(GLMotif::TextFieldSlider::EXP10);
+	diskRadiusSlider->setValueRange(double(parameters.diskRadius)*1.0e-4,double(parameters.diskRadius)*1.0e4,0.1);
+	diskRadiusSlider->setValue(double(parameters.diskRadius));
+	diskRadiusSlider->getValueChangedCallbacks().add(this,&MultiStreamlineExtractor::diskRadiusCallback);
+	
+	settingsDialog->manageChild();
+	
+	return settingsDialogPopup;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::readParameters(
+	Visualization::Abstract::ParametersSource& source)
+	{
+	/* Read the current parameters: */
+	parameters.read(source);
+	
+	/* Update extractor state: */
+	msle.update(parameters.ds,*parameters.ve,*parameters.cse);
+	msle.setNumStreamlines(parameters.numStreamlines);
+	
+	/* Update the GUI: */
+	if(maxNumVerticesSlider!=0)
+		maxNumVerticesSlider->setValue(parameters.maxNumVertices);
+	if(epsilonSlider!=0)
+		epsilonSlider->setValue(parameters.epsilon);
+	if(numStreamlinesSlider!=0)
+		numStreamlinesSlider->setValue(parameters.numStreamlines);
+	if(diskRadiusSlider!=0)
+		diskRadiusSlider->setValue(parameters.diskRadius);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::setSeedLocator(
+	const Visualization::Abstract::DataSet::Locator* seedLocator)
+	{
+	/* Get a pointer to the locator wrapper: */
+	const Locator* myLocator=dynamic_cast<const Locator*>(seedLocator);
+	if(myLocator==0)
+		Misc::throwStdErr("MultiStreamlineExtractor::setSeedLocator: Mismatching locator type");
+	
+	/* Copy the locator: */
+	parameters.dsl=myLocator->getDsl();
+	parameters.locatorValid=myLocator->isValid();
+	
+	/* Calculate the seeding point and seed disk frame: */
+	parameters.base=Point(seedLocator->getPosition());
+	Vector seedVector=parameters.dsl.calcValue(*parameters.ve);
+	parameters.frame[0]=Geometry::normal(seedVector);
+	parameters.frame[0].normalize();
+	parameters.frame[1]=Geometry::cross(seedVector,parameters.frame[0]);
+	parameters.frame[1].normalize();
+	
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+MultiStreamlineExtractor<DataSetWrapperParam>::createElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("MultiStreamlineExtractor::createElement: Mismatching parameter object type");
+	
+	/* Create a new multi-streamline visualization element: */
+	MultiStreamline* result=new MultiStreamline(myParameters,myParameters->numStreamlines,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	
+	/* Update the multi-streamline extractor: */
+	msle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
+	msle.setMultiStreamline(result->getMultiPolyline());
+	
+	/* Calculate all streamlines' starting points: */
+	for(unsigned int i=0;i<myParameters->numStreamlines;++i)
+		{
+		Scalar angle=Scalar(2)*Math::Constants<Scalar>::pi*Scalar(i)/Scalar(myParameters->numStreamlines);
+		Point p=myParameters->base;
+		p+=myParameters->frame[0]*(Math::cos(angle)*myParameters->diskRadius);
+		p+=myParameters->frame[1]*(Math::sin(angle)*myParameters->diskRadius);
+		msle.initializeStreamline(i,p,myParameters->dsl,typename MSLE::Scalar(0.1));
+		}
+	
+	/* Extract the streamline into the visualization element: */
+	msle.startStreamlines();
+	ElementSizeLimit<MultiStreamline> esl(*result,myParameters->maxNumVertices);
+	msle.continueStreamlines(esl);
+	msle.finishStreamlines();
+	
+	/* Return the result: */
+	return result;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+MultiStreamlineExtractor<DataSetWrapperParam>::startElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("MultiStreamlineExtractor::startElement: Mismatching parameter object type");
+	
+	/* Create a new multi-streamline visualization element: */
+	currentMultiStreamline=new MultiStreamline(myParameters,myParameters->numStreamlines,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	
+	/* Update the multi-streamline extractor: */
+	msle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
+	msle.setMultiStreamline(currentMultiStreamline->getMultiPolyline());
+	
+	/* Calculate all streamlines' starting points: */
+	for(unsigned int i=0;i<myParameters->numStreamlines;++i)
+		{
+		Scalar angle=Scalar(2)*Math::Constants<Scalar>::pi*Scalar(i)/Scalar(myParameters->numStreamlines);
+		Point p=myParameters->base;
+		p+=myParameters->frame[0]*(Math::cos(angle)*myParameters->diskRadius);
+		p+=myParameters->frame[1]*(Math::sin(angle)*myParameters->diskRadius);
+		msle.initializeStreamline(i,p,myParameters->dsl,typename MSLE::Scalar(0.1));
+		}
+	
+	/* Extract the streamline into the visualization element: */
+	msle.startStreamlines();
+	
+	/* Return the result: */
+	return currentMultiStreamline.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+bool
+MultiStreamlineExtractor<DataSetWrapperParam>::continueElement(
+	const Realtime::AlarmTimer& alarm)
+	{
+	/* Continue extracting the multi-streamline into the visualization element: */
+	size_t maxNumVertices=dynamic_cast<Parameters*>(currentMultiStreamline->getParameters())->maxNumVertices;
+	AlarmTimerElement<MultiStreamline> atcf(alarm,*currentMultiStreamline,maxNumVertices);
+	return msle.continueStreamlines(atcf)||currentMultiStreamline->getElementSize()>=maxNumVertices;
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::finishElement(
+	void)
+	{
+	msle.finishStreamlines();
+	currentMultiStreamline=0;
+	}
+
+template <class DataSetWrapperParam>
+inline
+Visualization::Abstract::Element*
+MultiStreamlineExtractor<DataSetWrapperParam>::startSlaveElement(
+	Visualization::Abstract::Parameters* extractParameters)
+	{
+	if(isMaster())
+		Misc::throwStdErr("MultiStreamlineExtractor::startSlaveElement: Cannot be called on master node");
+	
+	/* Get proper pointer to parameter object: */
+	Parameters* myParameters=dynamic_cast<Parameters*>(extractParameters);
+	if(myParameters==0)
+		Misc::throwStdErr("MultiStreamlineExtractor::startSlaveElement: Mismatching parameter object type");
+	
+	/* Create a new multi-streamline visualization element: */
+	currentMultiStreamline=new MultiStreamline(myParameters,myParameters->numStreamlines,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	
+	return currentMultiStreamline.getPointer();
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::continueSlaveElement(
+	void)
+	{
+	if(isMaster())
+		Misc::throwStdErr("MultiStreamlineExtractor::continueSlaveElement: Cannot be called on master node");
+	
+	currentMultiStreamline->getMultiPolyline().receive();
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::maxNumVerticesCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Update the parameters structure: */
+	parameters.maxNumVertices=size_t(cbData->value+0.5);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::epsilonCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Update the parameters structure: */
+	parameters.epsilon=Scalar(cbData->value);
+	
+	/* Update the multi-streamline extractor's accuracy threshold: */
+	msle.setEpsilon(typename MSLE::Scalar(cbData->value));
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::numStreamlinesCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Update the parameters structure: */
+	parameters.numStreamlines=(unsigned int)(cbData->value+0.5);
+	
+	/* Update the multi-streamline extractor's number of streamlines: */
+	msle.setNumStreamlines(parameters.numStreamlines);
+	}
+
+template <class DataSetWrapperParam>
+inline
+void
+MultiStreamlineExtractor<DataSetWrapperParam>::diskRadiusCallback(
+	GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData)
+	{
+	/* Update the parameters structure: */
+	parameters.diskRadius=Scalar(cbData->value);
+	}
+
+}
+
+}

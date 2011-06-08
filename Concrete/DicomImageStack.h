@@ -2,7 +2,7 @@
 DicomImageStack - Class to encapsulate operations on scalar-valued
 cartesian data sets stored in stacks of DICOM medical interchange
 images.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -38,7 +38,7 @@ namespace {
 /* Basic type declarations: */
 typedef float Scalar; // Scalar type of data set domain
 typedef float VScalar; // Scalar type of data set value
-typedef unsigned short int Value; // Memory representation of data set value
+typedef short int Value; // Memory representation of data set value
 typedef Visualization::Templatized::Cartesian<Scalar,3,Value> DS; // Templatized data set type
 typedef DensityValue<DS,VScalar> DataValue; // Type of data value descriptor
 typedef Visualization::Wrappers::Module<DS,DataValue> BaseModule; // Module base class type

@@ -2,7 +2,7 @@
 MultiStreamlineExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized multi-streamline
 extractor implementation.
-Copyright (c) 2006-2009 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #define VISUALIZATION_WRAPPERS_MULTISTREAMLINEEXTRACTOR_INCLUDED
 
 #include <Misc/Autopointer.h>
-#include <GLMotif/Slider.h>
+#include <GLMotif/TextFieldSlider.h>
 
 #include <Abstract/DataSet.h>
 #include <Abstract/Parameters.h>
@@ -34,9 +34,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Wrappers/MultiStreamline.h>
 
 /* Forward declarations: */
-namespace GLMotif {
-class TextField;
-}
 namespace Visualization {
 namespace Abstract {
 class VectorExtractor;
@@ -108,12 +105,6 @@ class MultiStreamlineExtractor:public Visualization::Abstract::Algorithm
 		DSL dsl; // Templatized data set locator following the seed point
 		bool locatorValid; // Flag if the locator has been properly initialized, and is inside the data set's domain
 		
-		/* Private methods: */
-		template <class DataSourceParam>
-		void readBinary(DataSourceParam& dataSource,bool raw,const Visualization::Abstract::VariableManager* variableManager); // Reads parameters from a binary data source
-		template <class DataSourceParam>
-		void writeBinary(DataSourceParam& dataSink,bool raw,const Visualization::Abstract::VariableManager* variableManager) const; // Writes parameters to a binary data source
-		
 		/* Constructors and destructors: */
 		public:
 		Parameters(Visualization::Abstract::VariableManager* variableManager);
@@ -123,16 +114,12 @@ class MultiStreamlineExtractor:public Visualization::Abstract::Algorithm
 			{
 			return locatorValid;
 			}
-		virtual void read(Misc::File& file,bool ascii,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::MulticastPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::ClusterPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void write(Misc::File& file,bool ascii,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::MulticastPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::ClusterPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
 		virtual Visualization::Abstract::Parameters* clone(void) const
 			{
 			return new Parameters(*this);
 			}
+		virtual void write(Visualization::Abstract::ParametersSink& sink) const;
+		virtual void read(Visualization::Abstract::ParametersSource& source);
 		
 		/* New methods: */
 		void update(Visualization::Abstract::VariableManager* variableManager,bool track); // Updates derived parameters after a read operation
@@ -145,15 +132,11 @@ class MultiStreamlineExtractor:public Visualization::Abstract::Algorithm
 	MSLE msle; // The templatized multistreamline extractor
 	MultiStreamlinePointer currentMultiStreamline; // The currently extracted multi-streamline visualization element
 	
-	/* UI components: */
-	GLMotif::TextField* maxNumVerticesValue; // Text field to display maximum number of extracted vertices
-	GLMotif::Slider* maxNumVerticesSlider; // Slider to change maximum number of extracted vertices
-	GLMotif::TextField* epsilonValue; // Text field to display current accuracy threshold value
-	GLMotif::Slider* epsilonSlider; // Slider to change current accuracy threshold value
-	GLMotif::TextField* numStreamlinesValue; // Text field to display current number of streamlines
-	GLMotif::Slider* numStreamlinesSlider; // Slider to change current number of streamlines
-	GLMotif::TextField* diskRadiusValue; // Text field to display current seed disk radius
-	GLMotif::Slider* diskRadiusSlider; // Slider to change current seed disk radius
+	/* UI elements: */
+	GLMotif::TextFieldSlider* maxNumVerticesSlider;
+	GLMotif::TextFieldSlider* epsilonSlider;
+	GLMotif::TextFieldSlider* numStreamlinesSlider;
+	GLMotif::TextFieldSlider* diskRadiusSlider;
 	
 	/* Constructors and destructors: */
 	public:
@@ -174,6 +157,7 @@ class MultiStreamlineExtractor:public Visualization::Abstract::Algorithm
 		return true;
 		}
 	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager);
+	virtual void readParameters(Visualization::Abstract::ParametersSource& source);
 	virtual Visualization::Abstract::Parameters* cloneParameters(void) const
 		{
 		return new Parameters(parameters);
@@ -199,10 +183,10 @@ class MultiStreamlineExtractor:public Visualization::Abstract::Algorithm
 		{
 		return msle;
 		}
-	void maxNumVerticesSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
-	void epsilonSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
-	void numStreamlinesSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
-	void diskRadiusSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
+	void maxNumVerticesCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void epsilonCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void numStreamlinesCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
+	void diskRadiusCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	};
 
 }
@@ -210,7 +194,7 @@ class MultiStreamlineExtractor:public Visualization::Abstract::Algorithm
 }
 
 #ifndef VISUALIZATION_WRAPPERS_MULTISTREAMLINEEXTRACTOR_IMPLEMENTATION
-#include <Wrappers/MultiStreamlineExtractor.cpp>
+#include <Wrappers/MultiStreamlineExtractor.icpp>
 #endif
 
 #endif

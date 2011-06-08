@@ -184,6 +184,24 @@ const DataSet* VariableManager::getDataSetByVectorVariable(int vectorVariableInd
 	return dataSet;
 	}
 
+int VariableManager::getScalarVariable(const char* scalarVariableName) const
+	{
+	for(int i=0;i<numScalarVariables;++i)
+		if(strcmp(getScalarVariableName(i),scalarVariableName)==0)
+			return i;
+	
+	return -1;
+	}
+
+int VariableManager::getVectorVariable(const char* vectorVariableName) const
+	{
+	for(int i=0;i<numVectorVariables;++i)
+		if(strcmp(getVectorVariableName(i),vectorVariableName)==0)
+			return i;
+	
+	return -1;
+	}
+
 void VariableManager::setCurrentScalarVariable(int newCurrentScalarVariableIndex)
 	{
 	if(currentScalarVariableIndex==newCurrentScalarVariableIndex||newCurrentScalarVariableIndex<0||newCurrentScalarVariableIndex>=numScalarVariables)
@@ -267,6 +285,16 @@ const ScalarExtractor* VariableManager::getScalarExtractor(int scalarVariableInd
 	return scalarVariables[scalarVariableIndex].scalarExtractor;
 	}
 
+int VariableManager::getScalarVariable(const ScalarExtractor* scalarExtractor) const
+	{
+	/* Find the scalar extractor among the registered extractors: */
+	for(int i=0;i<numScalarVariables;++i)
+		if(scalarVariables[i].scalarExtractor==scalarExtractor)
+			return i;
+	
+	return -1;
+	}
+
 const DataSet::VScalarRange& VariableManager::getScalarValueRange(int scalarVariableIndex)
 	{
 	if(scalarVariableIndex<0||scalarVariableIndex>=numScalarVariables)
@@ -303,11 +331,21 @@ const VectorExtractor* VariableManager::getVectorExtractor(int vectorVariableInd
 	return vectorExtractors[vectorVariableIndex];
 	}
 
+int VariableManager::getVectorVariable(const VectorExtractor* vectorExtractor) const
+	{
+	/* Find the vector extractor among the registered extractors: */
+	for(int i=0;i<numVectorVariables;++i)
+		if(vectorExtractors[i]==vectorExtractor)
+			return i;
+	
+	return -1;
+	}
+
 void VariableManager::showColorBar(bool show)
 	{
 	/* Hide or show color bar dialog based on parameter: */
 	if(show)
-		Vrui::popupPrimaryWidget(colorBarDialogPopup,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
+		Vrui::popupPrimaryWidget(colorBarDialogPopup);
 	else
 		Vrui::popdownPrimaryWidget(colorBarDialogPopup);
 	}
@@ -316,7 +354,7 @@ void VariableManager::showPaletteEditor(bool show)
 	{
 	/* Hide or show color bar dialog based on parameter: */
 	if(show)
-		Vrui::popupPrimaryWidget(paletteEditor,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
+		Vrui::popupPrimaryWidget(paletteEditor);
 	else
 		Vrui::popdownPrimaryWidget(paletteEditor);
 	}

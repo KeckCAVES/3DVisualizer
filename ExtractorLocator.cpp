@@ -1,7 +1,7 @@
 /***********************************************************************
 ExtractorLocator - Class for locators applying visualization algorithms
 to data sets.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,13 +23,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include "ExtractorLocator.h"
 
 #include <Misc/FunctionCalls.h>
+#include <Misc/ConfigurationFile.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GLMotif/WidgetManager.h>
 #include <GLMotif/PopupWindow.h>
 #include <GLMotif/RowColumn.h>
 #include <GLMotif/Label.h>
+#include <GLMotif/WidgetStateHelper.h>
 #include <Vrui/Vrui.h>
 
+#include <Abstract/ConfigurationFileParametersSink.h>
 #include <Abstract/DataSetRenderer.h>
 #include <Abstract/Algorithm.h>
 #include <Abstract/Element.h>
@@ -71,12 +74,12 @@ void ExtractorLocator::busyFunction(float percentageCompletion)
 		{
 		char percentage[10];
 		snprintf(percentage,sizeof(percentage),"%5.1f",percentageCompletion);
-		percentageLabel->setLabel(percentage);
+		percentageLabel->setString(percentage);
 		Vrui::requestUpdate();
 		}
 	}
 
-ExtractorLocator::ExtractorLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Extractor::Algorithm* sExtractor)
+ExtractorLocator::ExtractorLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Extractor::Algorithm* sExtractor,Misc::ConfigurationFileSection* cfg)
 	:BaseLocator(sLocatorTool,sApplication),Extractor(sExtractor),
 	 settingsDialog(extractor->createSettingsDialog(Vrui::getWidgetManager())),
 	 busyDialog(createBusyDialog(extractor->getName())),
@@ -95,9 +98,17 @@ ExtractorLocator::ExtractorLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* s
 		}
 	#endif
 	
-	/* Show the algorithm's settings dialog if it has one: */
 	if(settingsDialog!=0)
-		Vrui::popupPrimaryWidget(settingsDialog,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
+		{
+		/* Show the algorithm's settings dialog if it has one: */
+		Vrui::popupPrimaryWidget(settingsDialog);
+		
+		if(cfg!=0)
+			{
+			/* Read the settings dialog's stored position and size: */
+			GLMotif::readTopLevelPosition(settingsDialog,*cfg);
+			}
+		}
 	}
 
 ExtractorLocator::~ExtractorLocator(void)
@@ -118,6 +129,30 @@ ExtractorLocator::~ExtractorLocator(void)
 	
 	/* Delete the algorithm's settings dialog: */
 	delete settingsDialog;
+	}
+
+void ExtractorLocator::storeState(Misc::ConfigurationFileSection& configFileSection) const
+	{
+	/* Write the algorithm type: */
+	configFileSection.storeString("./algorithm",extractor->getName());
+	
+	/* Write the algorithm's current parameters: */
+	Visualization::Abstract::ConfigurationFileParametersSink sink(application->variableManager,configFileSection);
+	Visualization::Abstract::Parameters* parameters=extractor->cloneParameters();
+	parameters->write(sink);
+	delete parameters;
+	
+	if(settingsDialog!=0)
+		{
+		/* Write the settings dialog's current position and size: */
+		GLMotif::writeTopLevelPosition(settingsDialog,configFileSection);
+		}
+	}
+
+void ExtractorLocator::getName(std::string& name) const
+	{
+	/* Return the extractor's name: */
+	name=extractor->getName();
 	}
 
 void ExtractorLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData)
@@ -221,7 +256,7 @@ void ExtractorLocator::buttonPressCallback(Vrui::LocatorTool::ButtonPressCallbac
 		
 		/* Pop up the busy dialog: */
 		if(busyDialog!=0)
-			Vrui::popupPrimaryWidget(busyDialog,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
+			Vrui::popupPrimaryWidget(busyDialog);
 		}
 	}
 

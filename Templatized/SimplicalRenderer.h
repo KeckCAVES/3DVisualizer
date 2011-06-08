@@ -1,7 +1,7 @@
 /***********************************************************************
 SimplicalRenderer - Class to render simplical data sets. Implemented
 as a specialization of the generic DataSetRenderer class.
-Copyright (c) 2004-2007 Oliver Kreylos
+Copyright (c) 2004-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -74,7 +74,7 @@ class DataSetRenderer<Simplical<ScalarParam,dimensionParam,ValueParam> >
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_SIMPLICALRENDERER_IMPLEMENTATION
-#include <Templatized/SimplicalRenderer.cpp>
+#include <Templatized/SimplicalRenderer.icpp>
 #endif
 
 #endif

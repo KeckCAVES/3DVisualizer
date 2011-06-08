@@ -1,7 +1,7 @@
 /***********************************************************************
 IsosurfaceExtractorIndexedTriangleSet - Specialized version of
 IsosurfaceExtractor class for indexed triangle sets.
-Copyright (c) 2006-2008 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -132,7 +132,7 @@ class IsosurfaceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<V
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_ISOSURFACEEXTRACTORINDEXEDTRIANGLESET_IMPLEMENTATION
-#include <Templatized/IsosurfaceExtractorIndexedTriangleSet.cpp>
+#include <Templatized/IsosurfaceExtractorIndexedTriangleSet.icpp>
 #endif
 
 #endif

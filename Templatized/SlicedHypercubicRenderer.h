@@ -2,7 +2,7 @@
 SlicedHypercubicRenderer - Class to render sliced unstructured
 hypercubic data sets. Implemented as a specialization of the generic
 DataSetRenderer class.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -75,7 +75,7 @@ class DataSetRenderer<SlicedHypercubic<ScalarParam,dimensionParam,ValueParam> >
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_SLICEDHYPERCUBICRENDERER_IMPLEMENTATION
-#include <Templatized/SlicedHypercubicRenderer.cpp>
+#include <Templatized/SlicedHypercubicRenderer.icpp>
 #endif
 
 #endif

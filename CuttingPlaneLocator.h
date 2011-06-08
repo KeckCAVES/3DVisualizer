@@ -1,6 +1,6 @@
 /***********************************************************************
 CuttingPlaneLocator - Class for locators rendering cutting planes.
-Copyright (c) 2006-2009 Oliver Kreylos
+Copyright (c) 2006-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,6 +25,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include "BaseLocator.h"
 
 /* Forward declarations: */
+namespace Misc {
+class ConfigurationFileSection;
+}
 class CuttingPlane;
 
 class CuttingPlaneLocator:public BaseLocator
@@ -35,10 +38,11 @@ class CuttingPlaneLocator:public BaseLocator
 	
 	/* Constructors and destructors: */
 	public:
-	CuttingPlaneLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication);
+	CuttingPlaneLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg =0);
 	virtual ~CuttingPlaneLocator(void);
 	
 	/* Methods from Vrui::LocatorToolAdapter: */
+	virtual void storeState(Misc::ConfigurationFileSection& configFileSection) const;
 	virtual void motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData);
 	virtual void buttonPressCallback(Vrui::LocatorTool::ButtonPressCallbackData* cbData);
 	virtual void buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCallbackData* cbData);

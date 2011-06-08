@@ -1,7 +1,7 @@
 /***********************************************************************
 IsosurfaceExtractor - Generic class to extract isosurfaces from data
 sets.
-Copyright (c) 2005-2008 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -125,7 +125,7 @@ class IsosurfaceExtractor
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_ISOSURFACEEXTRACTOR_IMPLEMENTATION
-#include <Templatized/IsosurfaceExtractor.cpp>
+#include <Templatized/IsosurfaceExtractor.icpp>
 #endif
 
 #endif

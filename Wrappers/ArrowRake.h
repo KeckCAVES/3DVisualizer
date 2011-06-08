@@ -1,7 +1,7 @@
 /***********************************************************************
 ArrowRake - Class to represent rakes of arrow glyphs as visualization
 elements.
-Copyright (c) 2008-2009 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -131,7 +131,7 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 }
 
 #ifndef VISUALIZATION_WRAPPERS_ARROWRAKE_IMPLEMENTATION
-#include <Wrappers/ArrowRake.cpp>
+#include <Wrappers/ArrowRake.icpp>
 #endif
 
 #endif

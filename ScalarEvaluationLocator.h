@@ -1,7 +1,7 @@
 /***********************************************************************
 ScalarEvaluationLocator - Class for locators evaluating scalar
 properties of data sets.
-Copyright (c) 2008-2009 Oliver Kreylos
+Copyright (c) 2008-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 /* Forward declarations: */
 namespace Misc {
 class CallbackData;
+class ConfigurationFileSection;
 }
 namespace GLMotif {
 class TextField;
@@ -50,10 +51,11 @@ class ScalarEvaluationLocator:public EvaluationLocator
 
 	/* Constructors and destructors: */
 	public:
-	ScalarEvaluationLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication);
+	ScalarEvaluationLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg =0);
 	virtual ~ScalarEvaluationLocator(void);
 
 	/* Methods from Vrui::LocatorToolAdapter: */
+	virtual void storeState(Misc::ConfigurationFileSection& configFileSection) const;
 	virtual void motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData);
 	
 	/* New methods: */

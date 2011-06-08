@@ -2,7 +2,7 @@
 SeededColoredIsosurfaceExtractor - Wrapper class to map from the
 abstract visualization algorithm interface to a templatized colored
 isosurface extractor implementation.
-Copyright (c) 2008-2009 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/ToggleButton.h>
 #include <GLMotif/RadioBox.h>
 #include <GLMotif/DropdownBox.h>
-#include <GLMotif/Slider.h>
+#include <GLMotif/TextFieldSlider.h>
 
 #include <Abstract/DataSet.h>
 #include <Abstract/Parameters.h>
@@ -100,12 +100,6 @@ class SeededColoredIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 		DSL dsl; // Templatized data set locator following the seed point
 		bool locatorValid; // Flag if the locator has been properly initialized, and is inside the data set's domain
 		
-		/* Private methods: */
-		template <class DataSourceParam>
-		void readBinary(DataSourceParam& dataSource,bool raw,const Visualization::Abstract::VariableManager* variableManager); // Reads parameters from a binary data source
-		template <class DataSourceParam>
-		void writeBinary(DataSourceParam& dataSink,bool raw,const Visualization::Abstract::VariableManager* variableManager) const; // Writes parameters to a binary data source
-		
 		/* Constructors and destructors: */
 		public:
 		Parameters(int sScalarVariableIndex,int sColorScalarVariableIndex)
@@ -120,16 +114,12 @@ class SeededColoredIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 			{
 			return locatorValid;
 			}
-		virtual void read(Misc::File& file,bool ascii,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::MulticastPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void read(Comm::ClusterPipe& pipe,Visualization::Abstract::VariableManager* variableManager);
-		virtual void write(Misc::File& file,bool ascii,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::MulticastPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
-		virtual void write(Comm::ClusterPipe& pipe,const Visualization::Abstract::VariableManager* variableManager) const;
 		virtual Visualization::Abstract::Parameters* clone(void) const
 			{
 			return new Parameters(*this);
 			}
+		virtual void write(Visualization::Abstract::ParametersSink& sink) const;
+		virtual void read(Visualization::Abstract::ParametersSource& source);
 		};
 	
 	/* Elements: */
@@ -140,11 +130,10 @@ class SeededColoredIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 	ColoredIsosurfacePointer currentColoredIsosurface; // The currently extracted colored isosurface visualization element
 	
 	/* UI components: */
-	GLMotif::TextField* maxNumTrianglesValue; // Text field to display current maximum number of triangles
-	GLMotif::Slider* maxNumTrianglesSlider; // Slider to change current maximum number of triangles
-	GLMotif::DropdownBox* colorScalarVariableBox; // Dropdown box to interactively change the coloring scalar variable
-	GLMotif::RadioBox* extractionModeBox; // Radio box with toggles for extraction modes
-	GLMotif::ToggleButton* lightingToggle; // Toggle button to enable/disable surface lighting
+	GLMotif::TextFieldSlider* maxNumTrianglesSlider;
+	GLMotif::DropdownBox* colorScalarVariableBox;
+	GLMotif::RadioBox* extractionModeBox;
+	GLMotif::ToggleButton* lightingToggle;
 	GLMotif::TextField* currentValue; // Text field to display scalar value at current locator position
 	
 	/* Private methods: */
@@ -170,6 +159,7 @@ class SeededColoredIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 		return true;
 		}
 	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager);
+	virtual void readParameters(Visualization::Abstract::ParametersSource& source);
 	virtual Visualization::Abstract::Parameters* cloneParameters(void) const
 		{
 		return new Parameters(parameters);
@@ -195,7 +185,7 @@ class SeededColoredIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 		{
 		return cise;
 		}
-	void maxNumTrianglesSliderCallback(GLMotif::Slider::ValueChangedCallbackData* cbData);
+	void maxNumTrianglesCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);
 	void colorScalarVariableBoxCallback(GLMotif::DropdownBox::ValueChangedCallbackData* cbData);
 	void extractionModeBoxCallback(GLMotif::RadioBox::ValueChangedCallbackData* cbData);
 	void lightingToggleCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
@@ -206,7 +196,7 @@ class SeededColoredIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 }
 
 #ifndef VISUALIZATION_WRAPPERS_SEEDEDCOLOREDISOSURFACEEXTRACTOR_IMPLEMENTATION
-#include <Wrappers/SeededColoredIsosurfaceExtractor.cpp>
+#include <Wrappers/SeededColoredIsosurfaceExtractor.icpp>
 #endif
 
 #endif

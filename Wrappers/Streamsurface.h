@@ -3,7 +3,7 @@ Streamsurface - Wrapper class for surfaces spanned by multiple
 streamlines as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2006-2007 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_WRAPPERS_STREAMSURFACE_INCLUDED
 #define VISUALIZATION_WRAPPERS_STREAMSURFACE_INCLUDED
 
-#define NONSTANDARD_GLVERTEX_TEMPLATES
+#define GLVERTEX_NONSTANDARD_TEMPLATES
 #include <GL/GLVertex.h>
 
 #include <Abstract/Element.h>
@@ -88,7 +88,7 @@ class Streamsurface:public Visualization::Abstract::Element
 }
 
 #ifndef VISUALIZATION_WRAPPERS_STREAMSURFACE_IMPLEMENTATION
-#include <Wrappers/Streamsurface.cpp>
+#include <Wrappers/Streamsurface.icpp>
 #endif
 
 #endif

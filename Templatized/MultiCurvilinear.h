@@ -2,7 +2,7 @@
 MultiCurvilinear - Base class for vertex-centered multi-block
 curvilinear data sets containing arbitrary value types (scalars,
 vectors, tensors, etc.).
-Copyright (c) 2007-2009 Oliver Kreylos
+Copyright (c) 2007-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -35,6 +35,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Templatized/Tesseract.h>
 #include <Templatized/LinearIndexID.h>
 #include <Templatized/IteratorWrapper.h>
+
+/* Forward declarations: */
+namespace Visualization {
+namespace Templatized {
+template <class DataSetParam>
+class HypercubicLocator;
+}
+}
 
 namespace Visualization {
 
@@ -225,6 +233,7 @@ class MultiCurvilinear
 	
 	class Cell // Class to represent and iterate through cells
 		{
+		friend class HypercubicLocator<MultiCurvilinear>;
 		friend class MultiCurvilinear;
 		friend class Locator;
 		
@@ -276,7 +285,7 @@ class MultiCurvilinear
 		CellID getID(void) const // Returns cell's ID
 			{
 			// TODO: Try which version is faster
-			#if 0
+			#if 1
 			return CellID(CellID::Index(baseVertex-ds->grids[gridIndex].vertices.getArray())+ds->cellIDBases[gridIndex]);
 			#else
 			return CellID(CellID::Index(ds->grids[gridIndex].vertices.calcLinearIndex(index))+ds->cellIDBases[gridIndex]);
@@ -315,6 +324,7 @@ class MultiCurvilinear
 	
 	class Locator:private Cell // Class responsible for evaluating a data set at a given position
 		{
+		friend class HypercubicLocator<MultiCurvilinear>;
 		friend class MultiCurvilinear;
 		
 		/* Embedded classes: */
@@ -328,10 +338,10 @@ class MultiCurvilinear
 		using Cell::baseVertex;
 		CellPosition cellPos; // Local coordinates of last located point inside its cell
 		Scalar epsilon,epsilon2; // Accuracy threshold of point location algorithm
-		bool cantTrace; // Flag if the locator cannot trace on the next locatePoint call
+		bool canTrace; // Flag if the locator can trace on the next locatePoint call
 		
 		/* Private methods: */
-		bool newtonRaphsonStep(const Point& position); // Performs one Newton-Raphson step while tracing the given position
+		bool traverse(int stepDimension,int stepDirection); // Moves the locator into a neighboring cell and estimates the new local cell position
 		
 		/* Constructors and destructors: */
 		public:
@@ -412,6 +422,7 @@ class MultiCurvilinear
 		return grids[gridIndex];
 		}
 	void finalizeGrid(void); // Recalculates derived grid information after grid structure change
+	CellID findClosestCell(const Point& position) const; // Finds the cell whose center is closest to the given position, or an invalid ID if there is no close cell
 	Scalar getLocatorEpsilon(void) const // Returns the current default accuracy threshold for locators working on this data set
 		{
 		return locatorEpsilon;
@@ -497,7 +508,7 @@ class MultiCurvilinear
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_MULTICURVILINEAR_IMPLEMENTATION
-#include <Templatized/MultiCurvilinear.cpp>
+#include <Templatized/MultiCurvilinear.icpp>
 #endif
 
 #endif

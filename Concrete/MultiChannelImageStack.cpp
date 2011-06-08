@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <string>
 #include <iostream>
 #include <iomanip>
-#ifdef IMAGES_HAVE_TIFF
+#ifdef IMAGES_CONFIG_HAVE_TIFF
 #include <tiffio.h>
 #endif
 #include <Misc/SelfDestructPointer.h>

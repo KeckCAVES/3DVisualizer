@@ -1,7 +1,7 @@
 /***********************************************************************
 MultiCurvilinearGridRenderer - Helper class to render multi-curvilinear
 grids.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -70,7 +70,7 @@ class MultiCurvilinearGridRenderer
 }
 
 #ifndef VISUALIZATION_TEMPLATIZED_MULTICURVILINEARGRIDRENDERER_IMPLEMENTATION
-#include <Templatized/MultiCurvilinearGridRenderer.cpp>
+#include <Templatized/MultiCurvilinearGridRenderer.icpp>
 #endif
 
 #endif

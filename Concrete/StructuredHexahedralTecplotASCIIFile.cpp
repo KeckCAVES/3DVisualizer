@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/StructuredHexahedralTecplotASCIIFile.h>
+
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
@@ -29,12 +31,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iostream>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
-#include <Threads/GzippedFileCharacterSource.h>
+#include <IO/File.h>
+#include <IO/OpenFile.h>
 #include <Plugins/FactoryManager.h>
 
 #include <Concrete/TecplotASCIIFileHeaderParser.h>
-
-#include <Concrete/StructuredHexahedralTecplotASCIIFile.h>
 
 namespace Visualization {
 
@@ -108,8 +109,8 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 		Misc::throwStdErr("StructuredHexahedralTecplotASCIIFile::load: No scalar or vector variables specified");
 	
 	/* Create a parser and open the input file: */
-	Threads::GzippedFileCharacterSource dataFile(dataFileName);
-	TecplotASCIIFileHeaderParser parser(dataFile);
+	IO::AutoFile dataFile(IO::openFile(dataFileName));
+	TecplotASCIIFileHeaderParser parser(*dataFile);
 	
 	/* Create an array of ignore flags for the file's columns: */
 	int numVariables=int(parser.getNumVariables());

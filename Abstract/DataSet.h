@@ -2,7 +2,7 @@
 DataSet - Abstract base class to represent data sets.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Geometry/Point.h>
 #include <Geometry/Rotation.h>
 #include <Geometry/Box.h>
+#include <Geometry/LinearUnit.h>
 #include <Abstract/ScalarExtractor.h>
 #include <Abstract/VectorExtractor.h>
 
@@ -51,6 +52,7 @@ class DataSet
 	typedef Geometry::Point<Scalar,3> Point; // Point type in data set's domain
 	typedef Geometry::Rotation<Scalar,3> Orientation; // Orientation type in data set's domain
 	typedef Geometry::Box<Scalar,3> Box; // Axis-aligned box type in data set's domain
+	typedef Geometry::LinearUnit Unit; // Type for linear coordinate units
 	typedef ScalarExtractor::Scalar VScalar; // Scalar value type
 	typedef VectorExtractor::Vector VVector; // Vector value type
 	typedef std::pair<VScalar,VScalar> VScalarRange; // Type for scalar value ranges
@@ -104,6 +106,7 @@ class DataSet
 	
 	/* Methods: */
 	virtual CoordinateTransformer* getCoordinateTransformer(void) const =0; // Returns a new coordinate transformer from the data set's Cartesian coordinates back to its source coordinates
+	virtual Unit getUnit(void) const; // Returns the unit used by the data set's Cartesian coordinate space
 	virtual Box getDomainBox(void) const =0; // Returns an axis-aligned box enclosing the data set's domain
 	virtual Scalar calcAverageCellSize(void) const =0; // Returns an estimate of the data set's average cell size
 	virtual int getNumScalarVariables(void) const; // Returns number of scalar variables contained in the data set

@@ -1,7 +1,7 @@
 /***********************************************************************
 ElementList - Class to manage a list of previously extracted
 visualization elements.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -82,6 +82,7 @@ class ElementList
 	void elementListItemSelectedCallback(GLMotif::ListBox::ItemSelectedCallbackData* cbData);
 	void showElementToggleValueChangedCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
 	void showElementSettingsToggleValueChangedCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
+	void elementSettingsCloseCallback(Misc::CallbackData* cbData);
 	void deleteElementSelectedCallback(Misc::CallbackData* cbData);
 	
 	/* Constructors and destructors: */
@@ -93,8 +94,10 @@ class ElementList
 	void clear(void); // Deletes all elements from the list
 	void addElement(Element* newElement,const char* elementName); // Adds a new visualization element to the list
 	void saveElements(const char* elementFileName,bool ascii,const Visualization::Abstract::VariableManager* variableManager) const; // Saves all visible visualization elements to the given file
-	void showElementList(const GLMotif::WidgetManager::Transformation& transformation); // Shows the element list dialog
-	void hideElementList(void); // Hides the element list dialog
+	GLMotif::PopupWindow* getElementListDialog(void) // Returns the element list dialog
+		{
+		return elementListDialogPopup;
+		}
 	void renderElements(GLContextData& contextData,bool transparent) const; // Renders all visible transparent or opaque elements
 	};
 

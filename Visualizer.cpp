@@ -1,7 +1,7 @@
 /***********************************************************************
 Visualizer - Test application for the new visualization component
 framework.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -30,9 +30,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <string>
 #include <Misc/ThrowStdErr.h>
 #include <Misc/Timer.h>
+#include <Misc/StandardMarshallers.h>
 #include <Misc/FileNameExtensions.h>
 #include <Misc/CreateNumberedFileName.h>
-#include <Misc/File.h>
+#include <Misc/StandardValueCoders.h>
+#include <Misc/ConfigurationFile.h>
+#include <IO/File.h>
+#include <IO/OpenFile.h>
+#include <IO/ValueSource.h>
 #include <Comm/MulticastPipe.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GL/gl.h>
@@ -52,6 +57,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/Button.h>
 #include <GLMotif/CascadeButton.h>
 #include <Vrui/Vrui.h>
+#include <Vrui/OpenFile.h>
+#include <Vrui/CoordinateManager.h>
 #ifdef VISUALIZER_USE_COLLABORATION
 #include <Collaboration/CollaborationClient.h>
 #endif
@@ -59,6 +66,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/DataSetRenderer.h>
 #include <Abstract/CoordinateTransformer.h>
 #include <Abstract/VariableManager.h>
+#include <Abstract/BinaryParametersSink.h>
+#include <Abstract/BinaryParametersSource.h>
+#include <Abstract/FileParametersSource.h>
+#include <Abstract/ConfigurationFileParametersSource.h>
 #include <Abstract/Algorithm.h>
 #include <Abstract/Element.h>
 #include <Abstract/Module.h>
@@ -73,52 +84,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include "VectorEvaluationLocator.h"
 #include "ExtractorLocator.h"
 #include "ElementList.h"
-
-namespace {
-
-/****************
-Helper functions:
-****************/
-
-std::string readToken(Misc::File& file,int& nextChar)
-	{
-	/* Skip whitespace: */
-	while(nextChar!=EOF&&isspace(nextChar))
-		nextChar=file.getc();
-	
-	/* Read the next token: */
-	std::string result="";
-	if(nextChar=='"')
-		{
-		/* Skip the opening quote: */
-		nextChar=file.getc();
-		
-		/* Read a quoted token: */
-		while(nextChar!=EOF&&nextChar!='"')
-			{
-			result+=char(nextChar);
-			nextChar=file.getc();
-			}
-		
-		if(nextChar=='"')
-			nextChar=file.getc();
-		else
-			Misc::throwStdErr("unterminated quoted token in input file");
-		}
-	else
-		{
-		/* Read an unquoted token: */
-		while(nextChar!=EOF&&!isspace(nextChar))
-			{
-			result+=char(nextChar);
-			nextChar=file.getc();
-			}
-		}
-	
-	return result;
-	}
-
-}
 
 /***************************
 Methods of class Visualizer:
@@ -315,10 +280,10 @@ GLMotif::Popup* Visualizer::createColorMenu(void)
 	GLMotif::Button* loadPaletteButton=new GLMotif::Button("LoadPaletteButton",colorMenu,"Load Palette File");
 	loadPaletteButton->getSelectCallbacks().add(this,&Visualizer::loadPaletteCallback);
 	
-	GLMotif::ToggleButton* showColorBarToggle=new GLMotif::ToggleButton("ShowColorBarToggle",colorMenu,"Show Color Bar");
+	showColorBarToggle=new GLMotif::ToggleButton("ShowColorBarToggle",colorMenu,"Show Color Bar");
 	showColorBarToggle->getValueChangedCallbacks().add(this,&Visualizer::showColorBarCallback);
 	
-	GLMotif::ToggleButton* showPaletteEditorToggle=new GLMotif::ToggleButton("ShowPaletteEditorToggle",colorMenu,"Show Palette Editor");
+	showPaletteEditorToggle=new GLMotif::ToggleButton("ShowPaletteEditorToggle",colorMenu,"Show Palette Editor");
 	showPaletteEditorToggle->getValueChangedCallbacks().add(this,&Visualizer::showPaletteEditorCallback);
 	
 	colorMenu->manageChild();
@@ -360,6 +325,14 @@ GLMotif::PopupMenu* Visualizer::createMainMenu(void)
 	GLMotif::Button* centerDisplayButton=new GLMotif::Button("CenterDisplayButton",mainMenu,"Center Display");
 	centerDisplayButton->getSelectCallbacks().add(this,&Visualizer::centerDisplayCallback);
 	
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		{
+		showClientDialogToggle=new GLMotif::ToggleButton("ShowClientDialogToggle",mainMenu,"Show Client Dialog");
+		showClientDialogToggle->getValueChangedCallbacks().add(this,&Visualizer::showClientDialogCallback);
+		}
+	#endif
+	
 	mainMenu->manageChild();
 	
 	return mainMenuPopup;
@@ -372,147 +345,224 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 	
 	if(pipe==0||pipe->isMaster())
 		{
-		/* Open the element file: */
-		Misc::File elementFile(elementFileName,ascii?"r":"rb",ascii?Misc::File::DontCare:Misc::File::LittleEndian);
+		/* Create a data sink to send element parameters to the slaves: */
+		Visualization::Abstract::BinaryParametersSink<Comm::MulticastPipe> sink(variableManager,*pipe,true);
 		
-		/* Read all elements from the file: */
-		while(true)
+		if(ascii)
 			{
-			/* Read the next algorithm name: */
-			unsigned int nameLength=0;
-			char name[256];
-			if(ascii)
-				{
-				/* Skip whitespace: */
-				int nextChar;
-				while((nextChar=elementFile.getc())!=EOF&&isspace(nextChar))
-					;
-				
-				/* Read until end of line: */
-				while(nextChar!='\n'&&nextChar!=EOF)
-					{
-					name[nameLength]=char(nextChar);
-					++nameLength;
-					nextChar=elementFile.getc();
-					}
-				
-				if(nextChar==EOF) // Check for end-of-file indicator
-					{
-					/* Tell the slaves to bail out: */
-					if(pipe!=0)
-						pipe->write<unsigned int>(0);
-					
-					/* Bail out: */
-					break;
-					}
-				
-				/* Remove trailing whitespace: */
-				while(isspace(name[nameLength-1]))
-					--nameLength;
-				}
-			else
-				{
-				nameLength=elementFile.read<unsigned int>();
-				if(nameLength==0) // Check for end-of-file indicator
-					{
-					/* Tell the slaves to bail out: */
-					if(pipe!=0)
-						pipe->write<unsigned int>(0);
-					
-					/* Bail out: */
-					break;
-					}
-				elementFile.read(name,nameLength);
-				}
-			name[nameLength]='\0';
+			/* Open the element file: */
+			IO::AutoFile elementFileSource(IO::openFile(elementFileName));
+			IO::ValueSource elementFile(*elementFileSource);
+			elementFile.setPunctuation("");
+			elementFile.setQuotes("\"");
+			elementFile.skipWs();
 			
-			if(pipe!=0)
+			/* Read all elements from the file: */
+			while(!elementFile.eof())
 				{
-				/* Send the algorithm name to the slaves: */
-				pipe->write<unsigned int>(nameLength);
-				pipe->write(name,nameLength);
-				}
-			
-			/* Create an extractor for the given name: */
-			Algorithm* algorithm=0;
-			for(int i=0;algorithm==0&&i<module->getNumScalarAlgorithms();++i)
-				if(strcmp(name,module->getScalarAlgorithmName(i))==0)
-					algorithm=module->getScalarAlgorithm(i,variableManager,Vrui::openPipe());
-			for(int i=0;algorithm==0&&i<module->getNumVectorAlgorithms();++i)
-				if(strcmp(name,module->getVectorAlgorithmName(i))==0)
-					algorithm=module->getVectorAlgorithm(i,variableManager,Vrui::openPipe());
-			
-			/* Extract an element using the given extractor: */
-			if(algorithm!=0)
-				{
-				std::cout<<"Creating "<<name<<"..."<<std::flush;
-				Misc::Timer extractionTimer;
-				
-				/* Read the element's extraction parameters from the file: */
-				Parameters* parameters=algorithm->cloneParameters();
-				parameters->read(elementFile,ascii,variableManager);
+				/* Read the next algorithm name: */
+				std::string algorithmName=elementFile.readLine();
+				elementFile.skipWs();
 				
 				if(pipe!=0)
 					{
-					/* Send the extraction parameters to the slaves: */
-					parameters->write(*pipe,variableManager);
-					pipe->finishMessage();
+					/* Send the algorithm name to the slaves: */
+					Misc::Marshaller<std::string>::write(algorithmName,*pipe);
+					pipe->finishMessage(); // Redundant!!!
 					}
 				
-				/* Extract the element: */
-				Element* element=algorithm->createElement(parameters);
+				/* Create an extractor for the given name: */
+				Comm::MulticastPipe* algorithmPipe=Vrui::openPipe();
+				Algorithm* algorithm=module->getAlgorithm(algorithmName.c_str(),variableManager,algorithmPipe);
 				
-				/* Store the element: */
-				elementList->addElement(element,name);
-				
-				/* Destroy the extractor: */
-				delete algorithm;
-				
-				extractionTimer.elapse();
-				std::cout<<" done in "<<extractionTimer.getTime()*1000.0<<" ms"<<std::endl;
+				/* Extract an element using the given extractor: */
+				if(algorithm!=0)
+					{
+					std::cout<<"Creating "<<algorithmName<<"..."<<std::flush;
+					Misc::Timer extractionTimer;
+					
+					try
+						{
+						/* Read the element's extraction parameters from the file: */
+						Visualization::Abstract::FileParametersSource source(variableManager,elementFile);
+						Parameters* parameters=algorithm->cloneParameters();
+						parameters->read(source);
+						
+						if(pipe!=0)
+							{
+							/* Send the extraction parameters to the slaves: */
+							pipe->write<int>(1);
+							parameters->write(sink);
+							pipe->finishMessage();
+							}
+						
+						/* Extract the element: */
+						Element* element=algorithm->createElement(parameters);
+						
+						/* Store the element: */
+						elementList->addElement(element,algorithmName.c_str());
+						}
+					catch(std::runtime_error err)
+						{
+						if(pipe!=0)
+							{
+							/* Tell the slaves there was a problem: */
+							pipe->write<int>(0);
+							pipe->finishMessage();
+							}
+						
+						std::cout<<"Cancelled due to exception "<<err.what()<<"...";
+						}
+					
+					/* Destroy the extractor: */
+					delete algorithm;
+					
+					extractionTimer.elapse();
+					std::cout<<" done in "<<extractionTimer.getTime()*1000.0<<" ms"<<std::endl;
+					}
+				else
+					{
+					std::cout<<"Ignoring unknown algorithm "<<algorithmName<<std::endl;
+					delete algorithmPipe;
+					}
 				}
+			}
+		else
+			{
+			/* Open the element file and create a data source to read from it: */
+			IO::AutoFile elementFile(IO::openFile(elementFileName));
+			elementFile->setEndianness(IO::File::LittleEndian);
+			Visualization::Abstract::BinaryParametersSource<IO::File> source(variableManager,*elementFile,false);
+			
+			/* Read all elements from the file: */
+			while(!elementFile->eof())
+				{
+				/* Read the next algorithm name: */
+				std::string algorithmName=Misc::Marshaller<std::string>::read(*elementFile);
+				
+				if(pipe!=0)
+					{
+					/* Send the algorithm name to the slaves: */
+					Misc::Marshaller<std::string>::write(algorithmName,*pipe);
+					}
+				
+				/* Create an extractor for the given name: */
+				Comm::MulticastPipe* algorithmPipe=Vrui::openPipe();
+				Algorithm* algorithm=module->getAlgorithm(algorithmName.c_str(),variableManager,algorithmPipe);
+				
+				/* Extract an element using the given extractor: */
+				if(algorithm!=0)
+					{
+					std::cout<<"Creating "<<algorithmName<<"..."<<std::flush;
+					Misc::Timer extractionTimer;
+					
+					try
+						{
+						/* Read the element's extraction parameters from the file: */
+						Parameters* parameters=algorithm->cloneParameters();
+						parameters->read(source);
+						
+						if(pipe!=0)
+							{
+							/* Send the extraction parameters to the slaves: */
+							pipe->write<int>(1);
+							parameters->write(sink);
+							pipe->finishMessage();
+							}
+						
+						/* Extract the element: */
+						Element* element=algorithm->createElement(parameters);
+						
+						/* Store the element: */
+						elementList->addElement(element,algorithmName.c_str());
+						}
+					catch(std::runtime_error err)
+						{
+						if(pipe!=0)
+							{
+							/* Tell the slaves there was a problem: */
+							pipe->write<int>(0);
+							pipe->finishMessage();
+							}
+						
+						std::cout<<"Cancelled due to exception "<<err.what()<<"...";
+						}
+					
+					/* Destroy the extractor: */
+					delete algorithm;
+					
+					extractionTimer.elapse();
+					std::cout<<" done in "<<extractionTimer.getTime()*1000.0<<" ms"<<std::endl;
+					}
+				else
+					{
+					std::cout<<"Ignoring unknown algorithm "<<algorithmName<<std::endl;
+					delete algorithmPipe;
+					}
+				}
+			}
+		
+		if(pipe!=0)
+			{
+			/* Send an empty algorithm name to signal end-of-file to the slaves: */
+			Misc::Marshaller<std::string>::write("",*pipe);
+			pipe->finishMessage();
 			}
 		}
 	else
 		{
+		std::cout<<"Ready to receive elements"<<std::endl;
+
+		/* Create a data source to read elements' parameters: */
+		Visualization::Abstract::BinaryParametersSource<Comm::MulticastPipe> source(variableManager,*pipe,true);
+		
 		/* Receive all visualization elements from the master: */
 		while(true)
 			{
 			/* Receive the algorithm name from the master: */
-			unsigned int nameLength=pipe->read<unsigned int>();
-			if(nameLength==0) // Check for end-of-file indicator
+			std::cout<<"Reading algorithm name"<<std::endl;
+			std::string algorithmName=Misc::Marshaller<std::string>::read(*pipe);
+			if(algorithmName.empty()) // Check for end-of-file indicator
 				break;
-			char name[256];
-			pipe->read(name,nameLength);
-			name[nameLength]=0;
+			
+			// DEBUGGING
+			std::cout<<"Received algorithm "<<algorithmName<<std::endl;
 			
 			/* Create an extractor for the given name: */
-			Algorithm* algorithm=0;
-			for(int i=0;algorithm==0&&i<module->getNumScalarAlgorithms();++i)
-				if(strcmp(name,module->getScalarAlgorithmName(i))==0)
-					algorithm=module->getScalarAlgorithm(i,variableManager,Vrui::openPipe());
-			for(int i=0;algorithm==0&&i<module->getNumVectorAlgorithms();++i)
-				if(strcmp(name,module->getVectorAlgorithmName(i))==0)
-					algorithm=module->getVectorAlgorithm(i,variableManager,Vrui::openPipe());
+			Comm::MulticastPipe* algorithmPipe=Vrui::openPipe();
+			Algorithm* algorithm=module->getAlgorithm(algorithmName.c_str(),variableManager,algorithmPipe);
 			
 			/* Extract an element using the given extractor: */
 			if(algorithm!=0)
 				{
-				/* Receive the extraction parameters: */
-				Parameters* parameters=algorithm->cloneParameters();
-				parameters->read(*pipe,variableManager);
-				
-				/* Receive the element: */
-				Element* element=algorithm->startSlaveElement(parameters);
-				algorithm->continueSlaveElement();
-				
-				/* Store the element: */
-				elementList->addElement(element,name);
+				/* Check if there are valid parameters: */
+				if(pipe->read<int>()!=0)
+					{
+					std::cout<<"Receiving parameters"<<std::endl;
+					
+					/* Receive the extraction parameters: */
+					Parameters* parameters=algorithm->cloneParameters();
+					parameters->read(source);
+					
+					std::cout<<"Receiving element"<<std::endl;
+					/* Receive the element: */
+					Element* element=algorithm->startSlaveElement(parameters);
+					algorithm->continueSlaveElement();
+					
+					std::cout<<"Done"<<std::endl;
+
+					/* Store the element: */
+					elementList->addElement(element,algorithmName.c_str());
+					}
 				
 				/* Destroy the extractor: */
 				delete algorithm;
 				}
+			else
+				delete algorithmPipe;
 			}
+
+		std::cout<<"Done"<<std::endl;
 		}
 	
 	if(pipe!=0)
@@ -535,7 +585,6 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	 elementList(0),
 	 algorithm(0),
 	 mainMenu(0),
-	 showElementListToggle(0),
 	 inLoadPalette(false),inLoadElements(false)
 	{
 	/* Parse the command line: */
@@ -625,25 +674,19 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 		else
 			{
 			/* Read the meta-input file of the given name: */
-			Misc::File inputFile(argv[i],"rt");
-			
-			/* Parse the meta-input file: */
-			int nextChar=inputFile.getc();
+			IO::AutoFile metaInputFileSource(Vrui::openFile(argv[i]));
+			IO::ValueSource metaInputFile(*metaInputFileSource);
+			metaInputFile.skipWs();
 			
 			/* Read the module class name: */
-			moduleClassName=readToken(inputFile,nextChar);
+			moduleClassName=metaInputFile.readString();
 			
 			/* Read the data set arguments: */
 			dataSetArgs.clear();
-			while(true)
+			while(!metaInputFile.eof())
 				{
-				/* Read the next argument: */
-				std::string arg=readToken(inputFile,nextChar);
-				if(arg=="")
-					break;
-
-				/* Store the argument in the list: */
-				dataSetArgs.push_back(arg);
+				/* Read and store the next argument: */
+				dataSetArgs.push_back(metaInputFile.readString());
 				}
 			}
 		}
@@ -676,6 +719,10 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	
 	/* Create a variable manager: */
 	variableManager=new VariableManager(dataSet,argColorMapName);
+	variableManager->getColorBarDialog()->setCloseButton(true);
+	variableManager->getColorBarDialog()->getCloseCallbacks().add(this,&Visualizer::colorBarClosedCallback);
+	variableManager->getPaletteEditor()->setCloseButton(true);
+	variableManager->getPaletteEditor()->getCloseCallbacks().add(this,&Visualizer::paletteEditorClosedCallback);
 	
 	/* Determine the color to render the data set: */
 	for(int i=0;i<3;++i)
@@ -687,6 +734,9 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	
 	/* Get the data set's coordinate transformer: */
 	coordinateTransformer=dataSet->getCoordinateTransformer();
+	
+	/* Set Vrui's application unit: */
+	Vrui::getCoordinateManager()->setUnit(dataSet->getUnit());
 	
 	/* Create cutting planes: */
 	numCuttingPlanes=6;
@@ -714,6 +764,10 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 		
 		/* Get a pointer to the shared Visualizer protocol: */
 		sharedVisualizationClient=dynamic_cast<Collaboration::SharedVisualizationClient*>(collaborationClient->getProtocol(Collaboration::SharedVisualizationClient::protocolName));
+		
+		/* Add a close button to the client dialog: */
+		collaborationClient->getDialog()->setCloseButton(true);
+		collaborationClient->getDialog()->getCloseCallbacks().add(this,&Visualizer::clientDialogClosedCallback);
 		}
 	#endif
 	
@@ -723,6 +777,8 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	
 	/* Create the element list: */
 	elementList=new ElementList(Vrui::getWidgetManager());
+	elementList->getElementListDialog()->setCloseButton(true);
+	elementList->getElementListDialog()->getCloseCallbacks().add(this,&Visualizer::elementListClosedCallback);
 	
 	/* Load all element files listed on the command line: */
 	for(std::vector<const char*>::const_iterator lfnIt=loadFileNames.begin();lfnIt!=loadFileNames.end();++lfnIt)
@@ -783,38 +839,83 @@ void Visualizer::toolCreationCallback(Vrui::ToolManager::ToolCreationCallbackDat
 	if(locatorTool!=0)
 		{
 		BaseLocator* newLocator;
-		if(algorithm==0)
+		if(cbData->cfg!=0)
 			{
-			/* Create a cutting plane locator object and associate it with the new tool: */
-			newLocator=new CuttingPlaneLocator(locatorTool,this);
-			}
-		else if(algorithm<firstScalarAlgorithmIndex)
-			{
-			/* Create a scalar evaluation locator object and associate it with the new tool: */
-			newLocator=new ScalarEvaluationLocator(locatorTool,this);
-			}
-		else if(algorithm<firstScalarAlgorithmIndex+module->getNumScalarAlgorithms())
-			{
-			/* Create a data locator object and associate it with the new tool: */
-			int algorithmIndex=algorithm-firstScalarAlgorithmIndex;
-			Algorithm* extractor=module->getScalarAlgorithm(algorithmIndex,variableManager,Vrui::openPipe());
-			newLocator=new ExtractorLocator(locatorTool,this,extractor);
-			}
-		else if(algorithm<firstVectorAlgorithmIndex)
-			{
-			/* Create a vector evaluation locator object and associate it with the new tool: */
-			newLocator=new VectorEvaluationLocator(locatorTool,this);
+			/* Determine the algorithm type from the configuration file section: */
+			std::string algorithmName=cbData->cfg->retrieveString("./algorithm");
+			if(algorithmName=="Cutting Plane")
+				{
+				/* Create a cutting plane locator object and associate it with the new tool: */
+				newLocator=new CuttingPlaneLocator(locatorTool,this,cbData->cfg);
+				}
+			else if(algorithmName=="Evaluate Scalars")
+				{
+				/* Create a scalar evaluation locator object and associate it with the new tool: */
+				newLocator=new ScalarEvaluationLocator(locatorTool,this,cbData->cfg);
+				}
+			else if(algorithmName=="Evaluate Vectors")
+				{
+				/* Create a vector evaluation locator object and associate it with the new tool: */
+				newLocator=new VectorEvaluationLocator(locatorTool,this,cbData->cfg);
+				}
+			else
+				{
+				/* Create an extractor locator: */
+				Comm::MulticastPipe* algorithmPipe=Vrui::openPipe();
+				Algorithm* extractor=module->getAlgorithm(algorithmName.c_str(),variableManager,algorithmPipe);
+				if(extractor!=0)
+					{
+					if(cbData->cfg!=0)
+						{
+						/* Read the extractor's parameters from the configuration file section: */
+						Visualization::Abstract::ConfigurationFileParametersSource source(variableManager,*cbData->cfg);
+						extractor->readParameters(source);
+						}
+					
+					newLocator=new ExtractorLocator(locatorTool,this,extractor,cbData->cfg);
+					}
+				else
+					delete algorithmPipe;
+				}
 			}
 		else
 			{
-			/* Create a data locator object and associate it with the new tool: */
-			int algorithmIndex=algorithm-firstVectorAlgorithmIndex;
-			Algorithm* extractor=module->getVectorAlgorithm(algorithmIndex,variableManager,Vrui::openPipe());
-			newLocator=new ExtractorLocator(locatorTool,this,extractor);
+			if(algorithm==0)
+				{
+				/* Create a cutting plane locator object and associate it with the new tool: */
+				newLocator=new CuttingPlaneLocator(locatorTool,this);
+				}
+			else if(algorithm<firstScalarAlgorithmIndex)
+				{
+				/* Create a scalar evaluation locator object and associate it with the new tool: */
+				newLocator=new ScalarEvaluationLocator(locatorTool,this);
+				}
+			else if(algorithm<firstScalarAlgorithmIndex+module->getNumScalarAlgorithms())
+				{
+				/* Create a data locator object and associate it with the new tool: */
+				int algorithmIndex=algorithm-firstScalarAlgorithmIndex;
+				Algorithm* extractor=module->getScalarAlgorithm(algorithmIndex,variableManager,Vrui::openPipe());
+				newLocator=new ExtractorLocator(locatorTool,this,extractor);
+				}
+			else if(algorithm<firstVectorAlgorithmIndex)
+				{
+				/* Create a vector evaluation locator object and associate it with the new tool: */
+				newLocator=new VectorEvaluationLocator(locatorTool,this);
+				}
+			else
+				{
+				/* Create a data locator object and associate it with the new tool: */
+				int algorithmIndex=algorithm-firstVectorAlgorithmIndex;
+				Algorithm* extractor=module->getVectorAlgorithm(algorithmIndex,variableManager,Vrui::openPipe());
+				newLocator=new ExtractorLocator(locatorTool,this,extractor);
+				}
 			}
 		
-		/* Add new locator to list: */
-		baseLocators.push_back(newLocator);
+		if(newLocator!=0)
+			{
+			/* Add new locator to list: */
+			baseLocators.push_back(newLocator);
+			}
 		}
 	}
 
@@ -912,6 +1013,17 @@ void Visualizer::display(GLContextData& contextData) const
 			}
 	}
 
+void Visualizer::sound(ALContextData& contextData) const
+	{
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		{
+		/* Call the collaboration client's sound method: */
+		collaborationClient->sound(contextData);
+		}
+	#endif
+	}
+
 void Visualizer::changeRenderingModeCallback(GLMotif::RadioBox::ValueChangedCallbackData* cbData)
 	{
 	/* Set the new rendering mode: */
@@ -947,7 +1059,7 @@ void Visualizer::loadPaletteCallback(Misc::CallbackData*)
 		GLMotif::FileSelectionDialog* fsDialog=new GLMotif::FileSelectionDialog(Vrui::getWidgetManager(),"Load Palette File...",0,".pal",Vrui::openPipe());
 		fsDialog->getOKCallbacks().add(this,&Visualizer::loadPaletteOKCallback);
 		fsDialog->getCancelCallbacks().add(this,&Visualizer::loadPaletteCancelCallback);
-		Vrui::popupPrimaryWidget(fsDialog,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
+		Vrui::popupPrimaryWidget(fsDialog);
 		inLoadPalette=true;
 		}
 	}
@@ -982,10 +1094,20 @@ void Visualizer::showColorBarCallback(GLMotif::ToggleButton::ValueChangedCallbac
 	variableManager->showColorBar(cbData->set);
 	}
 
+void Visualizer::colorBarClosedCallback(Misc::CallbackData* cbData)
+	{
+	showColorBarToggle->setToggle(false);
+	}
+
 void Visualizer::showPaletteEditorCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
 	{
 	/* Hide or show palette editor based on toggle button state: */
 	variableManager->showPaletteEditor(cbData->set);
+	}
+
+void Visualizer::paletteEditorClosedCallback(Misc::CallbackData* cbData)
+	{
+	showPaletteEditorToggle->setToggle(false);
 	}
 
 void Visualizer::createStandardLuminancePaletteCallback(GLMotif::Menu::EntrySelectCallbackData* cbData)
@@ -1004,9 +1126,14 @@ void Visualizer::showElementListCallback(GLMotif::ToggleButton::ValueChangedCall
 	{
 	/* Hide or show element list based on toggle button state: */
 	if(cbData->set)
-		elementList->showElementList(Vrui::getWidgetManager()->calcWidgetTransformation(mainMenu));
+		Vrui::popupPrimaryWidget(elementList->getElementListDialog());
 	else
-		elementList->hideElementList();
+		Vrui::popdownPrimaryWidget(elementList->getElementListDialog());
+	}
+
+void Visualizer::elementListClosedCallback(Misc::CallbackData* cbData)
+	{
+	showElementListToggle->setToggle(false);
 	}
 
 void Visualizer::loadElementsCallback(Misc::CallbackData*)
@@ -1017,7 +1144,7 @@ void Visualizer::loadElementsCallback(Misc::CallbackData*)
 		GLMotif::FileSelectionDialog* fsDialog=new GLMotif::FileSelectionDialog(Vrui::getWidgetManager(),"Load Visualization Elements...",0,".asciielem;.binelem",Vrui::openPipe());
 		fsDialog->getOKCallbacks().add(this,&Visualizer::loadElementsOKCallback);
 		fsDialog->getCancelCallbacks().add(this,&Visualizer::loadElementsCancelCallback);
-		Vrui::popupPrimaryWidget(fsDialog,Vrui::getNavigationTransformation().transform(Vrui::getDisplayCenter()));
+		Vrui::popupPrimaryWidget(fsDialog);
 		inLoadElements=true;
 		}
 	}
@@ -1064,7 +1191,7 @@ void Visualizer::saveElementsCallback(Misc::CallbackData*)
 		char elementFileNameBuffer[256];
 		Misc::createNumberedFileName("SavedElements.asciielem",4,elementFileNameBuffer);
 		
-		/* Save the visible elements to a binary file: */
+		/* Save the visible elements to an ASCII file: */
 		elementList->saveElements(elementFileNameBuffer,true,variableManager);
 		#else
 		/* Create the binary element file: */
@@ -1081,6 +1208,28 @@ void Visualizer::clearElementsCallback(Misc::CallbackData*)
 	{
 	/* Delete all finished visualization elements: */
 	elementList->clear();
+	}
+
+void Visualizer::showClientDialogCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData)
+	{
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		{
+		/* Hide or show client dialog based on toggle button state: */
+		if(cbData->set)
+			collaborationClient->showDialog();
+		else
+			collaborationClient->hideDialog();
+		}
+	#endif
+	}
+
+void Visualizer::clientDialogClosedCallback(Misc::CallbackData* cbData)
+	{
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		showClientDialogToggle->setToggle(false);
+	#endif
 	}
 
 void Visualizer::centerDisplayCallback(Misc::CallbackData*)
