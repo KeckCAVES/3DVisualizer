@@ -28,16 +28,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #define VISUALIZATION_ABSTRACT_PARAMETERS_INCLUDED
 
 /* Forward declarations: */
-namespace Misc {
-class BufferedFile;
-}
-namespace Comm {
-class MulticastPipe;
-class ClusterPipe;
-}
 namespace Visualization {
 namespace Abstract {
-class VariableManager;
 class ParametersSink;
 class ParametersSource;
 }

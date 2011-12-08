@@ -2,7 +2,7 @@
 DicomImageStack - Class to encapsulate operations on scalar-valued
 cartesian data sets stored in stacks of DICOM medical interchange
 images.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -52,7 +52,7 @@ class DicomImageStack:public BaseModule
 	DicomImageStack(void); // Default constructor
 	
 	/* Methods: */
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	};
 
 }

@@ -2,7 +2,7 @@
 MultiChannelImageStack - Class to represent multivariate scalaar-valued
 Cartesian data sets stored as multiple matching stacks of color or
 greyscale images.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -53,7 +53,7 @@ class MultiChannelImageStack:public BaseModule
 	
 	/* Methods: */
 	public:
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	};
 
 }

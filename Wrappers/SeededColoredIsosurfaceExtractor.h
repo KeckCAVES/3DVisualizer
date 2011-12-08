@@ -142,7 +142,7 @@ class SeededColoredIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 	
 	/* Constructors and destructors: */
 	public:
-	SeededColoredIsosurfaceExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates a colored isosurface extractor
+	SeededColoredIsosurfaceExtractor(Visualization::Abstract::VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe); // Creates a colored isosurface extractor
 	virtual ~SeededColoredIsosurfaceExtractor(void);
 	
 	/* Methods from Visualization::Abstract::Algorithm: */

@@ -1,9 +1,9 @@
 /***********************************************************************
-BinaryParametersSource - Generic class for parameter sources utilizing
-the pipe I/O abstraction.
+BinaryParametersSource - Class for parameter sources reading from a file
+abstraction.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2010 Oliver Kreylos
+Copyright (c) 2010-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -28,25 +28,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/VariableManager.h>
 #include <Abstract/ParametersSource.h>
 
+/* Forward declarations: */
+namespace IO {
+class File;
+}
+
 namespace Visualization {
 
 namespace Abstract {
 
-template <class DataSourceParam>
 class BinaryParametersSource:public ParametersSource
 	{
-	/* Embedded classes: */
-	public:
-	typedef DataSourceParam DataSource; // Type for data sources
-	
 	/* Elements: */
 	private:
-	DataSource& source; // The data source
+	IO::File& source; // The data source
 	bool raw; // Flag whether the source reads variable indices (true) or variable names (false)
 	
 	/* Constructors and destructors: */
 	public:
-	BinaryParametersSource(VariableManager* sVariableManager,DataSource& sSource,bool sRaw);
+	BinaryParametersSource(VariableManager* sVariableManager,IO::File& sSource,bool sRaw);
 	
 	/* Methods from ParametersSource: */
 	virtual void read(const char* name,const ReaderBase& value);

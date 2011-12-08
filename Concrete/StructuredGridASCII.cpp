@@ -2,7 +2,7 @@
 StructuredGridASCII - Class defining lowest-common-denominator ASCII
 file format for curvilinear grids in Cartesian or spherical coordinates.
 Vertex positions and attributes are stored in separate files.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -21,18 +21,21 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/StructuredGridASCII.h>
+
 #include <ctype.h>
 #include <string.h>
 #include <stdio.h>
+#include <string>
 #include <iostream>
 #include <iomanip>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
-#include <Misc/File.h>
 #include <Plugins/FactoryManager.h>
+#include <IO/OpenFile.h>
+#include <IO/ValueSource.h>
+#include <Cluster/MulticastPipe.h>
 #include <Math/Math.h>
-
-#include <Concrete/StructuredGridASCII.h>
 
 namespace Visualization {
 
@@ -47,8 +50,10 @@ StructuredGridASCII::StructuredGridASCII(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
+	bool master=pipe==0||pipe->isMaster();
+	
 	/* Create the result data set: */
 	Misc::SelfDestructPointer<DataSet> result(new DataSet);
 	
@@ -65,66 +70,60 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 		}
 	
 	/* Open the grid definition file: */
-	std::cout<<"Reading grid file "<<*argIt<<"..."<<std::flush;
-	Misc::File gridFile(argIt->c_str(),"rt");
+	if(master)
+		std::cout<<"Reading grid file "<<*argIt<<"..."<<std::flush;
+	IO::ValueSource gridReader(openFile(*argIt,pipe));
+	gridReader.setPunctuation("#\n");
+	gridReader.skipWs();
 	
 	/* Parse the grid file header: */
 	DS::Index numVertices(-1,-1,-1);
 	bool sphericalCoordinates=false;
-	unsigned int lineIndex=0;
-	char line[256];
+	unsigned int lineIndex=1;
 	int parsedHeaderLines=0;
 	while(parsedHeaderLines<2)
 		{
 		/* Check if the file is already over: */
-		if(gridFile.eof())
+		if(gridReader.eof())
 			Misc::throwStdErr("StructuredGridASCII::load: early end-of-file in grid file %s",argIt->c_str());
 		
-		/* Read the next line from the file: */
-		gridFile.gets(line,sizeof(line));
-		++lineIndex;
-		
-		/* Skip comment lines: */
-		if(line[0]!='#')
+		/* Read the next token: */
+		std::string token=gridReader.readString();
+		if(token=="gridSize")
 			{
-			/* Parse the line: */
-			switch(parsedHeaderLines)
+			/* Read the grid size: */
+			try
 				{
-				case 0:
-					if(strncasecmp(line,"gridsize",8)==0&&(line[8]==' '||line[8]=='\t'))
-						{
-						/* Read the grid size: */
-						if(sscanf(line+9,"%d %d %d",&numVertices[0],&numVertices[1],&numVertices[2])!=3)
-							Misc::throwStdErr("StructuredGridASCII::load: invalid grid size in line %u in grid file %s",lineIndex,argIt->c_str());
-						}
-					else
-						Misc::throwStdErr("StructuredGridASCII::load: missing grid size in line %u in grid file %s",lineIndex,argIt->c_str());
-					break;
-				
-				case 1:
-					if(strncasecmp(line,"coordinate",10)==0&&(line[10]==' '||line[10]=='\t'))
-						{
-						/* Read the coordinate mode: */
-						const char* modeStartPtr;
-						for(modeStartPtr=line+11;*modeStartPtr!='\0'&&isspace(*modeStartPtr);++modeStartPtr)
-							;
-						const char* modeEndPtr;
-						for(modeEndPtr=modeStartPtr;*modeEndPtr!='\0'&&!isspace(*modeEndPtr);++modeEndPtr)
-							; 
-						if(modeEndPtr-modeStartPtr==9&&strncasecmp(modeStartPtr,"Cartesian",9)==0)
-							sphericalCoordinates=false;
-						else if(modeEndPtr-modeStartPtr==9&&strncasecmp(modeStartPtr,"spherical",9)==0)
-							sphericalCoordinates=true;
-						else
-							Misc::throwStdErr("StructuredGridASCII::load: invalid coordinate mode in line %u in grid file %s",lineIndex,argIt->c_str());
-						}
-					else
-						Misc::throwStdErr("StructuredGridASCII::load: missing coordinate mode in line %u in grid file %s",lineIndex,argIt->c_str());
-					break;
+				for(int i=0;i<3;++i)
+					numVertices[i]=gridReader.readInteger();
+				}
+			catch(IO::ValueSource::NumberError err)
+				{
+				Misc::throwStdErr("StructuredGridASCII::load: Invalid grid size in line %u in grid file %s",lineIndex,argIt->c_str());
 				}
 			
 			++parsedHeaderLines;
 			}
+		else if(token=="coordinate")
+			{
+			/* Read the coordinate mode: */
+			std::string coordinateMode=gridReader.readString();
+			if(coordinateMode=="Cartesian")
+				sphericalCoordinates=false;
+			else if(coordinateMode=="Spherical")
+				sphericalCoordinates=true;
+			else
+				Misc::throwStdErr("StructuredGridASCII::load: invalid coordinate mode %s in line %u in grid file %s",coordinateMode.c_str(),lineIndex,argIt->c_str());
+			
+			++parsedHeaderLines;
+			}
+		else if(token!="#")
+			Misc::throwStdErr("StructuredGridASCII::load: Unknown header token %s in line %u in grid file %s",token.c_str(),lineIndex,argIt->c_str());
+		
+		/* Go to the next line: */
+		gridReader.skipLine();
+		gridReader.skipWs();
+		++lineIndex;
 		}
 	
 	/* Initialize the data set: */
@@ -152,49 +151,64 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 	const double scaleFactor=1.0e-3; // Scale factor for Cartesian coordinates
 	
 	/* Read all vertex positions: */
-	std::cout<<"   0%"<<std::flush;
+	if(master)
+		std::cout<<"   0%"<<std::flush;
 	DS::Index index(0);
 	while(index[2]<numVertices[2])
 		{
-		/* Read the next line: */
-		gridFile.gets(line,sizeof(line));
-		++lineIndex;
+		/* Check if the file is already over: */
+		if(gridReader.eof())
+			Misc::throwStdErr("StructuredGridASCII::load: early end-of-file in grid file %s",argIt->c_str());
 		
-		if(line[0]!='#')
+		/* Check for empty or comment lines: */
+		if(gridReader.peekc()!='\n'&&gridReader.peekc()!='#')
 			{
 			/* Parse the line: */
 			DS::Point& vertex=dataSet.getVertexPosition(index);
 			if(sphericalCoordinates)
 				{
-				/* Read the vertex' position in spherical coordinates: */
-				double longitude,latitude,radius;
-				if(sscanf(line,"%lf %lf %lf",&longitude,&latitude,&radius)!=3)
-					Misc::throwStdErr("StructuredGridASCII::load: Invalid spherical vertex coordinate in line %u in grid file %s",lineIndex,argIt->c_str());
-				
-				/* Convert the vertex position to Cartesian coordinates: */
-				double s0=Math::sin(latitude);
-				double c0=Math::cos(latitude);
-				double r=radius*scaleFactor;
-				double xy=r*c0;
-				double s1=Math::sin(longitude);
-				double c1=Math::cos(longitude);
-				vertex[0]=Scalar(xy*c1);
-				vertex[1]=Scalar(xy*s1);
-				vertex[2]=Scalar(r*s0);
-				
-				if(storeSphericals)
+				try
 					{
-					/* Store the spherical coordinate components in the first three value slices: */
-					dataSet.getVertexValue(0,index)=Scalar(Math::deg(latitude));
-					dataSet.getVertexValue(1,index)=Scalar(Math::deg(longitude));
-					dataSet.getVertexValue(2,index)=Scalar(r);
+					/* Read the vertex' position in spherical coordinates: */
+					double longitude=gridReader.readNumber();
+					double latitude=gridReader.readNumber();
+					double radius=gridReader.readNumber();
+					
+					/* Convert the vertex position to Cartesian coordinates: */
+					double s0=Math::sin(latitude);
+					double c0=Math::cos(latitude);
+					double r=radius*scaleFactor;
+					double xy=r*c0;
+					double s1=Math::sin(longitude);
+					double c1=Math::cos(longitude);
+					vertex[0]=Scalar(xy*c1);
+					vertex[1]=Scalar(xy*s1);
+					vertex[2]=Scalar(r*s0);
+					
+					if(storeSphericals)
+						{
+						/* Store the spherical coordinate components in the first three value slices: */
+						dataSet.getVertexValue(0,index)=Scalar(Math::deg(latitude));
+						dataSet.getVertexValue(1,index)=Scalar(Math::deg(longitude));
+						dataSet.getVertexValue(2,index)=Scalar(r);
+						}
+					}
+				catch(IO::ValueSource::NumberError err)
+					{
+					Misc::throwStdErr("StructuredGridASCII::load: Invalid spherical vertex coordinate in line %u in grid file %s",lineIndex,argIt->c_str());
 					}
 				}
 			else
 				{
-				/* Read the vertex' position in Cartesian coordinates: */
-				if(sscanf(line,"%f %f %f",&vertex[0],&vertex[1],&vertex[2])!=3)
+				try
+					{
+					for(int i=0;i<3;++i)
+						vertex[i]=DS::Scalar(gridReader.readNumber());
+					}
+				catch(IO::ValueSource::NumberError err)
+					{
 					Misc::throwStdErr("StructuredGridASCII::load: Invalid Cartesian vertex coordinate in line %u in grid file %s",lineIndex,argIt->c_str());
+					}
 				}
 			
 			/* Go to the next vertex: */
@@ -202,16 +216,24 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 			for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
 				index[incDim]=0;
 			++index[incDim];
-			if(incDim==2)
+			if(incDim==2&&master)
 				std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
 			}
+		
+		/* Go to the next line: */
+		gridReader.skipLine();
+		gridReader.skipWs();
+		++lineIndex;
 		}
-	std::cout<<"\b\b\b\bdone"<<std::endl;
+	if(master)
+		std::cout<<"\b\b\b\bdone"<<std::endl;
 	
 	/* Finalize the grid structure: */
-	std::cout<<"Finalizing grid structure..."<<std::flush;
+	if(master)
+		std::cout<<"Finalizing grid structure..."<<std::flush;
 	dataSet.finalizeGrid();
-	std::cout<<" done"<<std::endl;
+	if(master)
+		std::cout<<" done"<<std::endl;
 	
 	/* Read all vertex attribute files given on the command line: */
 	bool logNextScalar=false;
@@ -222,8 +244,11 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 		else
 			{
 			/* Open the slice file: */
-			std::cout<<"Reading slice file "<<*argIt<<"..."<<std::flush;
-			Misc::File sliceFile(argIt->c_str(),"rt");
+			if(master)
+				std::cout<<"Reading slice file "<<*argIt<<"..."<<std::flush;
+			IO::ValueSource sliceReader(openFile(*argIt,pipe));
+			sliceReader.setPunctuation("#\n");
+			sliceReader.skipWs();
 			
 			/* Parse the slice file header: */
 			bool vectorValue=false;
@@ -233,125 +258,94 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 			while(parsedHeaderLines<2)
 				{
 				/* Check if the file is already over: */
-				if(sliceFile.eof())
+				if(sliceReader.eof())
 					Misc::throwStdErr("StructuredGridASCII::load: early end-of-file in slice file %s",argIt->c_str());
 				
-				/* Read the next line from the file: */
-				sliceFile.gets(line,sizeof(line));
-				++lineIndex;
-				
-				/* Skip comment lines: */
-				if(line[0]!='#')
+				/* Read the next token: */
+				std::string token=sliceReader.readString();
+				if(token=="gridSize")
 					{
-					/* Parse the line: */
-					switch(parsedHeaderLines)
+					/* Read the grid size: */
+					DS::Index sliceNumVertices;
+					try
 						{
-						case 0:
-							if(strncasecmp(line,"gridsize",8)==0&&(line[8]==' '||line[8]=='\t'))
-								{
-								/* Read the grid size: */
-								DS::Index sliceNumVertices;
-								if(sscanf(line+9,"%d %d %d",&sliceNumVertices[0],&sliceNumVertices[1],&sliceNumVertices[2])!=3)
-									Misc::throwStdErr("StructuredGridASCII::load: invalid grid size in line %u in slice file %s",lineIndex,argIt->c_str());
-								
-								/* Check if the slice grid size matches the grid size: */
-								if(sliceNumVertices!=numVertices)
-									Misc::throwStdErr("StructuredGridASCII::load: mismatching grid size in slice file %s",argIt->c_str());
-								}
-							else
-								Misc::throwStdErr("StructuredGridASCII::load: missing grid size in line %u in slice file %s",lineIndex,argIt->c_str());
-							break;
-
-						case 1:
-							if(strncasecmp(line,"scalar",6)==0&&(line[6]==' '||line[6]=='\t'))
-								{
-								vectorValue=false;
-								
-								/* Read the scalar value's name: */
-								char* nameStartPtr;
-								for(nameStartPtr=line+7;*nameStartPtr!='\0'&&isspace(*nameStartPtr);++nameStartPtr)
-									;
-								char* nameEndPtr;
-								for(nameEndPtr=nameStartPtr;*nameEndPtr!='\0';++nameEndPtr)
-									; 
-								for(;isspace(nameEndPtr[-1]);--nameEndPtr)
-									;
-								if(nameStartPtr!=nameEndPtr)
-									{
-									*nameEndPtr='\0';
-									
-									/* Add another slice to the data set: */
-									dataSet.addSlice();
-									
-									/* Add another scalar variable to the data value: */
-									if(logNextScalar)
-										{
-										char variableName[256];
-										snprintf(variableName,sizeof(variableName),"log(%s)",nameStartPtr);
-										dataValue.addScalarVariable(variableName);
-										}
-									else
-										dataValue.addScalarVariable(nameStartPtr);
-									}
-								else
-									Misc::throwStdErr("StructuredGridASCII::load: empty vector variable name in line %u in slice file %s",lineIndex,argIt->c_str());
-								}
-							else if(strncasecmp(line,"vector",6)==0&&(line[6]==' '||line[6]=='\t'))
-								{
-								vectorValue=true;
-								
-								/* Read the vector value's name: */
-								char* nameStartPtr;
-								for(nameStartPtr=line+7;*nameStartPtr!='\0'&&isspace(*nameStartPtr);++nameStartPtr)
-									;
-								char* nameEndPtr;
-								for(nameEndPtr=nameStartPtr;*nameEndPtr!='\0';++nameEndPtr)
-									; 
-								for(;isspace(nameEndPtr[-1]);--nameEndPtr)
-									;
-								if(nameStartPtr!=nameEndPtr)
-									{
-									*nameEndPtr='\0';
-									
-									/* Add another vector variable to the data value: */
-									int vectorVariableIndex=dataValue.getNumVectorVariables();
-									dataValue.addVectorVariable(nameStartPtr);
-									
-									/* Add four new slices to the data set (3 components plus magnitude): */
-									char variableName[256];
-									for(int i=0;i<3;++i)
-										{
-										dataSet.addSlice();
-										snprintf(variableName,sizeof(variableName),"%s %c",nameStartPtr,'X'+i);
-										dataValue.addScalarVariable(variableName);
-										dataValue.setVectorVariableScalarIndex(vectorVariableIndex,i,sliceIndex+i);
-										}
-									dataSet.addSlice();
-									snprintf(variableName,sizeof(variableName),"%s Magnitude",nameStartPtr);
-									dataValue.addScalarVariable(variableName);
-									}
-								else
-									Misc::throwStdErr("StructuredGridASCII::load: empty vector variable name in line %u in slice file %s",lineIndex,argIt->c_str());
-								}
-							else
-								Misc::throwStdErr("StructuredGridASCII::load: missing value type in line %u in slice file %s",lineIndex,argIt->c_str());
-							break;
+						for(int i=0;i<3;++i)
+							sliceNumVertices[i]=sliceReader.readInteger();
 						}
-
+					catch(IO::ValueSource::NumberError err)
+						{
+						Misc::throwStdErr("StructuredGridASCII::load: Invalid grid size in line %u in grid file %s",lineIndex,argIt->c_str());
+						}
+					
+					/* Check if the slice grid size matches the grid size: */
+					if(sliceNumVertices!=numVertices)
+						Misc::throwStdErr("StructuredGridASCII::load: mismatching grid size in slice file %s",argIt->c_str());
+					
 					++parsedHeaderLines;
 					}
+				else if(token=="scalar")
+					{
+					/* Read the scalar value's name: */
+					std::string scalarName=sliceReader.readString();
+					if(!scalarName.empty()&&scalarName!="\n")
+						{
+						/* Add another slice to the data set: */
+						dataSet.addSlice();
+						
+						/* Add another scalar variable to the data value: */
+						if(logNextScalar)
+							scalarName=std::string("log(")+scalarName+")";
+						dataValue.addScalarVariable(scalarName.c_str());
+						}
+					else
+						Misc::throwStdErr("StructuredGridASCII::load: empty scalar variable name in line %u in slice file %s",lineIndex,argIt->c_str());
+					
+					++parsedHeaderLines;
+					}
+				else if(token=="vector")
+					{
+					/* Read the vector value's name: */
+					std::string vectorName=sliceReader.readString();
+					if(!vectorName.empty()&&vectorName!="\n")
+						{
+						/* Add another vector variable to the data value: */
+						int vectorVariableIndex=dataValue.addVectorVariable(vectorName.c_str());
+						
+						/* Add four new slices to the data set (three components plus magnitude): */
+						for(int i=0;i<4;++i)
+							{
+							dataSet.addSlice();
+							int variableIndex=dataValue.addScalarVariable(makeVectorSliceName(vectorName,i).c_str());
+							if(i<3)
+								dataValue.setVectorVariableScalarIndex(vectorVariableIndex,i,variableIndex);
+							}
+						}
+					else
+						Misc::throwStdErr("StructuredGridASCII::load: empty vector variable name in line %u in slice file %s",lineIndex,argIt->c_str());
+					
+					++parsedHeaderLines;
+					}
+				else if(token!="#")
+					Misc::throwStdErr("StructuredGridASCII::load: Unknown header token %s in line %u in grid file %s",token.c_str(),lineIndex,argIt->c_str());
+				
+				/* Go to the next line: */
+				gridReader.skipLine();
+				gridReader.skipWs();
+				++lineIndex;
 				}
 			
 			/* Read all vertex attributes: */
-			std::cout<<"   0%"<<std::flush;
+			if(master)
+				std::cout<<"   0%"<<std::flush;
 			DS::Index index(0);
 			while(index[2]<numVertices[2])
 				{
-				/* Read the next line: */
-				sliceFile.gets(line,sizeof(line));
-				++lineIndex;
-
-				if(line[0]!='#')
+				/* Check if the file is already over: */
+				if(sliceReader.eof())
+					Misc::throwStdErr("StructuredGridASCII::load: early end-of-file in slice file %s",argIt->c_str());
+				
+				/* Check for empty or comment lines: */
+				if(sliceReader.peekc()!='\n'&&sliceReader.peekc()!='#')
 					{
 					/* Parse the line: */
 					if(vectorValue)
@@ -359,30 +353,44 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 						DataValue::VVector vector;
 						if(sphericalCoordinates)
 							{
-							/* Read the vector attribute in spherical coordinates: */
-							double longitude,latitude,radius;
-							if(sscanf(line,"%lf %lf %lf",&longitude,&latitude,&radius)!=3)
+							try
+								{
+								/* Read the vector attribute in spherical coordinates: */
+								double longitude=sliceReader.readNumber();
+								double latitude=sliceReader.readNumber();
+								double radius=sliceReader.readNumber();
+								
+								/* Convert the vector to Cartesian coordinates: */
+								const DS::Point& p=dataSet.getVertexPosition(index);
+								double xy=Math::sqr(double(p[0]))+Math::sqr(double(p[1]));
+								double r=xy+Math::sqr(double(p[2]));
+								xy=Math::sqrt(xy);
+								r=Math::sqrt(r);
+								double s0=double(p[2])/r;
+								double c0=xy/r;
+								double s1=double(p[1])/xy;
+								double c1=double(p[0])/xy;
+								vector[0]=Scalar(c1*(c0*radius-s0*latitude)-s1*longitude);
+								vector[1]=Scalar(s1*(c0*radius-s0*latitude)+c1*longitude);
+								vector[2]=Scalar(c0*latitude+s0*radius);
+								}
+							catch(IO::ValueSource::NumberError err)
+								{
 								Misc::throwStdErr("StructuredGridASCII::load: Invalid spherical vector attribute in line %u in slice file %s",lineIndex,argIt->c_str());
-							
-							/* Convert the vector to Cartesian coordinates: */
-							const DS::Point& p=dataSet.getVertexPosition(index);
-							double xy=Math::sqr(double(p[0]))+Math::sqr(double(p[1]));
-							double r=xy+Math::sqr(double(p[2]));
-							xy=Math::sqrt(xy);
-							r=Math::sqrt(r);
-							double s0=double(p[2])/r;
-							double c0=xy/r;
-							double s1=double(p[1])/xy;
-							double c1=double(p[0])/xy;
-							vector[0]=Scalar(c1*(c0*radius-s0*latitude)-s1*longitude);
-							vector[1]=Scalar(s1*(c0*radius-s0*latitude)+c1*longitude);
-							vector[2]=Scalar(c0*latitude+s0*radius);
+								}
 							}
 						else
 							{
-							/* Read the vector attribute in Cartesian coordinates: */
-							if(sscanf(line,"%f %f %f",&vector[0],&vector[1],&vector[2])!=3)
+							try
+								{
+								/* Read the vector attribute in Cartesian coordinates: */
+								for(int i=0;i<3;++i)
+									vector[i]=DataValue::VVector::Scalar(sliceReader.readNumber());
+								}
+							catch(IO::ValueSource::NumberError err)
+								{
 								Misc::throwStdErr("StructuredGridASCII::load: Invalid Cartesian vector attribute in line %u in slice file %s",lineIndex,argIt->c_str());
+								}
 							}
 						
 						/* Store the vector's components and magnitude: */
@@ -395,15 +403,26 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 						/* Read the scalar attribute: */
 						if(logNextScalar)
 							{
-							double value;
-							if(sscanf(line,"%lf",&value)!=1)
+							try
+								{
+								double value=sliceReader.readNumber();
+								dataSet.getVertexValue(sliceIndex,index)=Scalar(Math::log10(value));
+								}
+							catch(IO::ValueSource::NumberError err)
+								{
 								Misc::throwStdErr("StructuredGridASCII::load: Invalid logarithmic scalar vertex attribute in line %u in slice file %s",lineIndex,argIt->c_str());
-							dataSet.getVertexValue(sliceIndex,index)=Scalar(Math::log10(value));
+								}
 							}
 						else
 							{
-							if(sscanf(line,"%f",&dataSet.getVertexValue(sliceIndex,index))!=1)
+							try
+								{
+								dataSet.getVertexValue(sliceIndex,index)=Scalar(sliceReader.readNumber());
+								}
+							catch(IO::ValueSource::NumberError err)
+								{
 								Misc::throwStdErr("StructuredGridASCII::load: Invalid scalar vertex attribute in line %u in slice file %s",lineIndex,argIt->c_str());
+								}
 							}
 						}
 
@@ -412,11 +431,17 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 					for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
 						index[incDim]=0;
 					++index[incDim];
-					if(incDim==2)
+					if(incDim==2&&master)
 						std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
 					}
+				
+				/* Go to the next line: */
+				gridReader.skipLine();
+				gridReader.skipWs();
+				++lineIndex;
 				}
-			std::cout<<"\b\b\b\bdone"<<std::endl;
+			if(master)
+				std::cout<<"\b\b\b\bdone"<<std::endl;
 			}
 		}
 	

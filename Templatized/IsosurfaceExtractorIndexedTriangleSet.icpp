@@ -24,6 +24,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Templatized/IsosurfaceExtractorIndexedTriangleSet.h>
 
+#include <Abstract/Algorithm.h>
+
 namespace Visualization {
 
 namespace Templatized {
@@ -204,27 +206,45 @@ inline
 void
 IsosurfaceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam> >::extractIsosurface(
 	typename IsosurfaceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam> >::VScalar newIsovalue,
-	typename IsosurfaceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam> >::Isosurface& newIsosurface)
+	typename IsosurfaceExtractor<DataSetParam,ScalarExtractorParam,IndexedTriangleSet<VertexParam> >::Isosurface& newIsosurface,
+	Visualization::Abstract::Algorithm* algorithm)
 	{
 	/* Set the isosurface extraction parameters: */
 	isovalue=newIsovalue;
 	isosurface=&newIsosurface;
 	
 	/* Extract isosurface fragments from all cells: */
+	size_t numCells=dataSet->getTotalNumCells();
+	typename DataSet::CellIterator cIt=dataSet->beginCells();
+	size_t cellIndex=0;
 	if(extractionMode==FLAT)
 		{
-		for(typename DataSet::CellIterator cIt=dataSet->beginCells();cIt!=dataSet->endCells();++cIt)
+		for(int percent=1;percent<=100;++percent)
 			{
-			/* Extract the cell's isosurface fragment: */
-			extractFlatIsosurfaceFragment(*cIt);
+			size_t cellIndexEnd=(numCells*percent)/100;
+			for(;cellIndex<cellIndexEnd;++cellIndex,++cIt)
+				{
+				/* Extract the cell's isosurface fragment: */
+				extractFlatIsosurfaceFragment(*cIt);
+				}
+			
+			/* Update the busy dialog: */
+			algorithm->callBusyFunction(float(percent));
 			}
 		}
 	else
 		{
-		for(typename DataSet::CellIterator cIt=dataSet->beginCells();cIt!=dataSet->endCells();++cIt)
+		for(int percent=1;percent<=100;++percent)
 			{
-			/* Extract the cell's isosurface fragment: */
-	  	extractSmoothIsosurfaceFragment(*cIt);
+			size_t cellIndexEnd=(numCells*percent)/100;
+			for(;cellIndex<cellIndexEnd;++cellIndex,++cIt)
+				{
+				/* Extract the cell's isosurface fragment: */
+				extractSmoothIsosurfaceFragment(*cIt);
+				}
+			
+			/* Update the busy dialog: */
+			algorithm->callBusyFunction(float(percent));
 			}
 		}
 	isosurface->flush();

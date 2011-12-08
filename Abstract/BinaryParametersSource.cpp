@@ -3,7 +3,7 @@ BinaryParametersSource - Generic class for parameter sources utilizing
 the pipe I/O abstraction.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2010 Oliver Kreylos
+Copyright (c) 2010-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <string>
 #include <Misc/StandardMarshallers.h>
 #include <IO/File.h>
-#include <Comm/MulticastPipe.h>
-#include <Comm/ClusterPipe.h>
 
 namespace Visualization {
 
@@ -38,38 +36,23 @@ namespace Abstract {
 Methods of class BinaryParametersSource:
 ***************************************/
 
-template <class DataSourceParam>
-inline
-BinaryParametersSource<DataSourceParam>::BinaryParametersSource(
-	VariableManager* sVariableManager,
-	DataSourceParam& sSource,
-	bool sRaw)
+BinaryParametersSource::BinaryParametersSource(VariableManager* sVariableManager,IO::File& sSource,bool sRaw)
 	:ParametersSource(sVariableManager),
 	 source(sSource),raw(sRaw)
 	{
 	}
 
-template <class DataSourceParam>
-inline
-void
-BinaryParametersSource<DataSourceParam>::read(
-	const char* name,
-	const ReaderBase& value)
+void BinaryParametersSource::read(const char* name,const ReaderBase& value)
 	{
 	value.read(source);
 	}
 
-template <class DataSourceParam>
-inline
-void
-BinaryParametersSource<DataSourceParam>::readScalarVariable(
-	const char* name,
-	int& scalarVariableIndex)
+void BinaryParametersSource::readScalarVariable(const char* name,int& scalarVariableIndex)
 	{
 	if(raw)
 		{
 		/* Read the variable index directly: */
-		source.template read<int>(scalarVariableIndex);
+		source.read<int>(scalarVariableIndex);
 		}
 	else
 		{
@@ -79,17 +62,12 @@ BinaryParametersSource<DataSourceParam>::readScalarVariable(
 		}
 	}
 
-template <class DataSourceParam>
-inline
-void
-BinaryParametersSource<DataSourceParam>::readVectorVariable(
-	const char* name,
-	int& vectorVariableIndex)
+void BinaryParametersSource::readVectorVariable(const char* name,int& vectorVariableIndex)
 	{
 	if(raw)
 		{
 		/* Read the variable index directly: */
-		source.template read<int>(vectorVariableIndex);
+		source.read<int>(vectorVariableIndex);
 		}
 	else
 		{
@@ -98,14 +76,6 @@ BinaryParametersSource<DataSourceParam>::readVectorVariable(
 		vectorVariableIndex=variableManager->getVectorVariable(vectorVariableName.c_str());
 		}
 	}
-
-/******************************************************************
-Force instantiation of all standard BinaryParametersSource classes:
-******************************************************************/
-
-template class BinaryParametersSource<IO::File>;
-template class BinaryParametersSource<Comm::MulticastPipe>;
-template class BinaryParametersSource<Comm::ClusterPipe>;
 
 }
 

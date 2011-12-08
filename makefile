@@ -21,11 +21,11 @@
 # 02111-1307 USA
 ########################################################################
 
-# Root directory of the Vrui software installation. This must match the
-# same setting in Vrui's makefile. By default the directories match; if
-# the installation directory was adjusted during Vrui's installation, it
-# must be adjusted here as well.
-VRUIDIR = $(HOME)/Vrui-2.1
+# Directory containing the Vrui build system. The directory below
+# matches the default Vrui installation; if Vrui's installation
+# directory was changed during Vrui's installation, the directory below
+# must be adapted.
+VRUI_MAKEDIR := $(HOME)/Vrui-2.2/share/make
 
 # Base installation directory for 3D Visualizer and its module
 # plug-ins. The module plug-ins cannot be moved from this location
@@ -36,17 +36,19 @@ VRUIDIR = $(HOME)/Vrui-2.1
 # directories underneath the given base directory, respectively.
 # Important note: Do not use ~ as an abbreviation for the user's home
 # directory here; use $(HOME) instead.
-INSTALLDIR = $(shell pwd)
+INSTALLDIR := $(shell pwd)
 
 # Flag whether to use GLSL shaders instead of fixed OpenGL functionality
 # for some visualization algorithms, especially volume rendering. This
 # flag should only be set to 1 on newer, dedicated 3D graphics cards
 # such as Nvidia's G80 series.
-USE_SHADERS = 0
+USE_SHADERS = 1
 
 # Flag whether to build the 3D Visualizer collaboration module for
-# spatially distributed shared data exploration.
-USE_COLLABORATION = 0
+# spatially distributed shared data exploration. If the Vrui
+# Collaboration Infrastructure is not installed on the host system, this
+# flag will be ignored.
+USE_COLLABORATION = 1
 
 # List of default visualization modules:
 MODULE_NAMES = SphericalASCIIFile \
@@ -74,7 +76,6 @@ UNSUPPORTED_MODULE_NAMES = AnalyzeFile \
                            ConvectionFile \
                            ConvectionFileCartesian \
                            CSConvectionFile \
-                           DicomImageStack \
                            EarthTomographyGrid \
                            ReifSeismicTomography \
                            SeismicTomographyModel \
@@ -89,104 +90,155 @@ UNSUPPORTED_MODULE_NAMES = AnalyzeFile \
                            UnstructuredPlot3DFile
 
 ########################################################################
-# Nothing underneath here needs to be changed.
+# Everything below here should not have to be changed
 ########################################################################
+
+# Define the root of the package source tree
+PACKAGEROOT := $(shell pwd)
 
 # Version number for installation subdirectories. This is used to keep
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.8
-
-# Set up destination directories for compilation products:
-OBJDIRBASE = o
-ifeq ($(shell uname -m),x86_64)
-  LIBDIRBASE = lib64
-else
-  LIBDIRBASE = lib
-endif
-BINDIRBASE = bin
-MODULEDIR = 3DVisualizer-$(VERSION)
+VERSION = 1.9
 
 # Set up resource directories: */
+PLUGINSDIREXT = 3DVisualizer-$(VERSION)
 RESOURCEDIR = share/3DVisualizer-$(VERSION)
 
-# Set up additional flags for the C++ compiler:
-CFLAGS = 
+# Include definitions for the system environment and system-provided
+# packages
+include $(VRUI_MAKEDIR)/SystemDefinitions
+include $(VRUI_MAKEDIR)/Packages.System
+include $(VRUI_MAKEDIR)/Configuration.Vrui
+include $(VRUI_MAKEDIR)/Packages.Vrui
 
-# Create debug or fully optimized versions of the software:
-VRUIMAKEDIR = $(VRUIDIR)/share
-ifdef DEBUG
-  # Include the debug version of the Vrui application makefile fragment:
-  include $(VRUIMAKEDIR)/Vrui.debug.makeinclude
-  # Enable debugging and disable optimization:
-  CFLAGS += -g3 -O0
-  # Set destination directories for created objects:
-  OBJDIR = $(OBJDIRBASE)/debug
-  LIBDIR = $(LIBDIRBASE)/debug
-  BINDIR = $(BINDIRBASE)/debug
-else
-  # Include the release version of the Vrui application makefile fragment:
-  include $(VRUIMAKEDIR)/Vrui.makeinclude
-  # Disable debugging and enable optimization:
-  CFLAGS += -g0 -O3 -DNDEBUG
-  # Set destination directories for created objects:
-  OBJDIR = $(OBJDIRBASE)
-  LIBDIR = $(LIBDIRBASE)
-  BINDIR = $(BINDIRBASE)
+# Check if support for collaboration was requested
+ifneq ($(USE_COLLABORATION),0)
+  include $(VRUI_MAKEDIR)/Configuration.Collaboration
+  include $(VRUI_MAKEDIR)/Packages.Collaboration
+  
+  # Check if the collaboration infrastructure is installed
+  ifndef COLLABORATION_VERSION
+    USE_COLLABORATION = 0
+  endif
+endif
+
+# Add base directory to include path:
+EXTRACINCLUDEFLAGS += -I.
+
+# Set destination directory for plugins:
+LIBDESTDIR := $(PACKAGEROOT)/$(MYLIBEXT)
+PLUGINDESTDIR := $(LIBDESTDIR)/$(PLUGINSDIREXT)
+ifneq ($(USE_COLLABORATION),0)
+  COLLABORATIONPLUGINDESTDIR := $(LIBDESTDIR)/CollaborationPlugins
 endif
 
 # Set up installation directory structure:
-BININSTALLDIR = $(INSTALLDIR)/$(BINDIRBASE)
-PLUGININSTALLDIR = $(INSTALLDIR)/$(LIBDIR)/$(MODULEDIR)
+EXECUTABLEINSTALLDIR = $(INSTALLDIR)/$(EXEDIR)
+PLUGININSTALLDIR = $(INSTALLDIR)/$(MYLIBEXT)/$(PLUGINSDIREXT)
 SHAREINSTALLDIR = $(INSTALLDIR)/$(RESOURCEDIR)
+COLLABORATIONPLUGININSTALLDIR = $(PLUGININSTALLDIR)/$(COLLABORATIONPLUGINSDIREXT)
 
-# Add base directory to include path:
-CFLAGS += -I.
+########################################################################
+# Specify additional compiler and linker flags
+########################################################################
 
-# Pattern rule to compile C++ sources:
-$(OBJDIR)/%.o: %.cpp
-	@mkdir -p $(OBJDIR)/$(*D)
-	@echo Compiling $<...
-	@g++ -c -o $@ $(VRUI_CFLAGS) $(CFLAGS) $<
+CFLAGS += -Wall -pedantic
 
-# Function to generate full plug-in names:
-PLUGINNAME = $(LIBDIR)/$(MODULEDIR)/lib$(1).$(VRUI_PLUGINFILEEXT)
+MODULENAME = $(PLUGINDESTDIR)/lib$(1).$(PLUGINFILEEXT)
+COLLABORATIONPLUGINNAME = $(COLLABORATIONPLUGINDESTDIR)/lib$(1).$(PLUGINFILEEXT)
 
-# Pattern rule to link visualization module plug-ins:
-$(call PLUGINNAME,%): CFLAGS += $(VRUI_PLUGINCFLAGS)
-ifneq ($(USE_SHADERS),0)
-  $(call PLUGINNAME,%): CFLAGS += -DVISUALIZATION_USE_SHADERS
-endif
-$(call PLUGINNAME,%): CFLAGS += $(VRUI_PLUGINCFLAGS)
-$(call PLUGINNAME,%): $(OBJDIR)/Concrete/%.o
-	@mkdir -p $(LIBDIR)/$(MODULEDIR)
-	@echo Linking $@...
-	@g++ $(VRUI_PLUGINLINKFLAGS) -o $@ $^
+########################################################################
+# List packages used by this project
+# (Supported packages can be found in
+# $(VRUI_MAKEDIR)/BuildRoot/Packages)
+########################################################################
 
-# Rule to build all 3D Visualizer components:
-MODULES = $(MODULE_NAMES:%=$(call PLUGINNAME,%))
-ALL = $(BINDIR)/3DVisualizer \
-      $(MODULES)
+PACKAGES = MYGEOMETRY MYMATH MYCLUSTER MYIO MYTHREADS MYMISC
+
+########################################################################
+# Specify all final targets
+########################################################################
+
+EXECUTABLES = 
+MODULES = 
+COLLABORATIONPLUGINS = 
+
+EXECUTABLES += $(EXEDIR)/3DVisualizer
+
+MODULES += $(MODULE_NAMES:%=$(call MODULENAME,%))
+
 ifneq ($(USE_COLLABORATION),0)
-  ALL += $(BINDIR)/SharedVisualizationServer
+  EXECUTABLES += $(EXEDIR)/SharedVisualizationServer
+  COLLABORATIONPLUGIN_NAMES = SharedVisualizationServer
+  COLLABORATIONPLUGINS = $(COLLABORATIONPLUGIN_NAMES:%=$(call COLLABORATIONPLUGINNAME,%))
 endif
+
+ALL = $(EXECUTABLES) $(MODULES) $(COLLABORATIONPLUGINS)
+
 .PHONY: all
-all: $(ALL)
+all: config $(ALL)
 
-# Rule to remove build results:
-clean:
-	-rm -f $(OBJDIR)/*.o $(OBJDIR)/Abstract/*.o $(OBJDIR)/Wrappers/*.o $(OBJDIR)/Concrete/*.o
-	-rmdir $(OBJDIR)/Abstract $(OBJDIR)/Wrappers $(OBJDIR)/Concrete
+########################################################################
+# Pseudo-target to print configuration options
+########################################################################
+
+.PHONY: config
+config: Configure-End
+
+.PHONY: Configure-Begin
+Configure-Begin:
+	@echo "---- Configured 3D Visualizer options: ----"
+	@echo "Installation directory: $(INSTALLDIR)"
+ifneq ($(USE_SHADERS),0)
+	@echo "Use of GLSL shaders enabled"
+else
+	@echo "Use of GLSL shaders disabled"
+endif
+ifneq ($(USE_COLLABORATION),0)
+	@echo "Collaborative visualization enabled"
+	@echo "  Run 'make plugins-install' to install collaborative visualization server plug-in"
+else
+	@echo "Collaborative visualization disabled"
+  ifdef COLLABORATION_VERSION
+	@echo "  (Vrui Collaboration Infrastructure installed)"
+  else
+	@echo "  (Vrui Collaboration Infrastructure not installed)"
+  endif
+endif
+	@echo "Enabled modules: $(MODULE_NAMES)"
+
+.PHONY: Configure-End
+Configure-End: Configure-Begin
+Configure-End:
+	@echo "--------"
+
+$(wildcard *.cpp Abstract/*.cpp Templatized/*.cpp Wrappers/*.cpp Concrete/*.cpp): config
+
+########################################################################
+# Specify other actions to be performed on a `make clean'
+########################################################################
+
+.PHONY: extraclean
+extraclean:
+	-rm -f $(MODULE_NAMES:%=$(call MODULENAME,%))
+ifneq ($(USE_COLLABORATION),0)
+	-rm -f $(COLLABORATIONPLUGIN_NAMES:%=$(call COLLABORATIONPLUGINNAME,%))
+endif
+
+.PHONY: extrasqueakyclean
+extrasqueakyclean:
 	-rm -f $(ALL)
+	-rm -rf $(PACKAGEROOT)/$(LIBEXT)
 
-# Rule to clean the source directory for packaging:
-distclean:
-	-rm -rf $(OBJDIRBASE)
-	-rm -rf $(BINDIRBASE)
-	-rm -rf lib lib64
+# Include basic makefile
+include $(VRUI_MAKEDIR)/BasicMakefile
 
-# List of required source files:
+########################################################################
+# Specify build rules for executables
+########################################################################
+
 ABSTRACT_SOURCES = $(wildcard Abstract/*.cpp)
 
 TEMPLATIZED_SOURCES = $(wildcard Templatized/*.cpp)
@@ -223,7 +275,7 @@ else
                         PaletteRenderer.cpp
 endif
 ifneq ($(USE_COLLABORATION),0)
-  VISUALIZER_SOURCES += SharedVisualizationPipe.cpp \
+  VISUALIZER_SOURCES += SharedVisualizationProtocol.cpp \
                         SharedVisualizationClient.cpp
 endif
 
@@ -237,59 +289,89 @@ SHADERS = SingleChannelRaycaster.vs \
 $(OBJDIR)/Concrete/EarthRenderer.o: CFLAGS += -DEARTHRENDERER_IMAGEDIR='"$(SHAREINSTALLDIR)"'
 $(OBJDIR)/SingleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(SHAREINSTALLDIR)/Shaders"'
 $(OBJDIR)/TripleChannelRaycaster.o: CFLAGS += -DVISUALIZER_SHADERDIR='"$(SHAREINSTALLDIR)/Shaders"'
-$(OBJDIR)/Visualizer.o: CFLAGS += -DVISUALIZER_MODULENAMETEMPLATE='"$(PLUGININSTALLDIR)/lib%s.$(VRUI_PLUGINFILEEXT)"'
+$(OBJDIR)/Visualizer.o: CFLAGS += -DVISUALIZER_MODULENAMETEMPLATE='"$(PLUGININSTALLDIR)/lib%s.$(PLUGINFILEEXT)"'
 
 #
 # Rule to build 3D Visualizer main program
 #
 
+$(EXEDIR)/3DVisualizer: PACKAGES += MYVRUI MYREALTIME
+$(EXEDIR)/3DVisualizer: LINKFLAGS += $(PLUGINHOSTLINKFLAGS)
 ifneq ($(USE_COLLABORATION),0)
-  $(BINDIR)/3DVisualizer: CFLAGS += -DVISUALIZER_USE_COLLABORATION
-  $(BINDIR)/3DVisualizer: VRUI_LINKFLAGS += -lCollaboration.g++-3
+  $(EXEDIR)/3DVisualizer: PACKAGES += MYCOLLABORATIONCLIENT
+  $(EXEDIR)/3DVisualizer: CFLAGS += -DVISUALIZER_USE_COLLABORATION
 endif
-$(BINDIR)/3DVisualizer: $(VISUALIZER_SOURCES:%.cpp=$(OBJDIR)/%.o)
-	@mkdir -p $(BINDIR)
-	@echo Linking $@...
-	@g++ -o $@ $^ $(VRUI_LINKFLAGS) $(VRUI_PLUGINHOSTLINKFLAGS)
+$(EXEDIR)/3DVisualizer: $(VISUALIZER_SOURCES:%.cpp=$(OBJDIR)/%.o)
 .PHONY: 3DVisualizer
-3DVisualizer: $(BINDIR)/3DVisualizer
-
-# Dependencies and special flags for visualization modules:
-$(call PLUGINNAME,CitcomSRegionalASCIIFile): $(OBJDIR)/Concrete/CitcomSRegionalASCIIFile.o \
-                                             $(OBJDIR)/Concrete/CitcomSCfgFileParser.o
-
-$(call PLUGINNAME,CitcomSGlobalASCIIFile): $(OBJDIR)/Concrete/CitcomSGlobalASCIIFile.o \
-                                           $(OBJDIR)/Concrete/CitcomSCfgFileParser.o
-
-$(call PLUGINNAME,StructuredHexahedralTecplotASCIIFile): $(OBJDIR)/Concrete/TecplotASCIIFileHeaderParser.o \
-                                                         $(OBJDIR)/Concrete/StructuredHexahedralTecplotASCIIFile.o
-
-$(call PLUGINNAME,UnstructuredHexahedralTecplotASCIIFile): $(OBJDIR)/Concrete/TecplotASCIIFileHeaderParser.o \
-                                                           $(OBJDIR)/Concrete/UnstructuredHexahedralTecplotASCIIFile.o
-
-$(call PLUGINNAME,MultiChannelImageStack): PACKAGES += MYIMAGES
-
-$(call PLUGINNAME,DicomImageStack): $(OBJDIR)/Concrete/HuffmanTable.o \
-                                    $(OBJDIR)/Concrete/JPEGDecompressor.o \
-                                    $(OBJDIR)/Concrete/DicomFile.o \
-                                    $(OBJDIR)/Concrete/DicomImageStack.o
-
-# Keep module object files around after building:
-.SECONDARY: $(MODULE_NAMES:%=$(OBJDIR)/Concrete/%.o)
+3DVisualizer: $(EXEDIR)/3DVisualizer
 
 #
 # Rule to build shared Visualizer server
 #
 
-SHAREDVISUALIZATIONSERVER_SOURCES = SharedVisualizationPipe.cpp \
+SHAREDVISUALIZATIONSERVER_SOURCES = SharedVisualizationProtocol.cpp \
                                     SharedVisualizationServer.cpp \
                                     SharedVisualizationServerMain.cpp
 
-$(BINDIR)/SharedVisualizationServer: VRUI_LINKFLAGS += -lCollaboration.g++-3
-$(BINDIR)/SharedVisualizationServer: $(SHAREDVISUALIZATIONSERVER_SOURCES:%.cpp=$(OBJDIR)/%.o)
-	@mkdir -p $(BINDIR)
+$(EXEDIR)/SharedVisualizationServer: PACKAGES += MYCOLLABORATIONSERVER
+$(EXEDIR)/SharedVisualizationServer: $(SHAREDVISUALIZATIONSERVER_SOURCES:%.cpp=$(OBJDIR)/%.o)
+.PHONY: SharedVisualizationServer
+SharedVisualizationServer:$(EXEDIR)/SharedVisualizationServer
+
+########################################################################
+# Specify build rules for plug-ins
+########################################################################
+
+# Pattern rule to link visualization module plug-ins:
+$(call MODULENAME,%): PACKAGES += MYGLGEOMETRY MYGLSUPPORT MYGLWRAPPERS GL
+ifneq ($(USE_SHADERS),0)
+  $(call MODULENAME,%): CFLAGS += -DVISUALIZATION_USE_SHADERS
+endif
+$(call MODULENAME,%): $(OBJDIR)/pic/Concrete/%.o
+	@mkdir -p $(PLUGINDESTDIR)
+ifdef SHOWCOMMAND
+	$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $^ $(LINKDIRFLAGS) $(LINKLIBFLAGS)
+else
 	@echo Linking $@...
-	@g++ -o $@ $^ $(VRUI_LINKFLAGS) $(VRUI_PLUGINHOSTLINKFLAGS)
+	@$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $^ $(LINKDIRFLAGS) $(LINKLIBFLAGS)
+endif
+
+# Dependencies and special flags for visualization modules:
+$(call MODULENAME,CitcomSRegionalASCIIFile): $(OBJDIR)/pic/Concrete/CitcomSRegionalASCIIFile.o \
+                                             $(OBJDIR)/pic/Concrete/CitcomSCfgFileParser.o
+
+$(call MODULENAME,CitcomSGlobalASCIIFile): $(OBJDIR)/pic/Concrete/CitcomSGlobalASCIIFile.o \
+                                           $(OBJDIR)/pic/Concrete/CitcomSCfgFileParser.o
+
+$(call MODULENAME,StructuredHexahedralTecplotASCIIFile): $(OBJDIR)/pic/Concrete/TecplotASCIIFileHeaderParser.o \
+                                                         $(OBJDIR)/pic/Concrete/StructuredHexahedralTecplotASCIIFile.o
+
+$(call MODULENAME,UnstructuredHexahedralTecplotASCIIFile): $(OBJDIR)/pic/Concrete/TecplotASCIIFileHeaderParser.o \
+                                                           $(OBJDIR)/pic/Concrete/UnstructuredHexahedralTecplotASCIIFile.o
+
+$(call MODULENAME,MultiChannelImageStack): PACKAGES += MYIMAGES
+
+$(call MODULENAME,DicomImageStack): $(OBJDIR)/pic/Concrete/HuffmanTable.o \
+                                    $(OBJDIR)/pic/Concrete/JPEGDecompressor.o \
+                                    $(OBJDIR)/pic/Concrete/DicomFile.o \
+                                    $(OBJDIR)/pic/Concrete/DicomImageStack.o
+
+# Keep module object files around after building:
+.SECONDARY: $(MODULE_NAMES:%=$(OBJDIR)/pic/Concrete/%.o)
+
+# Pattern rule to link collaboration protocol plug-ins:
+$(call COLLABORATIONPLUGINNAME,%): PACKAGES += MYCOLLABORATIONSERVER
+$(call COLLABORATIONPLUGINNAME,%): $(OBJDIR)/pic/%.o
+	@mkdir -p $(COLLABORATIONPLUGINDESTDIR)
+ifdef SHOWCOMMAND
+	$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $^ $(LINKDIRFLAGS) $(LINKLIBFLAGS)
+else
+	@echo Linking $@...
+	@$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $^ $(LINKDIRFLAGS) $(LINKLIBFLAGS)
+endif
+
+# Keep collaboration plugin object files around after building:
+.SECONDARY: $(COLLABORATIONPLUGIN_NAMES:%=$(OBJDIR)/pic/%.o)
 
 #
 # Rule to install 3D Visualizer in a destination directory
@@ -298,11 +380,8 @@ $(BINDIR)/SharedVisualizationServer: $(SHAREDVISUALIZATIONSERVER_SOURCES:%.cpp=$
 install: $(ALL)
 	@echo Installing 3D Visualizer in $(INSTALLDIR)...
 	@install -d $(INSTALLDIR)
-	@install -d $(BININSTALLDIR)
-	@install $(BINDIR)/3DVisualizer $(BININSTALLDIR)
-ifneq ($(USE_COLLABORATION),0)
-	@install $(BINDIR)/SharedVisualizationServer $(BININSTALLDIR)
-endif
+	@install -d $(EXECUTABLEINSTALLDIR)
+	@install $(EXECUTABLES) $(EXECUTABLEINSTALLDIR)
 	@install -d $(PLUGININSTALLDIR)
 	@install $(MODULES) $(PLUGININSTALLDIR)
 	@install -d $(SHAREINSTALLDIR)
@@ -311,3 +390,12 @@ ifneq ($(USE_SHADERS),0)
 	@install -d $(SHAREINSTALLDIR)/Shaders
 	@install $(SHADERS:%=$(RESOURCEDIR)/Shaders/%) $(SHAREINSTALLDIR)/Shaders
 endif
+
+#
+# Rule to install 3D Visualizer's collaboration server plug-in
+#
+
+plugins-install: $(COLLABORATIONPLUGINS)
+	@echo Installing 3D Visualizer collaboration server plugin in $(COLLABORATIONPLUGININSTALLDIR)
+	@install $(COLLABORATIONPLUGINS) $(COLLABORATIONPLUGININSTALLDIR)
+

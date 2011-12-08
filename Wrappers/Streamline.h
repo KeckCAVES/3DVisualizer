@@ -58,7 +58,7 @@ class Streamline:public Visualization::Abstract::Element
 	
 	/* Constructors and destructors: */
 	public:
-	Streamline(Visualization::Abstract::Parameters* sParameters,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty streamline for the given parameters
+	Streamline(Visualization::Abstract::Parameters* sParameters,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty streamline for the given parameters
 	private:
 	Streamline(const Streamline& source); // Prohibit copy constructor
 	Streamline& operator=(const Streamline& source); // Prohibit assignment operator

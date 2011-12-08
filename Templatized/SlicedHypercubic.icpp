@@ -279,7 +279,7 @@ SlicedHypercubic<ScalarParam,dimensionParam,ValueScalarParam>::Locator::locatePo
 	for(iteration=0;iteration<10;++iteration)
 		{
 		/* Perform Newton-Raphson iteration in the current cell until it converges, or goes really bad: */
-		while(true)
+		for(int innerIteration=0;innerIteration<10;++innerIteration)
 			{
 			/* Do one step: */
 			bool converged=newtonRaphsonStep(position);

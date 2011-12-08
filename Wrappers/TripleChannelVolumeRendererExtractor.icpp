@@ -99,7 +99,7 @@ template <class DataSetWrapperParam>
 inline
 TripleChannelVolumeRendererExtractor<DataSetWrapperParam>::TripleChannelVolumeRendererExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
-	 Comm::MulticastPipe* sPipe)
+	 Cluster::MulticastPipe* sPipe)
 	:Abstract::Algorithm(sVariableManager,sPipe)
 	{
 	/* Initialize parameters: */

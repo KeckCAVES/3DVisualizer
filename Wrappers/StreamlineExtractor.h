@@ -134,7 +134,7 @@ class StreamlineExtractor:public Visualization::Abstract::Algorithm
 	
 	/* Constructors and destructors: */
 	public:
-	StreamlineExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates a streamline extractor
+	StreamlineExtractor(Visualization::Abstract::VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe); // Creates a streamline extractor
 	virtual ~StreamlineExtractor(void);
 	
 	/* Methods from Visualization::Abstract::Algorithm: */

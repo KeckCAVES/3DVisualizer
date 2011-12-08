@@ -68,7 +68,7 @@ class ColoredIsosurface:public Visualization::Abstract::Element
 	
 	/* Constructors and destructors: */
 	public:
-	ColoredIsosurface(Visualization::Abstract::Parameters* sParameters,bool sLighting,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty colored isosurface for the given parameters
+	ColoredIsosurface(Visualization::Abstract::Parameters* sParameters,bool sLighting,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty colored isosurface for the given parameters
 	private:
 	ColoredIsosurface(const ColoredIsosurface& source); // Prohibit copy constructor
 	ColoredIsosurface& operator=(const ColoredIsosurface& source); // Prohibit assignment operator

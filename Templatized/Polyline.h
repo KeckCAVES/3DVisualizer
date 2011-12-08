@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLObject.h>
 
 /* Forward declarations: */
-namespace Comm {
+namespace Cluster {
 class MulticastPipe;
 }
 
@@ -73,7 +73,7 @@ class Polyline:public GLObject
 	
 	/* Elements: */
 	private:
-	Comm::MulticastPipe* pipe; // Pipe to stream polyline data in a cluster environment (owned by caller)
+	Cluster::MulticastPipe* pipe; // Pipe to stream polyline data in a cluster environment (owned by caller)
 	unsigned int version; // Version number of the polyline (incremented on each clear operation)
 	size_t numVertices; // Total number of vertices currently in set
 	Chunk* head; // Pointer to first vertex buffer chunk
@@ -87,7 +87,7 @@ class Polyline:public GLObject
 	
 	/* Constructors and destructors: */
 	public:
-	Polyline(Comm::MulticastPipe* sPipe); // Creates empty polyline for given multicast pipe (or 0 in single-machine environment)
+	Polyline(Cluster::MulticastPipe* sPipe); // Creates empty polyline for given multicast pipe (or 0 in single-machine environment)
 	private:
 	Polyline(const Polyline& source); // Prohibit copy constructor
 	Polyline& operator=(const Polyline& source); // Prohibit assignment operator

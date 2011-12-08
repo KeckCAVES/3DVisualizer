@@ -159,7 +159,7 @@ template <class DataSetWrapperParam>
 inline
 MultiStreamlineExtractor<DataSetWrapperParam>::MultiStreamlineExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:Abstract::Algorithm(sVariableManager,sPipe),
 	 parameters(sVariableManager),
 	 msle(parameters.ds,*parameters.ve,*parameters.cse),

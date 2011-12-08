@@ -31,8 +31,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Misc/ValueCoder.h>
 #include <Misc/ArrayValueCoders.h>
 #include <IO/File.h>
-#include <Comm/MulticastPipe.h>
-#include <Comm/ClusterPipe.h>
 
 /* Forward declarations: */
 namespace Visualization {
@@ -56,8 +54,6 @@ class ReaderBase // Base class for atomic or compound values that can be read fr
 	/* Methods: */
 	virtual void read(const std::string& string) const =0; // Reads the value from a string
 	virtual void read(IO::File& file) const =0; // Reads the value from a binary file
-	virtual void read(Comm::MulticastPipe& pipe) const =0; // Reads the value from a binary multicast pipe
-	virtual void read(Comm::ClusterPipe& pipe) const =0; // Reads the value from a binary cluster pipe
 	};
 
 template <class DataParam>
@@ -84,14 +80,6 @@ class Reader:public ReaderBase // Generic class for values that can be read from
 		data=Misc::ValueCoder<Data>::decode(string.data(),string.data()+string.length());
 		}
 	virtual void read(IO::File& file) const
-		{
-		data=Misc::Marshaller<Data>::read(file);
-		}
-	virtual void read(Comm::MulticastPipe& file) const
-		{
-		data=Misc::Marshaller<Data>::read(file);
-		}
-	virtual void read(Comm::ClusterPipe& file) const
 		{
 		data=Misc::Marshaller<Data>::read(file);
 		}
@@ -123,14 +111,6 @@ class ArrayReader:public ReaderBase // Generic class for array values that can b
 		Misc::FixedArrayValueCoder<Data>::decode(elements,numElements,string.data(),string.data()+string.length());
 		}
 	virtual void read(IO::File& file) const
-		{
-		Misc::FixedArrayMarshaller<Data>::read(elements,numElements,file);
-		}
-	virtual void read(Comm::MulticastPipe& file) const
-		{
-		Misc::FixedArrayMarshaller<Data>::read(elements,numElements,file);
-		}
-	virtual void read(Comm::ClusterPipe& file) const
 		{
 		Misc::FixedArrayMarshaller<Data>::read(elements,numElements,file);
 		}

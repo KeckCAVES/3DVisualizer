@@ -43,7 +43,7 @@ ColoredIsosurface<DataSetWrapperParam>::ColoredIsosurface(
 	Visualization::Abstract::Parameters* sParameters,
 	bool sLighting,
 	const GLColorMap* sColorMap,
-	Comm::MulticastPipe* pipe)
+	Cluster::MulticastPipe* pipe)
 	:Visualization::Abstract::Element(sParameters),
 	 lighting(sLighting),
 	 colorMap(sColorMap),

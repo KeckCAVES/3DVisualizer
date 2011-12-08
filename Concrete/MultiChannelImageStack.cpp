@@ -2,7 +2,7 @@
 MultiChannelImageStack - Class to represent multivariate scalaar-valued
 Cartesian data sets stored as multiple matching stacks of color or
 greyscale images.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -64,12 +64,14 @@ struct StackDescriptor
 	int imageIndexStart;
 	int imageIndexStep;
 	int regionOrigin[2];
+	bool master;
 	
 	/* Constructors and destructors: */
-	StackDescriptor(DS& sDataSet)
+	StackDescriptor(DS& sDataSet,bool sMaster)
 		:dataSet(sDataSet),
 		 numVertices(0,0,0),cellSize(0,0,0),dsPartsMask(0x0),haveDs(false),
-		 imageIndexStart(0),imageIndexStep(1)
+		 imageIndexStart(0),imageIndexStep(1),
+		 master(sMaster)
 		{
 		regionOrigin[0]=regionOrigin[1]=0;
 		}
@@ -209,7 +211,8 @@ void loadGreyscaleImageStack(StackDescriptor& sd,int newSliceIndex,const char* i
 	
 	/* Get a pointer to the slice: */
 	Value* slicePtr=sd.dataSet.getSliceArray(newSliceIndex);
-	std::cout<<"Reading greyscale image stack "<<imageFileNameTemplate<<"...   0%"<<std::flush;
+	if(sd.master)
+		std::cout<<"Reading greyscale image stack "<<imageFileNameTemplate<<"...   0%"<<std::flush;
 	Misc::Timer loadTimer;
 	for(int imageIndex=0;imageIndex<sd.numVertices[2];++imageIndex,slicePtr+=sd.dataSet.getVertexStride(2))
 		{
@@ -229,10 +232,12 @@ void loadGreyscaleImageStack(StackDescriptor& sd,int newSliceIndex,const char* i
 		loadGreyscaleImage(sd,slicePtr,imageFileName.c_str());
 		#endif
 		
-		std::cout<<"\b\b\b\b"<<std::setw(3)<<((imageIndex+1)*100)/sd.numVertices[2]<<"%"<<std::flush;
+		if(sd.master)
+			std::cout<<"\b\b\b\b"<<std::setw(3)<<((imageIndex+1)*100)/sd.numVertices[2]<<"%"<<std::flush;
 		}
 	loadTimer.elapse();
-	std::cout<<"\b\b\b\bdone in "<<loadTimer.getTime()*1000.0<<" ms"<<std::endl;
+	if(sd.master)
+		std::cout<<"\b\b\b\bdone in "<<loadTimer.getTime()*1000.0<<" ms"<<std::endl;
 	}
 
 void loadColorImageStack(StackDescriptor& sd,const int newSliceIndices[3],const char* imageFileNameTemplate)
@@ -242,7 +247,8 @@ void loadColorImageStack(StackDescriptor& sd,const int newSliceIndices[3],const 
 	for(int i=0;i<3;++i)
 		slices[i]=sd.dataSet.getSliceArray(newSliceIndices[i]);
 	ptrdiff_t sliceIndex=0;
-	std::cout<<"Reading color image stack "<<imageFileNameTemplate<<"...   0%"<<std::flush;
+	if(sd.master)
+		std::cout<<"Reading color image stack "<<imageFileNameTemplate<<"...   0%"<<std::flush;
 	Misc::Timer loadTimer;
 	for(int imageIndex=0;imageIndex<sd.numVertices[2];++imageIndex,sliceIndex+=sd.dataSet.getVertexStride(2))
 		{
@@ -269,17 +275,20 @@ void loadColorImageStack(StackDescriptor& sd,const int newSliceIndices[3],const 
 					slices[i][vIndex]=Value(pixel[i]);
 				}
 			}
-		std::cout<<"\b\b\b\b"<<std::setw(3)<<((imageIndex+1)*100)/sd.numVertices[2]<<"%"<<std::flush;
+		if(sd.master)
+			std::cout<<"\b\b\b\b"<<std::setw(3)<<((imageIndex+1)*100)/sd.numVertices[2]<<"%"<<std::flush;
 		}
 	loadTimer.elapse();
-	std::cout<<"\b\b\b\bdone in "<<loadTimer.getTime()*1000.0<<" ms"<<std::endl;
+	if(sd.master)
+		std::cout<<"\b\b\b\bdone in "<<loadTimer.getTime()*1000.0<<" ms"<<std::endl;
 	}
 
 void filterImageStack(StackDescriptor& sd,int sliceIndex,bool medianFilter,bool lowpassFilter)
 	{
 	/* Get a pointer to the slice: */
 	Value* slicePtr=sd.dataSet.getSliceArray(sliceIndex);
-	std::cout<<"Filtering image stack...   0%"<<std::flush;
+	if(sd.master)
+		std::cout<<"Filtering image stack...   0%"<<std::flush;
 	Misc::Timer filterTimer;
 	
 	/* Create a buffer for a single voxel pile: */
@@ -354,13 +363,15 @@ void filterImageStack(StackDescriptor& sd,int sliceIndex,bool medianFilter,bool 
 					*vPtr=*pPtr;
 				}
 			}
-		std::cout<<"\b\b\b\b"<<std::setw(3)<<((x+1)*100)/sd.numVertices[0]<<"%"<<std::flush;
+		if(sd.master)
+			std::cout<<"\b\b\b\b"<<std::setw(3)<<((x+1)*100)/sd.numVertices[0]<<"%"<<std::flush;
 		}
 	
 	delete[] pileBuffer;
 	
 	filterTimer.elapse();
-	std::cout<<"\b\b\b\bdone in "<<filterTimer.getTime()*1000.0<<" ms"<<std::endl;
+	if(sd.master)
+		std::cout<<"\b\b\b\bdone in "<<filterTimer.getTime()*1000.0<<" ms"<<std::endl;
 	}
 
 }
@@ -374,8 +385,10 @@ MultiChannelImageStack::MultiChannelImageStack(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* MultiChannelImageStack::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* MultiChannelImageStack::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
+	bool master=pipe==0||pipe->isMaster();
+	
 	/* Create the result data set: */
 	Misc::SelfDestructPointer<DataSet> result(new DataSet);
 	DS& dataSet=result->getDs();
@@ -385,7 +398,7 @@ Visualization::Abstract::DataSet* MultiChannelImageStack::load(const std::vector
 	dataValue.initialize(&dataSet,0);
 	
 	/* Parse the module arguments: */
-	StackDescriptor sd(dataSet);
+	StackDescriptor sd(dataSet,master);
 	bool medianFilter=false;
 	bool lowpassFilter=false;
 	for(size_t i=0;i<args.size();++i)
@@ -428,8 +441,8 @@ Visualization::Abstract::DataSet* MultiChannelImageStack::load(const std::vector
 			++i;
 			if(i<args.size())
 				{
-				sd.imageDirectory=args[i];
-				if(!args[i].empty()&&args[i][args[i].size()-1]!='/')
+				sd.imageDirectory=getFullPath(args[i]);
+				if(!sd.imageDirectory.empty()&&sd.imageDirectory[sd.imageDirectory.size()-1]!='/')
 					sd.imageDirectory.push_back('/');
 				}
 			}

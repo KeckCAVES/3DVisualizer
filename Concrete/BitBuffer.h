@@ -1,7 +1,7 @@
 /***********************************************************************
 BitBuffer - Data structure to extract arbitrary-length integers from a
 stream of bytes.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #define VISUALIZATION_CONCRETE_BITBUFFER_INCLUDED
 
 #include <Misc/ThrowStdErr.h>
-#include <Misc/CharacterSource.h>
+#include <IO/File.h>
 
 namespace Visualization {
 
@@ -39,7 +39,7 @@ class BitBuffer
 	static const int fillSize=bufferSize-7; // Number of bits to grab from the input stream when a buffer underrun occurs
 	
 	/* Elements: */
-	Misc::CharacterSource& source; // Source for compressed JPEG data
+	IO::File& source; // Source for compressed JPEG data
 	BufferType bits; // Buffer of bits available for extraction
 	int numBits; // Number of bits still left in buffer
 	
@@ -76,7 +76,7 @@ class BitBuffer
 	
 	/* Constructors and destructors: */
 	public:
-	BitBuffer(Misc::CharacterSource& sSource) // Creates a bit buffer for the given JPEG stream
+	BitBuffer(IO::File& sSource) // Creates a bit buffer for the given JPEG stream
 		:source(sSource),
 		 bits(0),numBits(0)
 		{

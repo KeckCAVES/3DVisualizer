@@ -1,7 +1,7 @@
 /***********************************************************************
 TecplotASCIIFileHeaderParser - Helper functions to parse the headers of
 ASCII Tecplot files.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -146,7 +146,7 @@ void TecplotASCIIFileHeaderParser::parseZone(void)
 		}
 	}
 
-TecplotASCIIFileHeaderParser::TecplotASCIIFileHeaderParser(IO::File& source)
+TecplotASCIIFileHeaderParser::TecplotASCIIFileHeaderParser(IO::FilePtr source)
 	:IO::ValueSource(source)
 	{
 	/* Set the punctuation characters: */

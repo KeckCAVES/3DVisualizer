@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLObject.h>
 
 /* Forward declarations: */
-namespace Comm {
+namespace Cluster {
 class MulticastPipe;
 }
 
@@ -92,7 +92,7 @@ class IndexedTriangleSet:public GLObject
 	
 	/* Elements: */
 	private:
-	Comm::MulticastPipe* pipe; // Pipe to stream triangle set data in a cluster environment (owned by caller)
+	Cluster::MulticastPipe* pipe; // Pipe to stream triangle set data in a cluster environment (owned by caller)
 	unsigned int version; // Version number of the triangle set (incremented on each clear operation)
 	size_t numVertices; // Number of vertices in the triangle set
 	size_t numTriangles; // Number of triangles (index triples) in the triangle set
@@ -113,7 +113,7 @@ class IndexedTriangleSet:public GLObject
 	
 	/* Constructors and destructors: */
 	public:
-	IndexedTriangleSet(Comm::MulticastPipe* sPipe); // Creates empty triangle set for given multicast pipe (or 0 in single-machine environment)
+	IndexedTriangleSet(Cluster::MulticastPipe* sPipe); // Creates empty triangle set for given multicast pipe (or 0 in single-machine environment)
 	private:
 	IndexedTriangleSet(const IndexedTriangleSet& source); // Prohibit copy constructor
 	IndexedTriangleSet& operator=(const IndexedTriangleSet& source); // Prohibit assignment operator

@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Templatized/VolumeRenderingSampler.h>
 
 #include <Misc/Utility.h>
-#include <Comm/MulticastPipe.h>
+#include <Cluster/MulticastPipe.h>
 
 #include <Abstract/Algorithm.h>
 
@@ -82,7 +82,7 @@ VolumeRenderingSampler<DataSetParam>::sample(
 	typename ScalarExtractorParam::Scalar outOfDomainValue,
 	VoxelParam* voxels,
 	const ptrdiff_t voxelStrides[3],
-	Comm::MulticastPipe* pipe,
+	Cluster::MulticastPipe* pipe,
 	float percentageScale,
 	float percentageOffset,
 	Visualization::Abstract::Algorithm* algorithm) const

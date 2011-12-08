@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLObject.h>
 
 /* Forward declarations: */
-namespace Comm {
+namespace Cluster {
 class MulticastPipe;
 }
 
@@ -74,7 +74,7 @@ class TriangleSet:public GLObject
 	
 	/* Elements: */
 	private:
-	Comm::MulticastPipe* pipe; // Pipe to stream triangle set data in a cluster environment (owned by caller)
+	Cluster::MulticastPipe* pipe; // Pipe to stream triangle set data in a cluster environment (owned by caller)
 	unsigned int version; // Version number of the triangle set (incremented on each clear operation)
 	size_t numTriangles; // Total number of triangles currently in set
 	Chunk* head; // Pointer to first triangle buffer chunk
@@ -88,7 +88,7 @@ class TriangleSet:public GLObject
 	
 	/* Constructors and destructors: */
 	public:
-	TriangleSet(Comm::MulticastPipe* sPipe); // Creates empty triangle set for given multicast pipe (or 0 in single-machine environment)
+	TriangleSet(Cluster::MulticastPipe* sPipe); // Creates empty triangle set for given multicast pipe (or 0 in single-machine environment)
 	private:
 	TriangleSet(const TriangleSet& source); // Prohibit copy constructor
 	TriangleSet& operator=(const TriangleSet& source); // Prohibit assignment operator

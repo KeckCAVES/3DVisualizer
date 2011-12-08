@@ -59,7 +59,7 @@ class Isosurface:public Visualization::Abstract::Element
 	
 	/* Constructors and destructors: */
 	public:
-	Isosurface(Visualization::Abstract::Parameters* sParameters,VScalar sIsovalue,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty isosurface for the given parameters
+	Isosurface(Visualization::Abstract::Parameters* sParameters,VScalar sIsovalue,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty isosurface for the given parameters
 	private:
 	Isosurface(const Isosurface& source); // Prohibit copy constructor
 	Isosurface& operator=(const Isosurface& source); // Prohibit assignment operator

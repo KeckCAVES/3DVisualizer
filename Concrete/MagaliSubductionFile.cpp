@@ -40,7 +40,7 @@ MagaliSubductionFile::MagaliSubductionFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* MagaliSubductionFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* MagaliSubductionFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Open the data file: */
 	Misc::File dataFile(args[0].c_str(),"rb",Misc::File::LittleEndian);

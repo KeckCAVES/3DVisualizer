@@ -105,7 +105,7 @@ class TripleChannelVolumeRendererExtractor:public Visualization::Abstract::Algor
 	
 	/* Constructors and destructors: */
 	public:
-	TripleChannelVolumeRendererExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates a volume renderer extractor
+	TripleChannelVolumeRendererExtractor(Visualization::Abstract::VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe); // Creates a volume renderer extractor
 	virtual ~TripleChannelVolumeRendererExtractor(void);
 	
 	/* Methods from Visualization::Abstract::Algorithm: */

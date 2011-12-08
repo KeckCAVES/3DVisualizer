@@ -1,7 +1,7 @@
 /***********************************************************************
 CitcomSCfgFileParser - Helper function to parse configuration files
 describing the results of a CitcomS simulation run.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,12 +25,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <string>
 #include <Misc/ArrayIndex.h>
+#include <IO/File.h>
 
 namespace Visualization {
 
 namespace Concrete {
 
-void parseCitcomSCfgFile(const char* cfgFileName,std::string& dataDir,std::string& dataFileName,int& numSurfaces,Misc::ArrayIndex<3>& numCpus,Misc::ArrayIndex<3>& numVertices);
+void parseCitcomSCfgFile(const std::string& cfgFileName,IO::FilePtr cfgFile,std::string& dataDir,std::string& dataFileName,int& numSurfaces,Misc::ArrayIndex<3>& numCpus,Misc::ArrayIndex<3>& numVertices);
 
 }
 

@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #define ARROWRAKE_USEVBO 0
 
 #include <Misc/ThrowStdErr.h>
-#include <Comm/MulticastPipe.h>
+#include <Cluster/MulticastPipe.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GL/gl.h>
 #include <GL/GLColorTemplates.h>
@@ -98,7 +98,7 @@ ArrowRake<DataSetWrapperParam>::ArrowRake(
 	typename ArrowRake<DataSetWrapperParam>::Scalar sShaftRadius,
 	unsigned int sNumArrowVertices,
 	const GLColorMap* sColorMap,
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:Visualization::Abstract::Element(sParameters),
 	 colorMap(sColorMap),
 	 pipe(sPipe),
@@ -285,7 +285,7 @@ ArrowRake<DataSetWrapperParam>::update(
 					pipe->write<VScalar>(rIt->scalarValue);
 					}
 				}
-			pipe->finishMessage();
+			pipe->flush();
 			}
 		else
 			{

@@ -40,7 +40,7 @@ inline
 Streamline<DataSetWrapperParam>::Streamline(
 	Visualization::Abstract::Parameters* sParameters,
 	const GLColorMap* sColorMap,
-	Comm::MulticastPipe* pipe)
+	Cluster::MulticastPipe* pipe)
 	:Visualization::Abstract::Element(sParameters),
 	 colorMap(sColorMap),
 	 polyline(pipe)

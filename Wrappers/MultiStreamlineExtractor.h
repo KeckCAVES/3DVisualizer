@@ -140,7 +140,7 @@ class MultiStreamlineExtractor:public Visualization::Abstract::Algorithm
 	
 	/* Constructors and destructors: */
 	public:
-	MultiStreamlineExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates a multi-streamline extractor
+	MultiStreamlineExtractor(Visualization::Abstract::VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe); // Creates a multi-streamline extractor
 	virtual ~MultiStreamlineExtractor(void);
 	
 	/* Methods from Visualization::Abstract::Algorithm: */

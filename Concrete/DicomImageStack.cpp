@@ -2,7 +2,7 @@
 DicomImageStack - Class to encapsulate operations on scalar-valued
 cartesian data sets stored in stacks of DICOM medical interchange
 images.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/FileTests.h>
 #include <Plugins/FactoryManager.h>
+#include <Cluster/OpenFile.h>
 
 #include <Concrete/DicomFile.h>
 
@@ -47,10 +48,10 @@ DicomImageStack::DicomImageStack(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* DicomImageStack::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* DicomImageStack::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Parse the command line: */
-	const char* fileName=0;
+	std::string fileName;
 	int seriesNumber=-1;
 	bool flip=false;
 	for(std::vector<std::string>::const_iterator aIt=args.begin();aIt!=args.end();++aIt)
@@ -65,32 +66,30 @@ Visualization::Abstract::DataSet* DicomImageStack::load(const std::vector<std::s
 			else if(strcasecmp(aIt->c_str()+1,"flip")==0)
 				flip=true;
 			}
-		else if(fileName==0)
-			fileName=aIt->c_str();
+		else if(fileName.empty())
+			fileName=getFullPath(*aIt);
 		}
-	if(fileName==0)
+	if(fileName.empty())
 		Misc::throwStdErr("DicomImageStack::load: No DICOM file name provided");
 	
 	/* Create a stack descriptor for the given stack of DICOM images: */
 	Misc::SelfDestructPointer<DicomFile::ImageStackDescriptor> isd;
 	
 	/* Check if the given DICOM file name is a directory containing DICOM image files, or a DICOM directory file: */
-	if(Misc::isPathDirectory(args[0].c_str()))
+	if(Misc::isPathDirectory(fileName.c_str()))
 		{
+		/* Open the directory: */
+		IO::DirectoryPtr directory=Cluster::openDirectory(pipe!=0?pipe->getMultiplexer():0,fileName.c_str());
+		
 		/* Create a stack descriptor from all DICOM images in the given directory: */
-		isd.setTarget(DicomFile::readImageStackDescriptor(args[0].c_str()));
+		isd.setTarget(DicomFile::readImageStackDescriptor(directory));
 		if(!isd.isValid())
-			Misc::throwStdErr("DicomImageStack::load: Directory %s does not contain a valid image series",args[0].c_str());
+			Misc::throwStdErr("DicomImageStack::load: Directory %s does not contain a valid image series",fileName.c_str());
 		}
 	else
 		{
 		/* Open the DICOM directory file: */
-		DicomFile dcmDirectory(args[0].c_str());
-		
-		/* Extract the series number from the command line: */
-		int seriesNumber=-1; // Read the first series
-		if(args.size()>=2)
-			seriesNumber=atoi(args[1].c_str());
+		DicomFile dcmDirectory(fileName.c_str(),Cluster::openFile(pipe!=0?pipe->getMultiplexer():0,fileName.c_str()));
 		
 		/* Read the image stack descriptor for the selected series: */
 		Misc::SelfDestructPointer<DicomFile::Directory> directory(dcmDirectory.readDirectory());
@@ -98,9 +97,9 @@ Visualization::Abstract::DataSet* DicomImageStack::load(const std::vector<std::s
 		if(!isd.isValid())
 			{
 			if(seriesNumber==-1)
-				Misc::throwStdErr("DicomImageStack::load: Directory file %s does not contain a valid image series",args[0].c_str());
+				Misc::throwStdErr("DicomImageStack::load: Directory file %s does not contain a valid image series",fileName.c_str());
 			else
-				Misc::throwStdErr("DicomImageStack::load: Directory file %s does not contain a valid image series %d",args[0].c_str(),seriesNumber);
+				Misc::throwStdErr("DicomImageStack::load: Directory file %s does not contain a valid image series %d",fileName.c_str(),seriesNumber);
 			}
 		}
 	
@@ -118,7 +117,7 @@ Visualization::Abstract::DataSet* DicomImageStack::load(const std::vector<std::s
 	for(int i=0;i<isd->numImages;++i)
 		{
 		/* Open the slice DICOM file: */
-		DicomFile dcm(isd->imageFileNames[i]);
+		DicomFile dcm(isd->imageFileNames[i],Cluster::openFile(pipe!=0?pipe->getMultiplexer():0,isd->imageFileNames[i]));
 		
 		/* Read the slice image descriptor: */
 		Misc::SelfDestructPointer<DicomFile::ImageDescriptor> id(dcm.readImageDescriptor());

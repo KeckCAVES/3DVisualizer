@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_TEMPLATIZED_TRIANGLESET_IMPLEMENTATION
 
-#include <Comm/MulticastPipe.h>
+#include <Cluster/MulticastPipe.h>
 #include <GL/gl.h>
 #include <GL/GLVertexArrayParts.h>
 #define GLVERTEX_NONSTANDARD_TEMPLATES
@@ -90,7 +90,7 @@ TriangleSet<VertexParam>::addNewChunk(
 			/* Send unsent triangles in the last chunk across the pipe: */
 			pipe->write<unsigned int>((unsigned int)numUnsentTriangles);
 			pipe->write<Vertex>(tail->vertices+tailNumSentTriangles*3,numUnsentTriangles*3);
-			pipe->finishMessage();
+			pipe->flush();
 			}
 		
 		tailNumSentTriangles=0;
@@ -112,7 +112,7 @@ TriangleSet<VertexParam>::addNewChunk(
 template <class VertexParam>
 inline
 TriangleSet<VertexParam>::TriangleSet(
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:pipe(sPipe),
 	 version(0),
 	 numTriangles(0),
@@ -232,7 +232,7 @@ TriangleSet<VertexParam>::flush(
 		
 		/* Send a flush signal: */
 		pipe->write<unsigned int>(0);
-		pipe->finishMessage();
+		pipe->flush();
 		}
 	}
 

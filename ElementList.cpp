@@ -277,9 +277,9 @@ void ElementList::saveElements(const char* elementFileName,bool ascii,const Visu
 	else
 		{
 		/* Create a binary element file and a data sink to write into it: */
-		IO::AutoFile elementFile(Vrui::openFile(elementFileName,IO::File::WriteOnly));
-		elementFile->setEndianness(IO::File::LittleEndian);
-		Visualization::Abstract::BinaryParametersSink<IO::File> sink(variableManager,*elementFile,false);
+		IO::FilePtr elementFile(Vrui::openFile(elementFileName,IO::File::WriteOnly));
+		elementFile->setEndianness(Misc::LittleEndian);
+		Visualization::Abstract::BinaryParametersSink sink(variableManager,*elementFile,false);
 		
 		/* Save all visible visualization elements: */
 		for(ListElementList::const_iterator veIt=elements.begin();veIt!=elements.end();++veIt)

@@ -121,7 +121,7 @@ template <class DataSetWrapperParam>
 inline
 SeededSliceExtractor<DataSetWrapperParam>::SeededSliceExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:Abstract::Algorithm(sVariableManager,sPipe),
 	 parameters(getVariableManager()->getCurrentScalarVariable()),
 	 sle(getDs(sVariableManager->getDataSetByScalarVariable(parameters.scalarVariableIndex)),getSe(sVariableManager->getScalarExtractor(parameters.scalarVariableIndex))),

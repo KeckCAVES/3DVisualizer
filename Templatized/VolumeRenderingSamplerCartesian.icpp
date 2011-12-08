@@ -58,7 +58,7 @@ VolumeRenderingSampler<Cartesian<ScalarParam,3,ValueParam> >::sample(
 	typename ScalarExtractorParam::Scalar outOfDomainValue,
 	VoxelParam* voxels,
 	const ptrdiff_t voxelStrides[3],
-	Comm::MulticastPipe* pipe,
+	Cluster::MulticastPipe* pipe,
 	float percentageScale,
 	float percentageOffset,
 	Visualization::Abstract::Algorithm* algorithm) const
@@ -119,7 +119,7 @@ VolumeRenderingSampler<SlicedCartesian<ScalarParam,3,ValueScalarParam> >::sample
 	typename ScalarExtractorParam::Scalar outOfDomainValue,
 	VoxelParam* voxels,
 	const ptrdiff_t voxelStrides[3],
-	Comm::MulticastPipe* pipe,
+	Cluster::MulticastPipe* pipe,
 	float percentageScale,
 	float percentageOffset,
 	Visualization::Abstract::Algorithm* algorithm) const

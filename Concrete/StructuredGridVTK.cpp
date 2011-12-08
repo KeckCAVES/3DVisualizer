@@ -20,16 +20,16 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/StructuredGridVTK.h>
+
 #include <string>
 #include <iostream>
 #include <iomanip>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
+#include <Plugins/FactoryManager.h>
 #include <IO/OpenFile.h>
 #include <IO/ValueSource.h>
-#include <Plugins/FactoryManager.h>
-
-#include <Concrete/StructuredGridVTK.h>
 
 namespace Visualization {
 
@@ -44,21 +44,23 @@ StructuredGridVTK::StructuredGridVTK(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
+	bool master=pipe==0||pipe->isMaster();
+	
 	/* Create the result data set: */
 	Misc::SelfDestructPointer<DataSet> result(new DataSet);
 	DS& dataSet=result->getDs();
 	
 	/* Open the input file: */
-	IO::AutoFile file(IO::openFile(args[0].c_str()));
+	IO::FilePtr file(openFile(args[0],pipe));
 	
 	/* Attach a value source to the file to read the header: */
 	DS::Index numVertices;
 	bool binary=false;
 	std::string gridPointDataType;
 	{
-	IO::ValueSource headerSource(*file);
+	IO::ValueSource headerSource(file);
 	headerSource.setPunctuation('\n',true);
 	
 	/* Read the header line: */
@@ -131,10 +133,11 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 	else
 		{
 		/* Attach another data source to the file to read grid points: */
-		IO::ValueSource gridSource(*file);
+		IO::ValueSource gridSource(file);
 		gridSource.setPunctuation('\n',true);
 		
-		std::cout<<"Reading grid vertices...   0%"<<std::flush;
+		if(master)
+			std::cout<<"Reading grid vertices...   0%"<<std::flush;
 		DS::Index index(0);
 		while(index[2]<numVertices[2])
 			{
@@ -151,16 +154,19 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 			for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
 				index[incDim]=0;
 			++index[incDim];
-			if(incDim==2)
+			if(incDim==2&&master)
 				std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
 			}
-		std::cout<<"\b\b\b\bdone"<<std::endl;
+		if(master)
+			std::cout<<"\b\b\b\bdone"<<std::endl;
 		}
 	
 	/* Finalize the grid structure: */
-	std::cout<<"Finalizing grid structure..."<<std::flush;
+	if(master)
+		std::cout<<"Finalizing grid structure..."<<std::flush;
 	dataSet.finalizeGrid();
-	std::cout<<" done"<<std::endl;
+	if(master)
+		std::cout<<" done"<<std::endl;
 	
 	/* Initialize the result data set's data value: */
 	DataValue& dataValue=result->getDataValue();
@@ -173,7 +179,7 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 		std::string attributeType,attributeName,attributeScalarType;
 		int attributeNumScalars=1;
 		{
-		IO::ValueSource attributeSource(*file);
+		IO::ValueSource attributeSource(file);
 		attributeSource.setPunctuation('\n',true);
 		attributeSource.skipWs();
 		if(attributeSource.readString()!="POINT_DATA")
@@ -213,23 +219,16 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 			{
 			/* Add another vector variable to the data value: */
 			attributeVectors=true;
-			int vectorVariableIndex=dataValue.getNumVectorVariables();
-			dataValue.addVectorVariable(attributeName.c_str());
+			int vectorVariableIndex=dataValue.addVectorVariable(attributeName.c_str());
 			
-			/* Add four new slices to the data set (3 components plus magnitude): */
-			for(int i=0;i<3;++i)
+			/* Add four new slices to the data set (three components plus magnitude): */
+			for(int i=0;i<4;++i)
 				{
 				dataSet.addSlice();
-				std::string variableName=attributeName;
-				variableName.push_back(' ');
-				variableName.push_back('X'+i);
-				dataValue.addScalarVariable(variableName.c_str());
-				dataValue.setVectorVariableScalarIndex(vectorVariableIndex,i,sliceIndex+i);
+				int variableIndex=dataValue.addScalarVariable(makeVectorSliceName(attributeName,i).c_str());
+				if(i<3)
+					dataValue.setVectorVariableScalarIndex(vectorVariableIndex,i,variableIndex);
 				}
-			dataSet.addSlice();
-			std::string variableName=attributeName;
-			variableName.append(" Magnitude");
-			dataValue.addScalarVariable(variableName.c_str());
 			}
 		else
 			Misc::throwStdErr("StructuredGridVTK::load: VTK data file %s has unknown point attribute type %s",args[0].c_str(),attributeType.c_str());
@@ -241,10 +240,11 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 		else
 			{
 			/* Attach another data source to the file to read grid points: */
-			IO::ValueSource attributeSource(*file);
+			IO::ValueSource attributeSource(file);
 			attributeSource.setPunctuation('\n',true);
 			
-			std::cout<<"Reading "<<attributeName<<" point attributes...   0%"<<std::flush;
+			if(master)
+				std::cout<<"Reading "<<attributeName<<" point attributes...   0%"<<std::flush;
 			DS::Index index(0);
 			while(index[2]<numVertices[2])
 				{
@@ -278,10 +278,11 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 				for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
 					index[incDim]=0;
 				++index[incDim];
-				if(incDim==2)
+				if(incDim==2&&master)
 					std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
 				}
-			std::cout<<"\b\b\b\bdone"<<std::endl;
+			if(master)
+				std::cout<<"\b\b\b\bdone"<<std::endl;
 			}
 		}
 	

@@ -1,7 +1,7 @@
 /***********************************************************************
 TecplotASCIIFileHeaderParser - Helper functions to parse the headers of
 ASCII Tecplot files.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -71,7 +71,7 @@ class TecplotASCIIFileHeaderParser:public IO::ValueSource
 	
 	/* Constructors and destructors: */
 	public:
-	TecplotASCIIFileHeaderParser(IO::File& source); // Creates a parser for the given character source
+	TecplotASCIIFileHeaderParser(IO::FilePtr source); // Creates a parser for the given character source
 	
 	/* Methods: */
 	std::string getTitle(void) const // Returns the file's title

@@ -38,7 +38,7 @@ FloatGridFile::FloatGridFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* FloatGridFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* FloatGridFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Construct the grid file name: */
 	char gridFilename[2048];

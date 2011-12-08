@@ -156,7 +156,7 @@ template <class DataSetWrapperParam>
 inline
 ArrowRakeExtractor<DataSetWrapperParam>::ArrowRakeExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:Abstract::Algorithm(sVariableManager,sPipe),
 	 parameters(sVariableManager),
 	 currentArrowRake(0),currentParameters(0),

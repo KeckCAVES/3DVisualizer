@@ -1,7 +1,7 @@
 /***********************************************************************
 DicomFile - Class to represent and extract images from DICOM interchange
 files.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -30,11 +30,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
+#include <Misc/SizedTypes.h>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
 #include <Misc/HashTable.h>
-#include <Misc/Directory.h>
-#include <Misc/BufferCharacterSource.h>
+#include <IO/FixedMemoryFile.h>
 
 #include <Concrete/JPEGImageWriter.h>
 #include <Concrete/JPEGDecompressor.h>
@@ -70,13 +71,13 @@ struct DicomDataElement
 		};
 	
 	/* Elements: */
-	static const short unsigned int sequenceTags[][2]; // Array of tags that imply a sequence
-	unsigned short int tag[2]; // The data element's tag
-	ValueRepresentation vr; // The data element's value representation
+	static const Misc::UInt16 sequenceTags[][2]; // Array of tags that imply a sequence
+	Misc::UInt16 tag[2]; // The data element's tag
+	unsigned int vr; // The data element's value representation
 	unsigned int valueSize; // The data element's value size
 	
 	/* Methods: */
-	bool read(Misc::File& dcmFile,DicomFile::VrMode vrMode); // Reads the next data element from a DICOM file; returns false at end of file
+	bool read(IO::File& dcmFile,DicomFile::VrMode vrMode); // Reads the next data element from a DICOM file; returns false at end of file
 	bool isSequence(void) const // Returns true if the data element is an explicit or implicit (darn that!) sequence
 		{
 		/* Check for explicit type information: */
@@ -94,17 +95,17 @@ struct DicomDataElement
 		{
 		return tag[0]==group&&tag[1]==element;
 		};
-	void skipValue(Misc::File& dcmFile) const; // Skips the data element's value in the DICOM file
-	char* readValue(Misc::File& dcmFile) const; // Reads the data element's value into a newly created char array
-	int readIntValues(Misc::File& dcmFile,int numValues,int values[]) const; // Reads an array of string-encoded integer values; returns number of values in string
-	int readFloatValues(Misc::File& dcmFile,int numValues,float values[]) const; // Reads an array of string-encoded floating-point values; returns number of values in string
+	void skipValue(IO::File& dcmFile) const; // Skips the data element's value in the DICOM file
+	char* readValue(IO::File& dcmFile) const; // Reads the data element's value into a newly created char array
+	int readIntValues(IO::File& dcmFile,int numValues,int values[]) const; // Reads an array of string-encoded integer values; returns number of values in string
+	int readFloatValues(IO::File& dcmFile,int numValues,float values[]) const; // Reads an array of string-encoded floating-point values; returns number of values in string
 	};
 
 /*****************************************
 Static elements of class DicomDataElement:
 *****************************************/
 
-const unsigned short int DicomDataElement::sequenceTags[][2]=
+const Misc::UInt16 DicomDataElement::sequenceTags[][2]=
 	{
 	{0x0004,0x1220},
 	{0x0008,0x0082},{0x0008,0x0096},{0x0008,0x0110},{0x0008,0x1032},
@@ -206,18 +207,22 @@ const unsigned short int DicomDataElement::sequenceTags[][2]=
 
 struct DicomSequence
 	{
+	/* Embedded classes: */
+	public:
+	typedef IO::SeekableFile::Offset Offset; // Type for file positions
+	
 	/* Elements: */
 	public:
 	DicomSequence* succ; // Pointer to next sequence in sequence stack
-	unsigned short int tag[2]; // The tag of the data element the sequence belongs to
+	Misc::UInt16 tag[2]; // The tag of the data element the sequence belongs to
 	bool fixedSize; // Flag if the sequence has a fixed size (hence no end sequence data element)
-	Misc::File::Offset endOffset; // Offset of the first tag after the sequence if the sequence has fixed size
+	Offset endOffset; // Offset of the first tag after the sequence if the sequence has fixed size
 	int currentItemIndex; // Index of current sequence item
 	bool currentItemFixedSize; // Flag if the current sequence item has a fixed size
-	Misc::File::Offset currentItemEndOffset; // Offset of the first tag after the current item if the current item has fixed size
+	Offset currentItemEndOffset; // Offset of the first tag after the current item if the current item has fixed size
 	
 	/* Constructors and destructors: */
-	DicomSequence(DicomSequence* sSucc,unsigned short int sTag[2])
+	DicomSequence(DicomSequence* sSucc,Misc::UInt16 sTag[2])
 		:succ(sSucc),fixedSize(false),
 		 currentItemIndex(-1),currentItemFixedSize(false)
 		{
@@ -447,12 +452,14 @@ class MemoryImageWriter:public JPEGImageWriter // Class to write image data into
 Methods of class DicomDataElement:
 *********************************/
 
-bool DicomDataElement::read(Misc::File& dcmFile,DicomFile::VrMode vrMode)
+bool DicomDataElement::read(IO::File& dcmFile,DicomFile::VrMode vrMode)
 	{
-	/* Read the tag: */
-	dcmFile.read(tag,2);
+	/* Bail out on end-of-file: */
 	if(dcmFile.eof())
 		return false;
+	
+	/* Read the tag: */
+	dcmFile.read(tag,2);
 	
 	/* Determine the value representation: */
 	if(tag[0]==0xfffeU&&(tag[1]==0xe000U||tag[1]==0xe00dU||tag[1]==0xe0ddU)) // VR is defined by special tag
@@ -461,7 +468,7 @@ bool DicomDataElement::read(Misc::File& dcmFile,DicomFile::VrMode vrMode)
 		vr=UN;
 		
 		/* Read the value size: */
-		valueSize=dcmFile.read<unsigned int>();
+		valueSize=dcmFile.read<Misc::UInt32>();
 		}
 	else if(vrMode==DicomFile::VR_IMPLICIT&&tag[0]!=0x0002U) // VR is defined by dictionary
 		{
@@ -469,43 +476,42 @@ bool DicomDataElement::read(Misc::File& dcmFile,DicomFile::VrMode vrMode)
 		vr=UN;
 		
 		/* Read the value size: */
-		valueSize=dcmFile.read<unsigned int>();
+		valueSize=dcmFile.read<Misc::UInt32>();
 		}
 	else // VR is explicitly stored in file
 		{
 		/* Read the value representation: */
-		char vrName[2];
+		Misc::UInt8 vrName[2];
 		dcmFile.read(vrName,2);
-		vr=(ValueRepresentation)int(vrName[0]*256+vrName[1]);
+		vr=(unsigned int)(vrName[0])*256U+(unsigned int)(vrName[1]);
 		
 		/* Read the value size: */
 		if(vr==OB||vr==OF||vr==OW||vr==SQ||vr==UN||vr==UT)
 			{
 			/* Value size is four bytes with padding: */
-			char pad[2];
-			dcmFile.read(pad,2);
-			valueSize=dcmFile.read<unsigned int>();
+			dcmFile.skip<Misc::UInt8>(2);
+			valueSize=dcmFile.read<Misc::UInt32>();
 			}
 		else
 			{
 			/* Value size is two bytes: */
-			valueSize=dcmFile.read<unsigned short int>();
+			valueSize=dcmFile.read<Misc::UInt16>();
 			}
 		}
 	
 	return true;
 	}
 
-void DicomDataElement::skipValue(Misc::File& dcmFile) const
+void DicomDataElement::skipValue(IO::File& dcmFile) const
 	{
 	if(valueSize>0U&&valueSize!=0xffffffffU)
 		{
 		/* Round the value size up to the next even value: */
-		dcmFile.seekCurrent((valueSize+1U)&~0x1U);
+		dcmFile.skip<Misc::UInt8>((valueSize+1U)&~0x1U);
 		}
 	}
 
-char* DicomDataElement::readValue(Misc::File& dcmFile) const
+char* DicomDataElement::readValue(IO::File& dcmFile) const
 	{
 	char* result;
 	if(valueSize>0U&&valueSize!=0xffffffffU)
@@ -528,7 +534,7 @@ char* DicomDataElement::readValue(Misc::File& dcmFile) const
 	return result;
 	}
 
-int DicomDataElement::readIntValues(Misc::File& dcmFile,int numValues,int values[]) const
+int DicomDataElement::readIntValues(IO::File& dcmFile,int numValues,int values[]) const
 	{
 	/* Read the data element value: */
 	char* value=readValue(dcmFile);
@@ -557,10 +563,13 @@ int DicomDataElement::readIntValues(Misc::File& dcmFile,int numValues,int values
 		start=end+1;
 		}
 	
+	/* Clean up: */
+	delete[] value;
+	
 	return numValuesRead;
 	}
 
-int DicomDataElement::readFloatValues(Misc::File& dcmFile,int numValues,float values[]) const
+int DicomDataElement::readFloatValues(IO::File& dcmFile,int numValues,float values[]) const
 	{
 	/* Read the data element value: */
 	char* value=readValue(dcmFile);
@@ -589,7 +598,9 @@ int DicomDataElement::readFloatValues(Misc::File& dcmFile,int numValues,float va
 		start=end+1;
 		}
 	
+	/* Clean up: */
 	delete[] value;
+	
 	return numValuesRead;
 	}
 
@@ -598,7 +609,7 @@ Helper functions:
 ****************/
 
 template <class SourcePixelType,class DestPixelType>
-void readRawImage(Misc::File& file,const int imageSize[2],DestPixelType* imageBuffer,const ptrdiff_t imageBufferStrides[2],const PixelTypeConverter<SourcePixelType,DestPixelType>& ptc)
+void readRawImage(IO::File& file,const int imageSize[2],DestPixelType* imageBuffer,const ptrdiff_t imageBufferStrides[2],const PixelTypeConverter<SourcePixelType,DestPixelType>& ptc)
 	{
 	/* Read the image one row at a time: */
 	SourcePixelType* rowBuffer=new SourcePixelType[imageSize[0]];
@@ -776,11 +787,9 @@ Methods of class DicomFile::Series:
 void DicomFile::Series::printDirectory(int indent) const
 	{
 	/* Print the series info: */
-	char is[128];
 	for(int i=0;i<indent;++i)
-		is[i]='\t';
-	is[indent]='\0';
-	printf("%sSeries %3d:\n",is,seriesNumber);
+		std::cout<<'\t';
+	std::cout<<"Series "<<std::setw(3)<<seriesNumber<<std::endl;
 	
 	/* Print all child directory entries: */
 	Directory::printDirectory(indent);
@@ -856,11 +865,9 @@ Methods of class DicomFile::Image:
 void DicomFile::Image::printDirectory(int indent) const
 	{
 	/* Print the image info: */
-	char is[128];
 	for(int i=0;i<indent;++i)
-		is[i]='\t';
-	is[indent]='\0';
-	printf("%sSlice %03d: %4d x %4d pixel image in file %s\n",is,sliceIndex,imageSize[0],imageSize[1],imageFileName);
+		std::cout<<'\t';
+	std::cout<<"Slice "<<std::setw(3)<<sliceIndex<<": "<<std::setw(4)<<imageSize[0]<<" x "<<std::setw(4)<<imageSize[1]<<" pixel image in file "<<imageFileName<<std::endl;
 	
 	/* Print all child directory entries: */
 	Directory::printDirectory(indent);
@@ -887,27 +894,29 @@ DicomFile::Image::~Image(void)
 Methods of class DicomFile:
 **************************/
 
-DicomFile::DicomFile(const char* dcmFileName)
-	:dcmFile(dcmFileName,"rb",Misc::File::LittleEndian),
+DicomFile::DicomFile(const char* dcmFileName,IO::SeekableFilePtr sDcmFile)
+	:dcmFile(sDcmFile),
 	 vrMode(VR_IMPLICIT),fileType(FILE_UNKNOWN),imageType(IMAGETYPE_UNKNOWN),imageMode(IMAGE_RAW)
 	{
+	dcmFile->setEndianness(Misc::LittleEndian);
+	
 	/* Skip the preamble: */
-	dcmFile.seekSet(128);
+	dcmFile->setReadPosAbs(128);
 	
 	/* Read the prefix: */
 	char prefix[4];
-	dcmFile.read(prefix,sizeof(prefix));
+	dcmFile->read(prefix,sizeof(prefix));
 	if(strncasecmp(prefix,"DICM",4)!=0)
 		Misc::throwStdErr("DicomFile::DicomFile: file \"%s\" is not a DICOM file",dcmFileName);
 	
 	/* Process the header tag group: */
 	DicomDataElement de;
-	Misc::File::Offset lastTagOffset;
+	Offset lastTagOffset;
 	while(true)
 		{
 		/* Read the next data element: */
-		lastTagOffset=dcmFile.tell();
-		de.read(dcmFile,vrMode);
+		lastTagOffset=dcmFile->getReadPos();
+		de.read(*dcmFile,vrMode);
 		
 		/* Finish processing if a non-header group tag is encountered: */
 		if(de.tag[0]!=0x0002U)
@@ -917,7 +926,7 @@ DicomFile::DicomFile(const char* dcmFileName)
 		if(de.tag[1]==0x0002U) // Media Storage SOP Class UID
 			{
 			/* Read the UID value: */
-			char* uid=de.readValue(dcmFile);
+			char* uid=de.readValue(*dcmFile);
 			
 			/* Determine the file type: */
 			if(strcmp(uid,"1.2.840.10008.1.3.10")==0) // Media Storage Directory Storage
@@ -943,51 +952,51 @@ DicomFile::DicomFile(const char* dcmFileName)
 		else if(de.tag[1]==0x0010U) // Transfer Syntax UID
 			{
 			/* Read the UID value: */
-			char* uid=de.readValue(dcmFile);
+			char* uid=de.readValue(*dcmFile);
 			
 			/* Determine the transfer syntax: */
 			if(strcmp(uid,"1.2.840.10008.1.2")==0) // Implicit VR Little Endian
 				{
 				vrMode=VR_IMPLICIT;
-				dcmFile.setEndianness(Misc::File::LittleEndian);
+				dcmFile->setEndianness(Misc::LittleEndian);
 				}
 			else if(strcmp(uid,"1.2.840.10008.1.2.1")==0) // Explicit VR Little Endian
 				{
 				vrMode=VR_EXPLICIT;
-				dcmFile.setEndianness(Misc::File::LittleEndian);
+				dcmFile->setEndianness(Misc::LittleEndian);
 				}
 			else if(strcmp(uid,"1.2.840.10008.1.2.2")==0) // Explicit VR Big Endian
 				{
 				vrMode=VR_EXPLICIT;
-				dcmFile.setEndianness(Misc::File::BigEndian);
+				dcmFile->setEndianness(Misc::BigEndian);
 				}
 			else if(strcmp(uid,"1.2.840.10008.1.2.4.50")==0) // Lossy JPEG
 				{
 				vrMode=VR_EXPLICIT;
-				dcmFile.setEndianness(Misc::File::LittleEndian);
+				dcmFile->setEndianness(Misc::LittleEndian);
 				imageMode=IMAGE_JPEG_LOSSY;
 				}
 			else if(strcmp(uid,"1.2.840.10008.1.2.4.70")==0) // Lossless JPEG
 				{
 				vrMode=VR_EXPLICIT;
-				dcmFile.setEndianness(Misc::File::LittleEndian);
+				dcmFile->setEndianness(Misc::LittleEndian);
 				imageMode=IMAGE_JPEG_LOSSLESS;
 				}
 			else if(strcmp(uid,"1.2.840.10008.1.2.5")==0) // RLE
 				{
 				vrMode=VR_EXPLICIT;
-				dcmFile.setEndianness(Misc::File::LittleEndian);
+				dcmFile->setEndianness(Misc::LittleEndian);
 				imageMode=IMAGE_RLE;
 				}
 			
 			delete[] uid;
 			}
 		else
-			de.skipValue(dcmFile);
+			de.skipValue(*dcmFile);
 		}
 	
 	/* Rewind to the last read tag: */
-	dcmFile.seekSet(lastTagOffset);
+	dcmFile->setReadPosAbs(lastTagOffset);
 	}
 
 DicomFile::~DicomFile(void)
@@ -1008,7 +1017,7 @@ DicomFile::ImageDescriptor* DicomFile::readImageDescriptor(void)
 	while(true)
 		{
 		/* Check if the next data element ends the current sequence: */
-		Misc::File::Offset deOffset=dcmFile.tell();
+		Offset deOffset=dcmFile->getReadPos();
 		if(sequenceTop!=0&&sequenceTop->fixedSize&&sequenceTop->endOffset==deOffset)
 			{
 			/* End the current sequence: */
@@ -1018,7 +1027,7 @@ DicomFile::ImageDescriptor* DicomFile::readImageDescriptor(void)
 			}
 		
 		/* Read the next data element: */
-		if(!de.read(dcmFile,vrMode))
+		if(!de.read(*dcmFile,vrMode))
 			break;
 		
 		/* Handle sequences: */
@@ -1031,67 +1040,67 @@ DicomFile::ImageDescriptor* DicomFile::readImageDescriptor(void)
 			if(de.valueSize>0U&&de.valueSize!=0xffffffffU)
 				{
 				sequenceTop->fixedSize=true;
-				sequenceTop->endOffset=dcmFile.tell()+Misc::File::Offset(de.valueSize);
+				sequenceTop->endOffset=dcmFile->getReadPos()+Offset(de.valueSize);
 				}
 			}
 		
 		/* Parse relevant information: */
 		if(de.is(0x0018U,0x0050U)) // Slice thickness
 			{
-			char* value=de.readValue(dcmFile);
+			char* value=de.readValue(*dcmFile);
 			result->sliceThickness=float(atof(value));
 			delete[] value;
 			}
 		else if(de.is(0x0020U,0x0013U)) // Instance number (index in image stack)
 			{
-			char* value=de.readValue(dcmFile);
+			char* value=de.readValue(*dcmFile);
 			result->stackIndex=atoi(value);
 			delete[] value;
 			}
 		else if(de.is(0x0020U,0x0032U)) // Image position
 			{
-			de.readFloatValues(dcmFile,3,result->imagePos);
+			de.readFloatValues(*dcmFile,3,result->imagePos);
 			}
 		else if(de.is(0x0028U,0x0002U)) // Samples per pixel
 			{
-			result->pixelSamples=dcmFile.read<unsigned short>();
+			result->pixelSamples=dcmFile->read<Misc::UInt16>();
 			}
 		else if(de.is(0x0028U,0x0010U)) // Number of image rows
 			{
-			result->imageSize[1]=dcmFile.read<unsigned short>();
+			result->imageSize[1]=dcmFile->read<Misc::UInt16>();
 			}
 		else if(de.is(0x0028U,0x0011U)) // Number of image columns
 			{
-			result->imageSize[0]=dcmFile.read<unsigned short>();
+			result->imageSize[0]=dcmFile->read<Misc::UInt16>();
 			}
 		else if(de.is(0x0028U,0x0030U)) // Pixel size
 			{
-			de.readFloatValues(dcmFile,2,result->pixelSize);
+			de.readFloatValues(*dcmFile,2,result->pixelSize);
 			}
 		else if(de.is(0x0028U,0x0100U)) // Bits per pixel
 			{
-			result->pixelBits=dcmFile.read<unsigned short>();
+			result->pixelBits=dcmFile->read<Misc::UInt16>();
 			}
 		else if(de.is(0x0028U,0x0101U)) // Bits per pixel used
 			{
-			result->pixelBitsUsed=dcmFile.read<unsigned short>();
+			result->pixelBitsUsed=dcmFile->read<Misc::UInt16>();
 			}
 		else if(de.is(0x0028U,0x0102U)) // Pixel high bit index
 			{
-			result->pixelBitsMSB=dcmFile.read<unsigned short>();
+			result->pixelBitsMSB=dcmFile->read<Misc::UInt16>();
 			}
 		else if(de.is(0x0028U,0x0103U)) // Pixel representation
 			{
-			result->pixelSigned=dcmFile.read<unsigned short>()!=0;
+			result->pixelSigned=dcmFile->read<Misc::UInt16>()!=0;
 			}
 		else if(de.is(0x7fe0U,0x0010U)) // Pixel data
 			{
 			if(de.valueSize>0U&&de.valueSize!=0xffffffffU)
 				{
 				/* It's a fixed-size pixel data element: */
-				result->imageOffset=dcmFile.tell();
+				result->imageOffset=dcmFile->getReadPos();
 				result->imageDataSize=size_t(de.valueSize);
-				de.skipValue(dcmFile);
+				de.skipValue(*dcmFile);
 				}
 			else
 				{
@@ -1110,7 +1119,7 @@ DicomFile::ImageDescriptor* DicomFile::readImageDescriptor(void)
 			if(de.valueSize>0U&&de.valueSize!=0xffffffffU)
 				{
 				sequenceTop->currentItemFixedSize=true;
-				sequenceTop->currentItemEndOffset=dcmFile.tell()+Misc::File::Offset(de.valueSize);
+				sequenceTop->currentItemEndOffset=dcmFile->getReadPos()+Offset(de.valueSize);
 				}
 			
 			/* Process sequence items based on context: */
@@ -1118,9 +1127,9 @@ DicomFile::ImageDescriptor* DicomFile::readImageDescriptor(void)
 				{
 				if(de.valueSize>0U&&de.valueSize!=0xffffffffU)
 					{
-					result->imageOffset=dcmFile.tell();
+					result->imageOffset=dcmFile->getReadPos();
 					result->imageDataSize=size_t(de.valueSize);
-					de.skipValue(dcmFile);
+					de.skipValue(*dcmFile);
 					}
 				}
 			}
@@ -1140,7 +1149,7 @@ DicomFile::ImageDescriptor* DicomFile::readImageDescriptor(void)
 			sequenceTop=newSequenceTop;
 			}
 		else
-			de.skipValue(dcmFile);
+			de.skipValue(*dcmFile);
 		}
 	
 	/* Close all pending sequences: */
@@ -1170,38 +1179,33 @@ class DicomImageFileSorter
 
 }
 
-DicomFile::ImageStackDescriptor* DicomFile::readImageStackDescriptor(const char* directoryName)
+DicomFile::ImageStackDescriptor* DicomFile::readImageStackDescriptor(IO::DirectoryPtr directory)
 	{
-	/* Open the directory: */
-	Misc::Directory directory(directoryName);
-	
 	/* Read all DICOM image files in the directory: */
 	std::vector<DicomImageFile> images;
-	while(!directory.eod())
+	while(directory->readNextEntry())
 		{
 		try
 			{
-			/* Open the directory entry as a DICOM file: */
-			std::string dcmName(directoryName);
-			dcmName.push_back('/');
-			dcmName.append(directory.getEntryName());
-			DicomFile dcm(dcmName.c_str());
-			
-			/* Read the DICOM file's image descriptor: */
-			ImageDescriptor* id=dcm.readImageDescriptor();
-			if(id!=0)
+			if(directory->getEntryType()==Misc::PATHTYPE_FILE)
 				{
-				/* Store the image name / image descriptor pair: */
-				images.push_back(std::pair<std::string,ImageDescriptor*>(directory.getEntryName(),id));
+				/* Open the directory entry as a DICOM file: */
+				DicomFile dcm(directory->getEntryName(),directory->openFile(directory->getEntryName()));
+
+				/* Read the DICOM file's image descriptor: */
+				ImageDescriptor* id=dcm.readImageDescriptor();
+				if(id!=0)
+					{
+					/* Store the image name / image descriptor pair: */
+					images.push_back(DicomImageFile(directory->getEntryName(),id));
+					}
 				}
 			}
-		catch(std::runtime_error)
+		catch(std::runtime_error err)
 			{
 			/* Ignore the offending file */
+			std::cout<<"Ignoring file "<<directory->getEntryName()<<" due to exception "<<err.what()<<std::endl;
 			}
-		
-		/* Read the next directory entry: */
-		directory.readNextEntry();
 		}
 	
 	/* Sort the image files by slice index: */
@@ -1253,7 +1257,7 @@ DicomFile::ImageStackDescriptor* DicomFile::readImageStackDescriptor(const char*
 	for(std::vector<DicomImageFile>::iterator it=images.begin();it!=images.end();++it)
 		{
 		/* Construct the full slice file name: */
-		std::string name(directoryName);
+		std::string name=directory->getPath();
 		name.push_back('/');
 		name.append(it->first);
 		
@@ -1262,6 +1266,9 @@ DicomFile::ImageStackDescriptor* DicomFile::readImageStackDescriptor(const char*
 		result->imageFileNames[si]=new char[name.length()+1];
 		memcpy(result->imageFileNames[si],name.data(),name.length());
 		result->imageFileNames[si][name.length()]='\0';
+		
+		/* Delete the image descriptor: */
+		delete it->second;
 		}
 	
 	return result;
@@ -1274,7 +1281,7 @@ void DicomFile::readImage(const DicomFile::ImageDescriptor& id,DestPixelTypePara
 	if(imageMode==IMAGE_RAW)
 		{
 		/* Position the file to the image data: */
-		dcmFile.seekSet(id.imageOffset);
+		dcmFile->setReadPosAbs(id.imageOffset);
 		
 		if(id.pixelBits<=8)
 			{
@@ -1282,13 +1289,13 @@ void DicomFile::readImage(const DicomFile::ImageDescriptor& id,DestPixelTypePara
 				{
 				/* Raw pixel format is signed char: */
 				PixelTypeConverter<signed char,DestPixelTypeParam> ptc(id.pixelBitsMSB);
-				readRawImage(dcmFile,id.imageSize,imageBuffer,imageBufferStrides,ptc);
+				readRawImage(*dcmFile,id.imageSize,imageBuffer,imageBufferStrides,ptc);
 				}
 			else
 				{
 				/* Raw pixel format is unsigned char: */
 				PixelTypeConverter<unsigned char,DestPixelTypeParam> ptc(id.pixelBitsMSB);
-				readRawImage(dcmFile,id.imageSize,imageBuffer,imageBufferStrides,ptc);
+				readRawImage(*dcmFile,id.imageSize,imageBuffer,imageBufferStrides,ptc);
 				}
 			}
 		else if(id.pixelBits<=16)
@@ -1297,13 +1304,13 @@ void DicomFile::readImage(const DicomFile::ImageDescriptor& id,DestPixelTypePara
 				{
 				/* Raw pixel format is signed short: */
 				PixelTypeConverter<signed short,DestPixelTypeParam> ptc(id.pixelBitsMSB);
-				readRawImage(dcmFile,id.imageSize,imageBuffer,imageBufferStrides,ptc);
+				readRawImage(*dcmFile,id.imageSize,imageBuffer,imageBufferStrides,ptc);
 				}
 			else
 				{
 				/* Raw pixel format is unsigned short: */
 				PixelTypeConverter<unsigned short,DestPixelTypeParam> ptc(id.pixelBitsMSB);
-				readRawImage(dcmFile,id.imageSize,imageBuffer,imageBufferStrides,ptc);
+				readRawImage(*dcmFile,id.imageSize,imageBuffer,imageBufferStrides,ptc);
 				}
 			}
 		}
@@ -1318,15 +1325,13 @@ void DicomFile::readImage(const DicomFile::ImageDescriptor& id,DestPixelTypePara
 	else if(imageMode==IMAGE_JPEG_LOSSLESS)
 		{
 		/* Read the compressed image into a buffer: */
-		unsigned char* compressedData=new unsigned char[id.imageDataSize];
-		dcmFile.seekSet(id.imageOffset);
-		dcmFile.read(compressedData,id.imageDataSize);
-		
-		/* Set up a JPEG stream reading from the buffer: */
-		Misc::BufferCharacterSource source(compressedData,id.imageDataSize);
+		IO::FixedMemoryFile jpegBuffer(id.imageDataSize);
+		jpegBuffer.ref();
+		dcmFile->setReadPosAbs(id.imageOffset);
+		dcmFile->readRaw(jpegBuffer.getMemory(),id.imageDataSize);
 		
 		/* Create a JPEG decompressor: */
-		JPEGDecompressor dc(source);
+		JPEGDecompressor dc(jpegBuffer);
 		
 		/* Read the first scan: */
 		if(dc.readScanHeader())
@@ -1341,9 +1346,6 @@ void DicomFile::readImage(const DicomFile::ImageDescriptor& id,DestPixelTypePara
 			/* Decompress the JPEG scan: */
 			dc.readImage(imgWriter);
 			}
-		
-		/* Clean up: */
-		delete[] compressedData;
 		}
 	}
 
@@ -1356,19 +1358,19 @@ DicomFile::Directory* DicomFile::readDirectory(void)
 	
 	/* Read all data elements: */
 	DicomSequence* sequenceTop=0;
-	Misc::File::Offset currentDirectoryItemOffset=0;
-	Misc::File::Offset nextSiblingRecordOffset=0;
-	Misc::File::Offset firstChildRecordOffset=0;
+	Offset currentDirectoryItemOffset=0;
+	Offset nextSiblingRecordOffset=0;
+	Offset firstChildRecordOffset=0;
 	Directory* currentDirectory=0;
 	Series* currentSeries=0;
 	Image* currentImage=0;
-	typedef Misc::HashTable<Misc::File::Offset,std::pair<Directory*,int> > DirectoryLinkHasher;
+	typedef Misc::HashTable<Offset,std::pair<Directory*,int> > DirectoryLinkHasher;
 	DirectoryLinkHasher directoryLinkHasher(101);
 	DicomDataElement de;
 	while(true)
 		{
 		/* Check if the next data element ends the current sequence: */
-		Misc::File::Offset deOffset=dcmFile.tell();
+		Offset deOffset=dcmFile->getReadPos();
 		if(sequenceTop!=0&&sequenceTop->fixedSize&&sequenceTop->endOffset==deOffset)
 			{
 			/* End the current sequence: */
@@ -1378,7 +1380,7 @@ DicomFile::Directory* DicomFile::readDirectory(void)
 			}
 		
 		/* Read the next data element: */
-		if(!de.read(dcmFile,vrMode))
+		if(!de.read(*dcmFile,vrMode))
 			break;
 		
 		/* Handle sequences: */
@@ -1391,30 +1393,27 @@ DicomFile::Directory* DicomFile::readDirectory(void)
 			if(de.valueSize>0U&&de.valueSize!=0xffffffffU)
 				{
 				sequenceTop->fixedSize=true;
-				sequenceTop->endOffset=dcmFile.tell()+Misc::File::Offset(de.valueSize);
+				sequenceTop->endOffset=dcmFile->getReadPos()+Offset(de.valueSize);
 				}
 			}
 		
 		/* Parse relevant information: */
 		if(de.is(0x0004U,0x1200U)) // First directory entry offset
 			{
-			unsigned int offset=dcmFile.read<unsigned int>();
-			directoryLinkHasher.setEntry(DirectoryLinkHasher::Entry(Misc::File::Offset(offset),std::pair<Directory*,int>(result,0)));
+			directoryLinkHasher[dcmFile->read<Misc::UInt32>()]=std::pair<Directory*,int>(result,0);
 			}
 		else if(de.is(0x0004U,0x1400U)) // Offset of next directory record
 			{
-			unsigned int offset=dcmFile.read<unsigned int>();
-			nextSiblingRecordOffset=Misc::File::Offset(offset);
+			nextSiblingRecordOffset=dcmFile->read<Misc::UInt32>();
 			}
 		else if(de.is(0x0004U,0x1420U)) // Offset of lower-level directory record
 			{
-			unsigned int offset=dcmFile.read<unsigned int>();
-			firstChildRecordOffset=Misc::File::Offset(offset);
+			firstChildRecordOffset=dcmFile->read<Misc::UInt32>();
 			}
 		else if(de.is(0x0004U,0x1430U)) // Directory record type
 			{
 			/* Create a new directory item based on the record type: */
-			char* value=de.readValue(dcmFile); // Note that values are space-padded to even length!
+			char* value=de.readValue(*dcmFile); // Note that values are space-padded to even length!
 			if(strcmp(value,"PATIENT ")==0)
 				{
 				currentDirectory=new Directory;
@@ -1456,13 +1455,13 @@ DicomFile::Directory* DicomFile::readDirectory(void)
 				}
 			
 			/* Store the new entry's offsets in the hash table: */
-			directoryLinkHasher.setEntry(DirectoryLinkHasher::Entry(firstChildRecordOffset,std::pair<Directory*,int>(currentDirectory,0)));
-			directoryLinkHasher.setEntry(DirectoryLinkHasher::Entry(nextSiblingRecordOffset,std::pair<Directory*,int>(currentDirectory,1)));
+			directoryLinkHasher[firstChildRecordOffset]=std::pair<Directory*,int>(currentDirectory,0);
+			directoryLinkHasher[nextSiblingRecordOffset]=std::pair<Directory*,int>(currentDirectory,1);
 			}
 		else if(de.is(0x0004U,0x1500U)) // Referenced file ID
 			{
 			/* Read file name: */
-			char* value=de.readValue(dcmFile);
+			char* value=de.readValue(*dcmFile);
 			
 			/* Convert to UNIX-style file name: */
 			for(char* cPtr=value;*cPtr!='\0';++cPtr)
@@ -1474,37 +1473,37 @@ DicomFile::Directory* DicomFile::readDirectory(void)
 			}
 		else if(de.is(0x0018U,0x0050U)) // Slice thickness
 			{
-			char* value=de.readValue(dcmFile);
+			char* value=de.readValue(*dcmFile);
 			currentImage->sliceThickness=float(atof(value));
 			delete[] value;
 			}
 		else if(de.is(0x0020U,0x0011U)) // Series number
 			{
-			char* value=de.readValue(dcmFile);
+			char* value=de.readValue(*dcmFile);
 			currentSeries->seriesNumber=atoi(value);
 			delete[] value;
 			}
 		else if(de.is(0x0020U,0x0013U)) // Instance number (index in image stack)
 			{
-			char* value=de.readValue(dcmFile);
+			char* value=de.readValue(*dcmFile);
 			currentImage->sliceIndex=atoi(value);
 			delete[] value;
 			}
 		else if(de.is(0x0020U,0x0032U)) // Image position
 			{
-			de.readFloatValues(dcmFile,3,currentImage->imagePosition);
+			de.readFloatValues(*dcmFile,3,currentImage->imagePosition);
 			}
 		else if(de.is(0x0028U,0x0010U)) // Number of image rows
 			{
-			currentImage->imageSize[1]=dcmFile.read<unsigned short>();
+			currentImage->imageSize[1]=dcmFile->read<Misc::UInt16>();
 			}
 		else if(de.is(0x0028U,0x0011U)) // Number of image columns
 			{
-			currentImage->imageSize[0]=dcmFile.read<unsigned short>();
+			currentImage->imageSize[0]=dcmFile->read<Misc::UInt16>();
 			}
 		else if(de.is(0x0028U,0x0030U)) // Pixel size
 			{
-			de.readFloatValues(dcmFile,2,currentImage->pixelSize);
+			de.readFloatValues(*dcmFile,2,currentImage->pixelSize);
 			}
 		else if(de.is(0xfffeU,0xe000U)) // Start of sequence item
 			{
@@ -1517,7 +1516,7 @@ DicomFile::Directory* DicomFile::readDirectory(void)
 			if(de.valueSize>0U&&de.valueSize!=0xffffffffU)
 				{
 				sequenceTop->currentItemFixedSize=true;
-				sequenceTop->currentItemEndOffset=dcmFile.tell()+Misc::File::Offset(de.valueSize);
+				sequenceTop->currentItemEndOffset=dcmFile->getReadPos()+Offset(de.valueSize);
 				}
 			
 			/* Process sequence items based on context: */
@@ -1527,8 +1526,8 @@ DicomFile::Directory* DicomFile::readDirectory(void)
 				currentDirectoryItemOffset=deOffset;
 				
 				/* Reset the current record values: */
-				nextSiblingRecordOffset=Misc::File::Offset(0);
-				firstChildRecordOffset=Misc::File::Offset(0);
+				nextSiblingRecordOffset=Offset(0);
+				firstChildRecordOffset=Offset(0);
 				currentDirectory=0;
 				currentSeries=0;
 				currentImage=0;
@@ -1550,7 +1549,7 @@ DicomFile::Directory* DicomFile::readDirectory(void)
 			sequenceTop=newSequenceTop;
 			}
 		else
-			de.skipValue(dcmFile);
+			de.skipValue(*dcmFile);
 		}
 	
 	/* Close all pending sequences: */

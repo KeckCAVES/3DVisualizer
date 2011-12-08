@@ -86,3 +86,10 @@
   version number to same.
 - Moved template implementation files to .icpp file extension for
   consistency with Vrui library and other packages.
+
+3D Visualizer 1.9:
+- Bumped required Vrui version number to 2.2-001.
+- Allowed to completely disable data set rendering via the Rendering
+  Modes menu.
+- Added direct handling of additional scene graphs, with ability to
+  toggle visibility of individual scene graphs to Rendering Modes menu.

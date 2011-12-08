@@ -3,7 +3,7 @@ Algorithm - Abstract base class for visualization algorithms that
 extract visualization elements from data sets.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -33,7 +33,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 namespace Realtime {
 class AlarmTimer;
 }
-namespace Comm {
+namespace Cluster {
 class MulticastPipe;
 }
 namespace GLMotif {
@@ -62,13 +62,13 @@ class Algorithm
 	/* Elements: */
 	private:
 	VariableManager* variableManager; // Pointer to the variable manager containing the source data set and variables for this algorithm
-	Comm::MulticastPipe* pipe; // Multicast pipe to synchronize element extraction in a cluster-based environment; created externally but owned by Algorithm object
+	Cluster::MulticastPipe* pipe; // Multicast pipe to synchronize element extraction in a cluster-based environment; created externally but owned by Algorithm object
 	bool master; // Flag if this instance of the algorithm runs on the master node of a visualization cluster
 	BusyFunction* busyFunction; // Function called at regular intervals during a long-running operation
 	
 	/* Constructors and destructors: */
 	public:
-	Algorithm(VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates algorithm to own the given pipe
+	Algorithm(VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe); // Creates algorithm to own the given pipe
 	private:
 	Algorithm(const Algorithm& source); // Prohibit copy constructor
 	Algorithm& operator=(const Algorithm& source); // Prohibit assignment operator
@@ -80,7 +80,7 @@ class Algorithm
 		{
 		return variableManager;
 		}
-	Comm::MulticastPipe* getPipe(void) const // Returns the algorithm's pipe
+	Cluster::MulticastPipe* getPipe(void) const // Returns the algorithm's pipe
 		{
 		return pipe;
 		}

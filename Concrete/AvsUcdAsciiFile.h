@@ -1,7 +1,7 @@
 /***********************************************************************
-ImageStack - Class to represent scalar-valued Cartesian data sets stored
-as stacks of color or greyscale images.
-Copyright (c) 2005-2011 Oliver Kreylos
+AvsUcdAsciiFile - Class reading AVS Unstructured Cell Data files in ASCII
+format.
+Copyright (c) 2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,11 +20,11 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#ifndef VISUALIZATION_CONCRETE_IMAGESTACK_INCLUDED
-#define VISUALIZATION_CONCRETE_IMAGESTACK_INCLUDED
+#ifndef VISUALIZATION_CONCRETE_AVSUCDASCIIFILE_INCLUDED
+#define VISUALIZATION_CONCRETE_AVSUCDASCIIFILE_INCLUDED
 
-#include <Wrappers/CartesianIncludes.h>
-#include <Concrete/DensityValue.h>
+#include <Wrappers/SlicedHypercubicIncludes.h>
+#include <Wrappers/SlicedScalarVectorDataValue.h>
 
 #include <Wrappers/Module.h>
 
@@ -37,21 +37,19 @@ namespace {
 /* Basic type declarations: */
 typedef float Scalar; // Scalar type of data set domain
 typedef float VScalar; // Scalar type of data set value
-typedef unsigned char Value; // Memory representation of data set value
-typedef Visualization::Templatized::Cartesian<Scalar,3,Value> DS; // Templatized data set type
-typedef DensityValue<DS,VScalar> DataValue; // Type of data value descriptor
+typedef Visualization::Templatized::SlicedHypercubic<Scalar,3,VScalar> DS; // Templatized data set type
+typedef Visualization::Wrappers::SlicedScalarVectorDataValue<DS,VScalar> DataValue; // Type of data value descriptor
 typedef Visualization::Wrappers::Module<DS,DataValue> BaseModule; // Module base class type
 
 }
 
-class ImageStack:public BaseModule
+class AvsUcdAsciiFile:public BaseModule
 	{
 	/* Constructors and destructors: */
 	public:
-	ImageStack(void); // Default constructor
+	AvsUcdAsciiFile(void); // Default constructor
 	
 	/* Methods: */
-	public:
 	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	};
 

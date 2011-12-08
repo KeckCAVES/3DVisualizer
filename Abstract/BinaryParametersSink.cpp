@@ -3,7 +3,7 @@ BinaryParametersSink - Generic class for parameter sinks utilizing the
 pipe I/O abstraction.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2010 Oliver Kreylos
+Copyright (c) 2010-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -27,8 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <string>
 #include <Misc/StandardMarshallers.h>
 #include <IO/File.h>
-#include <Comm/MulticastPipe.h>
-#include <Comm/ClusterPipe.h>
 
 namespace Visualization {
 
@@ -38,38 +36,23 @@ namespace Abstract {
 Methods of class BinaryParametersSink:
 *************************************/
 
-template <class DataSinkParam>
-inline
-BinaryParametersSink<DataSinkParam>::BinaryParametersSink(
-	const VariableManager* sVariableManager,
-	DataSinkParam& sSink,
-	bool sRaw)
+BinaryParametersSink::BinaryParametersSink(const VariableManager* sVariableManager,IO::File& sSink,bool sRaw)
 	:ParametersSink(sVariableManager),
 	 sink(sSink),raw(sRaw)
 	{
 	}
 
-template <class DataSinkParam>
-inline
-void
-BinaryParametersSink<DataSinkParam>::write(
-	const char* name,
-	const WriterBase& value)
+void BinaryParametersSink::write(const char* name,const WriterBase& value)
 	{
 	value.write(sink);
 	}
 
-template <class DataSinkParam>
-inline
-void
-BinaryParametersSink<DataSinkParam>::writeScalarVariable(
-	const char* name,
-	int scalarVariableIndex)
+void BinaryParametersSink::writeScalarVariable(const char* name,int scalarVariableIndex)
 	{
 	if(raw)
 		{
 		/* Write the variable index directly: */
-		sink.template write<int>(scalarVariableIndex);
+		sink.write<int>(scalarVariableIndex);
 		}
 	else
 		{
@@ -79,17 +62,12 @@ BinaryParametersSink<DataSinkParam>::writeScalarVariable(
 		}
 	}
 
-template <class DataSinkParam>
-inline
-void
-BinaryParametersSink<DataSinkParam>::writeVectorVariable(
-	const char* name,
-	int vectorVariableIndex)
+void BinaryParametersSink::writeVectorVariable(const char* name,int vectorVariableIndex)
 	{
 	if(raw)
 		{
 		/* Write the variable index directly: */
-		sink.template write<int>(vectorVariableIndex);
+		sink.write<int>(vectorVariableIndex);
 		}
 	else
 		{
@@ -98,14 +76,6 @@ BinaryParametersSink<DataSinkParam>::writeVectorVariable(
 		Misc::Marshaller<std::string>::write(vectorVariableName,sink);
 		}
 	}
-
-/****************************************************************
-Force instantiation of all standard BinaryParametersSink classes:
-****************************************************************/
-
-template class BinaryParametersSink<IO::File>;
-template class BinaryParametersSink<Comm::MulticastPipe>;
-template class BinaryParametersSink<Comm::ClusterPipe>;
 
 }
 

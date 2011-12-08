@@ -42,7 +42,7 @@ Isosurface<DataSetWrapperParam>::Isosurface(
 	Visualization::Abstract::Parameters* sParameters,
 	typename Isosurface<DataSetWrapperParam>::VScalar sIsovalue,
 	const GLColorMap* sColorMap,
-	Comm::MulticastPipe* pipe)
+	Cluster::MulticastPipe* pipe)
 	:Visualization::Abstract::Element(sParameters),
 	 isovalue(sIsovalue),
 	 colorMap(sColorMap),

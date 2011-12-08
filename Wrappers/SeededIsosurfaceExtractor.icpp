@@ -135,7 +135,7 @@ template <class DataSetWrapperParam>
 inline
 SeededIsosurfaceExtractor<DataSetWrapperParam>::SeededIsosurfaceExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:Abstract::Algorithm(sVariableManager,sPipe),
 	 parameters(sVariableManager->getCurrentScalarVariable()),
 	 ise(getDs(sVariableManager->getDataSetByScalarVariable(parameters.scalarVariableIndex)),getSe(sVariableManager->getScalarExtractor(parameters.scalarVariableIndex))),

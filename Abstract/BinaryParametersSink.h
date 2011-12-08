@@ -3,7 +3,7 @@ BinaryParametersSink - Generic class for parameter sinks utilizing the
 pipe I/O abstraction.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2010 Oliver Kreylos
+Copyright (c) 2010-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -28,25 +28,25 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/VariableManager.h>
 #include <Abstract/ParametersSink.h>
 
+/* Forward declarations: */
+namespace IO {
+class File;
+}
+
 namespace Visualization {
 
 namespace Abstract {
 
-template <class DataSinkParam>
 class BinaryParametersSink:public ParametersSink
 	{
-	/* Embedded classes: */
-	public:
-	typedef DataSinkParam DataSink; // Type for data sinks
-	
 	/* Elements: */
 	private:
-	DataSink& sink; // The data sink
+	IO::File& sink; // The data sink
 	bool raw; // Flag whether the sink writes variable indices (true) or variable names (false)
 	
 	/* Constructors and destructors: */
 	public:
-	BinaryParametersSink(const VariableManager* sVariableManager,DataSink& sSink,bool sRaw);
+	BinaryParametersSink(const VariableManager* sVariableManager,IO::File& sSink,bool sRaw);
 	
 	/* Methods from ParametersSink: */
 	virtual void write(const char* name,const WriterBase& value);

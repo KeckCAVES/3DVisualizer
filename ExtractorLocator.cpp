@@ -1,7 +1,7 @@
 /***********************************************************************
 ExtractorLocator - Class for locators applying visualization algorithms
 to data sets.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Misc/FunctionCalls.h>
 #include <Misc/ConfigurationFile.h>
 #include <Geometry/OrthogonalTransformation.h>
+#include <Geometry/OutputOperators.h>
 #include <GLMotif/WidgetManager.h>
 #include <GLMotif/PopupWindow.h>
 #include <GLMotif/RowColumn.h>
@@ -68,15 +69,12 @@ GLMotif::PopupWindow* ExtractorLocator::createBusyDialog(const char* algorithmNa
 	return busyDialogPopup;
 	}
 
-void ExtractorLocator::busyFunction(float percentageCompletion)
+void ExtractorLocator::busyFunction(float newCompletionPercentage)
 	{
-	if(busyDialog!=0)
-		{
-		char percentage[10];
-		snprintf(percentage,sizeof(percentage),"%5.1f",percentageCompletion);
-		percentageLabel->setString(percentage);
-		Vrui::requestUpdate();
-		}
+	/* Pass the new completion percentage to the main thread: */
+	completionPercentage=newCompletionPercentage;
+	completionPercentageUpdated=true;
+	Vrui::requestUpdate();
 	}
 
 ExtractorLocator::ExtractorLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Extractor::Algorithm* sExtractor,Misc::ConfigurationFileSection* cfg)
@@ -85,10 +83,11 @@ ExtractorLocator::ExtractorLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* s
 	 busyDialog(createBusyDialog(extractor->getName())),
 	 locator(application->dataSet->getLocator()),
 	 dragging(false),
-	 lastSeedRequestID(0)
+	 lastSeedRequestID(0),
+	 completionPercentage(0.0f),completionPercentageUpdated(false)
 	{
 	/* Set the algorithm's busy function: */
-	extractor->setBusyFunction(new Misc::VoidMethodCall<float,ExtractorLocator>(this,&ExtractorLocator::busyFunction));
+	extractor->setBusyFunction(Misc::createFunctionCall(this,&ExtractorLocator::busyFunction));
 	
 	#ifdef VISUALIZER_USE_COLLABORATION
 	if(application->sharedVisualizationClient!=0)
@@ -197,6 +196,18 @@ void ExtractorLocator::motionCallback(Vrui::LocatorTool::MotionCallbackData* cbD
 		/* Pop down the busy dialog: */
 		if(!(extractor->hasSeededCreator()&&extractor->hasIncrementalCreator())&&busyDialog!=0)
 			Vrui::popdownPrimaryWidget(busyDialog);
+		}
+	
+	/* Check for updates on long-running operations: */
+	if(completionPercentageUpdated)
+		{
+		if(busyDialog!=0)
+			{
+			char percentage[10];
+			snprintf(percentage,sizeof(percentage),"%5.1f",completionPercentage);
+			percentageLabel->setString(percentage);
+			}
+		completionPercentageUpdated=false;
 		}
 	}
 

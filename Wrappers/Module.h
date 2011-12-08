@@ -87,10 +87,10 @@ class Module:public Visualization::Abstract::Module
 	virtual Visualization::Abstract::DataSetRenderer* getRenderer(const Visualization::Abstract::DataSet* dataSet) const;
 	virtual int getNumScalarAlgorithms(void) const;
 	virtual const char* getScalarAlgorithmName(int scalarAlgorithmIndex) const;
-	virtual Visualization::Abstract::Algorithm* getScalarAlgorithm(int scalarAlgorithmIndex,Visualization::Abstract::VariableManager* variableManager,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::Algorithm* getScalarAlgorithm(int scalarAlgorithmIndex,Visualization::Abstract::VariableManager* variableManager,Cluster::MulticastPipe* pipe) const;
 	virtual int getNumVectorAlgorithms(void) const;
 	virtual const char* getVectorAlgorithmName(int vectorAlgorithmIndex) const;
-	virtual Visualization::Abstract::Algorithm* getVectorAlgorithm(int vectorAlgorithmIndex,Visualization::Abstract::VariableManager* variableManager,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::Algorithm* getVectorAlgorithm(int vectorAlgorithmIndex,Visualization::Abstract::VariableManager* variableManager,Cluster::MulticastPipe* pipe) const;
 	};
 
 }

@@ -51,7 +51,7 @@ class MultiVolFile:public BaseModule
 	
 	/* Methods: */
 	public:
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	};
 
 }

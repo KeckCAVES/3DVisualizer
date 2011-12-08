@@ -2,7 +2,7 @@
 SharedVisualizationClient - Client for collaborative data exploration in
 spatially distributed VR environments, implemented as a plug-in of the
 Vrui remote collaboration infrastructure.
-Copyright (c) 2009-2010 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,8 +25,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <string>
 #include <iostream>
+#include <Comm/NetPipe.h>
+#include <Cluster/MulticastPipe.h>
 #include <Vrui/Vrui.h>
-#include <Collaboration/CollaborationPipe.h>
 
 #include <Abstract/VariableManager.h>
 #include <Abstract/Parameters.h>
@@ -41,8 +42,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include "ExtractorLocator.h"
 #include "ElementList.h"
 
-namespace Collaboration {
-
 /*********************************************************
 Methods of class SharedVisualizationClient::RemoteLocator:
 *********************************************************/
@@ -52,18 +51,18 @@ SharedVisualizationClient::RemoteLocator::RemoteLocator(SharedVisualizationClien
 	{
 	}
 
-void SharedVisualizationClient::RemoteLocator::readSeedRequest(CollaborationPipe& pipe)
+void SharedVisualizationClient::RemoteLocator::readSeedRequest(Comm::NetPipe& pipe)
 	{
 	/* Read the seed request ID: */
-	unsigned int newSeedRequestID=pipe.read<unsigned int>();
+	unsigned int newSeedRequestID=pipe.read<Card>();
 	#ifdef VERBOSE
 	std::cout<<"SharedVisualizationClient: Received seed request "<<newSeedRequestID<<std::endl;
 	#endif
 	
 	/* Read extraction parameters from pipe: */
-	Visualization::Abstract::BinaryParametersSource<Comm::ClusterPipe> source(extractor->getVariableManager(),pipe,false);
+	Visualization::Abstract::BinaryParametersSource source(extractor->getVariableManager(),pipe,false);
 	Parameters* newSeedParameters=extractor->cloneParameters();
-	pipe.read<unsigned int>(); // Read and ignore parameter blob size
+	pipe.read<Card>(); // Read and ignore parameter blob size
 	newSeedParameters->read(source);
 	
 	/* Post a seed request: */
@@ -97,18 +96,18 @@ SharedVisualizationClient::RemoteClientState::~RemoteClientState(void)
 Methods of class SharedVisualizationClient:
 ******************************************/
 
-void SharedVisualizationClient::receiveRemoteLocator(SharedVisualizationClient::RemoteClientState* rcs,CollaborationPipe& pipe)
+void SharedVisualizationClient::receiveRemoteLocator(SharedVisualizationClient::RemoteClientState* rcs,Comm::NetPipe& pipe)
 	{
 	/* Receive the new locator's ID and algorithm name: */
-	unsigned int newLocatorID=pipe.read<unsigned int>();
-	std::string algorithmName=pipe.read<std::string>();
+	unsigned int newLocatorID=pipe.read<Card>();
+	std::string algorithmName=read<std::string>(pipe);
 	
 	#ifdef VERBOSE
 	std::cout<<"SharedVisualizationClient: Creating "<<algorithmName<<" locator with ID "<<newLocatorID<<std::endl;
 	#endif
 	
 	/* Create an extractor for the given algorithm name: */
-	Comm::MulticastPipe* algorithmPipe=Vrui::openPipe();
+	Cluster::MulticastPipe* algorithmPipe=Vrui::openPipe();
 	Algorithm* algorithm=application->module->getAlgorithm(algorithmName.c_str(),application->variableManager,algorithmPipe);
 	if(algorithm!=0)
 		{
@@ -127,10 +126,10 @@ void SharedVisualizationClient::receiveRemoteLocator(SharedVisualizationClient::
 		}
 	}
 
-SharedVisualizationClient::RemoteLocator* SharedVisualizationClient::findRemoteLocator(SharedVisualizationClient::RemoteClientState* rcs,CollaborationPipe& pipe)
+SharedVisualizationClient::RemoteLocator* SharedVisualizationClient::findRemoteLocator(SharedVisualizationClient::RemoteClientState* rcs,Comm::NetPipe& pipe)
 	{
 	/* Read the locator ID: */
-	unsigned int locatorID=pipe.read<unsigned int>();
+	unsigned int locatorID=pipe.read<Card>();
 	
 	{
 	Threads::Mutex::Lock locatorLock(rcs->locatorMutex);
@@ -163,120 +162,22 @@ unsigned int SharedVisualizationClient::getNumMessages(void) const
 	return MESSAGES_END;
 	}
 
-void SharedVisualizationClient::sendConnectRequest(CollaborationPipe& pipe)
+void SharedVisualizationClient::sendConnectRequest(Comm::NetPipe& pipe)
 	{
 	/* Send the length of the following message: */
-	pipe.write<unsigned int>(sizeof(unsigned int));
+	pipe.write<Card>(sizeof(Card));
 	
 	/* Send the client's protocol version: */
-	pipe.write<unsigned int>(protocolVersion);
+	pipe.write<Card>(protocolVersion);
 	}
 
-void SharedVisualizationClient::sendClientUpdate(CollaborationPipe& pipe)
-	{
-	{
-	Threads::Mutex::Lock locatorLock(locatorMutex);
-	
-	/* Send the locator action list to the server: */
-	for(LocatorActionList::iterator aIt=actions.begin();aIt!=actions.end();++aIt)
-		{
-		switch(aIt->action)
-			{
-			case CREATE_LOCATOR:
-				/* Send a creation message: */
-				pipe.writeMessage(CREATE_LOCATOR);
-				
-				/* Send the new locator's ID and algorithm name: */
-				pipe.write<unsigned int>(aIt->locatorIt->getDest().locatorID);
-				pipe.write<std::string>(aIt->locatorIt->getSource()->getExtractor()->getName());
-				
-				#ifdef VERBOSE
-				std::cout<<"SharedVisualizationClient: Creating "<<aIt->locatorIt->getSource()->getExtractor()->getName()<<" locator with ID "<<aIt->locatorIt->getDest().locatorID<<std::endl;
-				#endif
-				
-				break;
-			
-			case SEED_REQUEST:
-				/* Only send a message if the action's request ID matches what's still in the locator (i.e., if this was the most recent request): */
-				if(aIt->requestID==aIt->locatorIt->getDest().seedRequestID)
-					{
-					/* Send a seed request message: */
-					pipe.writeMessage(SEED_REQUEST);
-					
-					/* Send the locator's ID and seed request ID: */
-					pipe.write<unsigned int>(aIt->locatorIt->getDest().locatorID);
-					pipe.write<unsigned int>(aIt->requestID);
-					
-					/* Calculate and send the seed request's extraction parameters message size: */
-					Visualization::Abstract::BinaryParametersSize size(application->variableManager,false);
-					aIt->locatorIt->getDest().seedParameters->write(size);
-					pipe.write<unsigned int>(size.getSize());
-					
-					/* Send the seed request's extraction parameters: */
-					Visualization::Abstract::BinaryParametersSink<Comm::ClusterPipe> sink(application->variableManager,pipe,false);
-					aIt->locatorIt->getDest().seedParameters->write(sink);
-					
-					/* Delete the seed parameters: */
-					delete aIt->locatorIt->getDest().seedParameters;
-					aIt->locatorIt->getDest().seedParameters=0;
-					
-					#ifdef VERBOSE
-					std::cout<<"SharedVisualizationClient: Sending seed request "<<aIt->requestID<<" for locator "<<aIt->locatorIt->getDest().locatorID<<std::endl;
-					#endif
-					}
-				
-				break;
-			
-			case FINALIZATION_REQUEST:
-				/* Send a finalization request message: */
-				pipe.writeMessage(FINALIZATION_REQUEST);
-				
-				/* Send the locator's ID and final seed request ID: */
-				pipe.write<unsigned int>(aIt->locatorIt->getDest().locatorID);
-				pipe.write<unsigned int>(aIt->requestID);
-					
-				#ifdef VERBOSE
-				std::cout<<"SharedVisualizationClient: Sending finalization request "<<aIt->requestID<<" for locator "<<aIt->locatorIt->getDest().locatorID<<std::endl;
-				#endif
-				
-				break;
-			
-			case DESTROY_LOCATOR:
-				/* Send a destruction message: */
-				pipe.writeMessage(DESTROY_LOCATOR);
-				
-				/* Send the locator's ID: */
-				pipe.write<unsigned int>(aIt->locatorIt->getDest().locatorID);
-				
-				#ifdef VERBOSE
-				std::cout<<"SharedVisualizationClient: Destroying locator "<<aIt->locatorIt->getDest().locatorID<<std::endl;
-				#endif
-				
-				/* Remove the locator's state from the hash table: */
-				locators.removeEntry(aIt->locatorIt);
-					
-				break;
-			
-			default:
-				; // Just to make g++ happy
-			}
-		}
-	
-	/* Terminate the action list: */
-	pipe.writeMessage(UPDATE_END);
-	
-	/* Clear the action list: */
-	actions.clear();
-	}
-	}
-
-ProtocolClient::RemoteClientState* SharedVisualizationClient::receiveClientConnect(CollaborationPipe& pipe)
+Collaboration::ProtocolClient::RemoteClientState* SharedVisualizationClient::receiveClientConnect(Comm::NetPipe& pipe)
 	{
 	/* Create a new remote client state object: */
 	RemoteClientState* newClient=new RemoteClientState;
 	
 	/* Receive the number of locators on the remote client: */
-	unsigned int numLocators=pipe.read<unsigned int>();
+	unsigned int numLocators=pipe.read<Card>();
 	
 	/* Create remote locators: */
 	for(unsigned int i=0;i<numLocators;++i)
@@ -285,39 +186,41 @@ ProtocolClient::RemoteClientState* SharedVisualizationClient::receiveClientConne
 	return newClient;
 	}
 
-void SharedVisualizationClient::receiveServerUpdate(CollaborationPipe& pipe)
+bool SharedVisualizationClient::receiveServerUpdate(Comm::NetPipe& pipe)
 	{
 	/* Ignore a list of global server messages: */
-	CollaborationPipe::MessageIdType message;
-	while((message=pipe.readMessage())!=UPDATE_END)
+	MessageIdType message;
+	while((message=readMessage(pipe))!=UPDATE_END)
 		switch(message)
 			{
 			case CREATE_ELEMENT:
 				{
 				/* Skip an element creation message: */
-				unsigned int elementId=pipe.read<unsigned int>();
-				std::string algorithmName=pipe.read<std::string>();
-				size_t parametersSize=pipe.read<unsigned int>();
-				unsigned char* parameters=new unsigned char[parametersSize];
-				pipe.read<unsigned char>(parameters,parametersSize);
-				pipe.read<unsigned char>(); // bool enabled=pipe.read<unsigned char>()!=0;
+				unsigned int elementId=pipe.read<Card>();
+				std::string algorithmName=read<std::string>(pipe);
+				size_t parametersSize=pipe.read<Card>();
+				Byte* parameters=new Byte[parametersSize];
+				pipe.read(parameters,parametersSize);
+				pipe.read<Byte>(); // bool enabled=pipe.read<unsigned char>()!=0;
 				
 				#ifdef VERBOSE
 				std::cout<<"Ignored creation of "<<algorithmName<<" element with ID "<<elementId<<std::endl;
 				#endif
 				}
 			}
+	
+	return false;
 	}
 
-void SharedVisualizationClient::receiveServerUpdate(ProtocolClient::RemoteClientState* rcs,CollaborationPipe& pipe)
+bool SharedVisualizationClient::receiveServerUpdate(Collaboration::ProtocolClient::RemoteClientState* rcs,Comm::NetPipe& pipe)
 	{
 	RemoteClientState* myRcs=dynamic_cast<RemoteClientState*>(rcs);
 	if(myRcs==0)
 		Misc::throwStdErr("SharedVisualizationClient::receiveServerUpdate: Mismatching remote client state object type");
 	
 	/* Receive a list of locator action messages from the server: */
-	CollaborationPipe::MessageIdType message;
-	while((message=pipe.readMessage())!=UPDATE_END)
+	MessageIdType message;
+	while((message=readMessage(pipe))!=UPDATE_END)
 		switch(message)
 			{
 			case CREATE_LOCATOR:
@@ -340,17 +243,9 @@ void SharedVisualizationClient::receiveServerUpdate(ProtocolClient::RemoteClient
 				else
 					{
 					/* Read and ignore the seed request: */
-					pipe.read<unsigned int>();
-					unsigned int parametersSize=pipe.read<unsigned int>();
-					unsigned char buffer[256];
-					while(parametersSize>0)
-						{
-						unsigned int readSize=parametersSize;
-						if(readSize>256)
-							readSize=256;
-						pipe.read<unsigned char>(buffer,readSize);
-						parametersSize-=readSize;
-						}
+					pipe.skip<Card>(1);
+					unsigned int parametersSize=pipe.read<Card>();
+					pipe.skip<Byte>(parametersSize);
 					}
 				
 				break;
@@ -362,7 +257,7 @@ void SharedVisualizationClient::receiveServerUpdate(ProtocolClient::RemoteClient
 				RemoteLocator* locator=findRemoteLocator(myRcs,pipe);
 				
 				/* Read the final seed request ID: */
-				unsigned int finalRequestID=pipe.read<unsigned int>();
+				unsigned int finalRequestID=pipe.read<Card>();
 				#ifdef VERBOSE
 				std::cout<<"SharedVisualizationServer: Received finalization request "<<finalRequestID<<std::endl;
 				#endif
@@ -379,7 +274,7 @@ void SharedVisualizationClient::receiveServerUpdate(ProtocolClient::RemoteClient
 			case DESTROY_LOCATOR:
 				{
 				/* Read the locator ID: */
-				unsigned int locatorID=pipe.read<unsigned int>();
+				unsigned int locatorID=pipe.read<Card>();
 				
 				/* Find the remote locator and remove it from the hash table: */
 				RemoteLocator* locator=0;
@@ -402,6 +297,104 @@ void SharedVisualizationClient::receiveServerUpdate(ProtocolClient::RemoteClient
 			default:
 				Misc::throwStdErr("SharedVisualizationClient::receiveServerUpdate: received unknown locator action message %u",message);
 			}
+	
+	return false;
+	}
+
+void SharedVisualizationClient::sendClientUpdate(Comm::NetPipe& pipe)
+	{
+	Threads::Mutex::Lock locatorLock(locatorMutex);
+	
+	/* Send the locator action list to the server: */
+	for(LocatorActionList::iterator aIt=actions.begin();aIt!=actions.end();++aIt)
+		{
+		switch(aIt->action)
+			{
+			case CREATE_LOCATOR:
+				#ifdef VERBOSE
+				std::cout<<"SharedVisualizationClient: Creating "<<aIt->locatorIt->getSource()->getExtractor()->getName()<<" locator with ID "<<aIt->locatorIt->getDest().locatorID<<std::endl;
+				#endif
+				
+				/* Send a creation message: */
+				writeMessage(CREATE_LOCATOR,pipe);
+				
+				/* Send the new locator's ID and algorithm name: */
+				pipe.write<Card>(aIt->locatorIt->getDest().locatorID);
+				write(std::string(aIt->locatorIt->getSource()->getExtractor()->getName()),pipe);
+				
+				break;
+			
+			case SEED_REQUEST:
+				/* Only send a message if the action's request ID matches what's still in the locator (i.e., if this was the most recent request): */
+				if(aIt->requestID==aIt->locatorIt->getDest().seedRequestID)
+					{
+					#ifdef VERBOSE
+					std::cout<<"SharedVisualizationClient: Sending seed request "<<aIt->requestID<<" for locator "<<aIt->locatorIt->getDest().locatorID<<std::endl;
+					#endif
+					
+					/* Send a seed request message: */
+					writeMessage(SEED_REQUEST,pipe);
+					
+					/* Send the locator's ID and seed request ID: */
+					pipe.write<Card>(aIt->locatorIt->getDest().locatorID);
+					pipe.write<Card>(aIt->requestID);
+					
+					/* Calculate and send the seed request's extraction parameters message size: */
+					Visualization::Abstract::BinaryParametersSize size(application->variableManager,false);
+					aIt->locatorIt->getDest().seedParameters->write(size);
+					pipe.write<Card>(size.getSize());
+					
+					/* Send the seed request's extraction parameters: */
+					Visualization::Abstract::BinaryParametersSink sink(application->variableManager,pipe,false);
+					aIt->locatorIt->getDest().seedParameters->write(sink);
+					
+					/* Delete the seed parameters: */
+					delete aIt->locatorIt->getDest().seedParameters;
+					aIt->locatorIt->getDest().seedParameters=0;
+					}
+				
+				break;
+			
+			case FINALIZATION_REQUEST:
+				#ifdef VERBOSE
+				std::cout<<"SharedVisualizationClient: Sending finalization request "<<aIt->requestID<<" for locator "<<aIt->locatorIt->getDest().locatorID<<std::endl;
+				#endif
+				
+				/* Send a finalization request message: */
+				writeMessage(FINALIZATION_REQUEST,pipe);
+				
+				/* Send the locator's ID and final seed request ID: */
+				pipe.write<Card>(aIt->locatorIt->getDest().locatorID);
+				pipe.write<Card>(aIt->requestID);
+					
+				break;
+			
+			case DESTROY_LOCATOR:
+				#ifdef VERBOSE
+				std::cout<<"SharedVisualizationClient: Destroying locator "<<aIt->locatorIt->getDest().locatorID<<std::endl;
+				#endif
+				
+				/* Send a destruction message: */
+				writeMessage(DESTROY_LOCATOR,pipe);
+				
+				/* Send the locator's ID: */
+				pipe.write<Card>(aIt->locatorIt->getDest().locatorID);
+				
+				/* Remove the locator's state from the hash table: */
+				locators.removeEntry(aIt->locatorIt);
+					
+				break;
+			
+			default:
+				; // Just to make g++ happy
+			}
+		}
+	
+	/* Terminate the action list: */
+	writeMessage(UPDATE_END,pipe);
+	
+	/* Clear the action list: */
+	actions.clear();
 	}
 
 void SharedVisualizationClient::rejectedByServer(void)
@@ -410,7 +403,7 @@ void SharedVisualizationClient::rejectedByServer(void)
 	std::cout<<"SharedVisualizationClient: Server does not support shared Visualizer protocol. Bummer."<<std::endl;
 	}
 
-void SharedVisualizationClient::frame(ProtocolClient::RemoteClientState* rcs)
+void SharedVisualizationClient::frame(Collaboration::ProtocolClient::RemoteClientState* rcs)
 	{
 	RemoteClientState* myRcs=dynamic_cast<RemoteClientState*>(rcs);
 	if(myRcs==0)
@@ -428,7 +421,7 @@ void SharedVisualizationClient::frame(ProtocolClient::RemoteClientState* rcs)
 	}
 	}
 
-void SharedVisualizationClient::glRenderAction(const ProtocolClient::RemoteClientState* rcs,GLContextData& contextData) const
+void SharedVisualizationClient::glRenderAction(const Collaboration::ProtocolClient::RemoteClientState* rcs,GLContextData& contextData) const
 	{
 	const RemoteClientState* myRcs=dynamic_cast<const RemoteClientState*>(rcs);
 	if(myRcs==0)
@@ -507,5 +500,3 @@ void SharedVisualizationClient::destroyLocator(ExtractorLocator* locator)
 	actions.push_back(LocatorAction(DESTROY_LOCATOR,locatorIt,0));
 	}
 	}
-
-}

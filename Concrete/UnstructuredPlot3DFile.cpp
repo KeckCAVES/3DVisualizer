@@ -176,7 +176,7 @@ UnstructuredPlot3DFile::UnstructuredPlot3DFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* UnstructuredPlot3DFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* UnstructuredPlot3DFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Create result data set: */
 	DataSet* result=new DataSet;

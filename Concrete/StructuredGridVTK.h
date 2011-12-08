@@ -50,7 +50,7 @@ class StructuredGridVTK:public BaseModule
 	StructuredGridVTK(void); // Default constructor
 	
 	/* Methods: */
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	};
 
 }

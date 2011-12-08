@@ -59,7 +59,7 @@ class MultiStreamline:public Visualization::Abstract::Element
 	
 	/* Constructors and destructors: */
 	public:
-	MultiStreamline(Visualization::Abstract::Parameters* sParameters,unsigned int numStreamlines,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty multi-streamline for the given parameters
+	MultiStreamline(Visualization::Abstract::Parameters* sParameters,unsigned int numStreamlines,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty multi-streamline for the given parameters
 	private:
 	MultiStreamline(const MultiStreamline& source); // Prohibit copy constructor
 	MultiStreamline& operator=(const MultiStreamline& source); // Prohibit assignment operator

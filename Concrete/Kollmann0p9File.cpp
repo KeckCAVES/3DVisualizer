@@ -56,7 +56,7 @@ Kollmann0p9File::Kollmann0p9File(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* Kollmann0p9File::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* Kollmann0p9File::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Open the data file: */
 	Misc::File dataFile(args[0].c_str(),"rt");

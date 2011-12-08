@@ -1,9 +1,29 @@
-#include <ctype.h>
-#include <string.h>
-#include <stdlib.h>
-#include <Misc/File.h>
+/***********************************************************************
+CitcomSCfgFileParser - Helper function to parse configuration files
+describing the results of a CitcomS simulation run.
+Copyright (c) 2008-2011 Oliver Kreylos
+
+This file is part of the 3D Data Visualizer (Visualizer).
+
+The 3D Data Visualizer is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published
+by the Free Software Foundation; either version 2 of the License, or (at
+your option) any later version.
+
+The 3D Data Visualizer is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with the 3D Data Visualizer; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+***********************************************************************/
 
 #include <Concrete/CitcomSCfgFileParser.h>
+
+#include <Misc/ThrowStdErr.h>
+#include <IO/ValueSource.h>
 
 namespace Visualization {
 
@@ -11,122 +31,117 @@ namespace Concrete {
 
 void
 parseCitcomSCfgFile(
-	const char* cfgFileName,
+	const std::string& cfgFileName,
+	IO::FilePtr cfgFile,
 	std::string& dataDir,
 	std::string& dataFileName,
 	int& numSurfaces,
 	Misc::ArrayIndex<3>& numCpus,
 	Misc::ArrayIndex<3>& numVertices)
 	{
-	/* Open the run's configuration file: */
-	Misc::File cfgFile(cfgFileName,"rt");
+	/* Read the run's configuration file: */
+	IO::ValueSource cfgSource(cfgFile);
+	cfgSource.setPunctuation("#;[]=");
+	cfgSource.skipWs();
 	bool inSolverSection=false;
 	bool inSolverMesherSection=false;
-	while(!cfgFile.eof())
+	while(!cfgSource.eof())
 		{
-		/* Read the next line from the file: */
-		char line[256];
-		cfgFile.gets(line,sizeof(line));
-		
-		/* Skip initial whitespace: */
-		char* linePtr;
-		for(linePtr=line;*linePtr!='\0'&&isspace(*linePtr);++linePtr)
-			;
-		
-		/* Check if it's a section header: */
-		char* sectionStart=0;
-		char* sectionEnd;
-		if(*linePtr=='[')
+		/* Read the next tag: */
+		std::string tag=cfgSource.readString();
+		if(tag=="#"||tag==";")
 			{
-			for(sectionEnd=linePtr+1;*sectionEnd!='\0'&&*sectionEnd!=']';++sectionEnd)
-				;
-			if(*sectionEnd==']')
+			/* Skip the rest of the line: */
+			cfgSource.skipLine();
+			cfgSource.skipWs();
+			}
+		else if(tag=="[")
+			{
+			/* Read the section name: */
+			std::string section=cfgSource.readString();
+			if(!cfgSource.isLiteral(']'))
+				Misc::throwStdErr("CitcomSCfgFileParser: Malformed section header in configuration file %s",cfgFileName.c_str());
+			
+			/* Check for known sections: */
+			inSolverSection=section=="CitcomS.solver";
+			inSolverMesherSection=section=="CitcomS.solver.mesher";
+			}
+		else if(inSolverSection)
+			{
+			/* Check for equal sign: */
+			if(!cfgSource.isLiteral('='))
+				Misc::throwStdErr("CitcomSCfgFileParser: Missing \"=\" in tag %s in configuration file %s",tag.c_str(),cfgFileName.c_str());
+			
+			if(tag=="datadir")
 				{
-				sectionStart=linePtr+1;
-				*sectionEnd='\0';
+				/* Read the data directory: */
+				dataDir=cfgSource.readString();
+				
+				/* Check if the data directory is relative to the location of the configuration file: */
+				if(!dataDir.empty()&&dataDir[0]!='/')
+					{
+					/* Get the directory containing the configuration file: */
+					std::string::const_iterator slashIt=cfgFileName.end();
+					for(std::string::const_iterator sIt=cfgFileName.begin();sIt!=cfgFileName.end();++sIt)
+						if(*sIt=='/')
+							slashIt=sIt;
+					if(slashIt!=cfgFileName.end())
+						{
+						/* Prepend the configuration file's directory: */
+						std::string newDataDir(cfgFileName.begin(),slashIt+1);
+						newDataDir.append(dataDir);
+						dataDir=newDataDir;
+						}
+					}
+				
+				/* Terminate the data directory with a slash: */
+				if(!dataDir.empty()&&dataDir[dataDir.size()-1]!='/')
+					dataDir.push_back('/');
+				}
+			else if(tag=="datafile")
+				{
+				/* Read the data file name: */
+				dataFileName=cfgSource.readString();
+				}
+			else
+				{
+				/* Skip the rest of the line: */
+				cfgSource.skipLine();
+				cfgSource.skipWs();
 				}
 			}
-		if(sectionStart!=0)
+		else if(inSolverMesherSection)
 			{
-			inSolverSection=strcasecmp(sectionStart,"CitcomS.solver")==0;
-			inSolverMesherSection=strcasecmp(sectionStart,"CitcomS.solver.mesher")==0;
+			/* Check for equal sign: */
+			if(!cfgSource.isLiteral('='))
+				Misc::throwStdErr("CitcomSCfgFileParser: Missing \"=\" in tag %s in configuration file %s",tag.c_str(),cfgFileName.c_str());
+			
+			if(tag=="nproc_surf")
+				numSurfaces=cfgSource.readInteger();
+			else if(tag=="nprocx")
+				numCpus[0]=cfgSource.readInteger();
+			else if(tag=="nprocy")
+				numCpus[1]=cfgSource.readInteger();
+			else if(tag=="nprocz")
+				numCpus[2]=cfgSource.readInteger();
+			else if(tag=="nodex")
+				numVertices[0]=cfgSource.readInteger();
+			else if(tag=="nodey")
+				numVertices[1]=cfgSource.readInteger();
+			else if(tag=="nodez")
+				numVertices[2]=cfgSource.readInteger();
+			else
+				{
+				/* Skip the rest of the line: */
+				cfgSource.skipLine();
+				cfgSource.skipWs();
+				}
 			}
 		else
 			{
-			/* Look for known tag/value pairs: */
-			char* tagStart=linePtr;
-			char* eqPtr;
-			for(eqPtr=linePtr;*eqPtr!='\0'&&*eqPtr!='=';++eqPtr)
-				;
-			if(*eqPtr=='=')
-				{
-				char* tagEnd;
-				for(tagEnd=eqPtr;tagEnd>tagStart&&isspace(tagEnd[-1]);--tagEnd)
-					;
-				*tagEnd='\0';
-				char* valueStart;
-				for(valueStart=eqPtr+1;*valueStart!='\0'&&isspace(*valueStart);++valueStart)
-					;
-				char* valueEnd;
-				for(valueEnd=valueStart;*valueEnd!='\0';++valueEnd)
-					;
-				for(;valueEnd>valueStart&&isspace(valueEnd[-1]);--valueEnd)
-					;
-				*valueEnd='\0';
-				
-				if(inSolverSection)
-					{
-					if(strcasecmp(tagStart,"datadir")==0)
-						{
-						if(*valueStart!='/')
-							{
-							/* Concatenate the given relative data directory to the directory containing the cfg file: */
-							const char* slashPtr=0;
-							for(const char* cfgPtr=cfgFileName;*cfgPtr!='\0';++cfgPtr)
-								if(*cfgPtr=='/')
-									slashPtr=cfgPtr;
-							if(slashPtr==0)
-								{
-								/* Cfg file is in the current directory: */
-								dataDir=valueStart;
-								}
-							else
-								{
-								/* Append the given path to the cfg file's path: */
-								dataDir=std::string(cfgFileName,slashPtr+1-cfgFileName);
-								dataDir.append(valueStart);
-								}
-							}
-						else
-							{
-							/* Use the given absolute data directory: */
-							dataDir=valueStart;
-							}
-						}
-					else if(strcasecmp(tagStart,"datafile")==0)
-						{
-						/* Remember the data file's name: */
-						dataFileName=valueStart;
-						}
-					}
-				else if(inSolverMesherSection)
-					{
-					if(strcasecmp(tagStart,"nproc_surf")==0)
-						numSurfaces=atoi(valueStart);
-					else if(strcasecmp(tagStart,"nprocx")==0)
-						numCpus[0]=atoi(valueStart);
-					else if(strcasecmp(tagStart,"nprocy")==0)
-						numCpus[1]=atoi(valueStart);
-					else if(strcasecmp(tagStart,"nprocz")==0)
-						numCpus[2]=atoi(valueStart);
-					else if(strcasecmp(tagStart,"nodex")==0)
-						numVertices[0]=atoi(valueStart);
-					else if(strcasecmp(tagStart,"nodey")==0)
-						numVertices[1]=atoi(valueStart);
-					else if(strcasecmp(tagStart,"nodez")==0)
-						numVertices[2]=atoi(valueStart);
-					}
-				}
+			/* Skip the rest of the line: */
+			cfgSource.skipLine();
+			cfgSource.skipWs();
 			}
 		}
 	}

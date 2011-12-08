@@ -3,7 +3,7 @@ Algorithm - Abstract base class for visualization algorithms that
 extract visualization elements from data sets.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
 #include <Misc/ThrowStdErr.h>
-#include <Comm/MulticastPipe.h>
+#include <Cluster/MulticastPipe.h>
 
 #include <Abstract/Parameters.h>
 
@@ -37,7 +37,7 @@ namespace Abstract {
 Methods of class Algortithm:
 ***************************/
 
-Algorithm::Algorithm(VariableManager* sVariableManager,Comm::MulticastPipe* sPipe)
+Algorithm::Algorithm(VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe)
 	:variableManager(sVariableManager),pipe(sPipe),
 	 master(pipe==0||pipe->isMaster()),
 	 busyFunction(0)

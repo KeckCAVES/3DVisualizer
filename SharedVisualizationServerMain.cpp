@@ -78,7 +78,7 @@ int main(int argc,char* argv[])
 	std::cout<<"SharedVisualizationServerMain: Started server on port "<<server.getListenPortId()<<std::endl;
 	
 	/* Add a shared Visualizer protocol object: */
-	server.registerProtocol(new Collaboration::SharedVisualizationServer);
+	server.registerProtocol(new SharedVisualizationServer);
 	
 	/* Reroute SIG_INT signals to cleanly shut down multiplexer: */
 	struct sigaction sigIntAction;

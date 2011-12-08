@@ -31,8 +31,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Misc/ValueCoder.h>
 #include <Misc/ArrayValueCoders.h>
 #include <IO/File.h>
-#include <Comm/MulticastPipe.h>
-#include <Comm/ClusterPipe.h>
 
 /* Forward declarations: */
 namespace Visualization {
@@ -57,8 +55,6 @@ class WriterBase // Base class for atomic or compound values that can be written
 	virtual size_t getBinarySize(void) const =0; // Returns the size of the value when written to a binary sink
 	virtual void write(std::string& string) const =0; // Writes the value to a string
 	virtual void write(IO::File& file) const =0; // Writes the value to a binary file
-	virtual void write(Comm::MulticastPipe& pipe) const =0; // Writes the value to a binary multicast pipe
-	virtual void write(Comm::ClusterPipe& pipe) const =0; // Writes the value to a binary cluster pipe
 	};
 
 template <class DataParam>
@@ -89,14 +85,6 @@ class Writer:public WriterBase // Generic class for values that can be written t
 		string=Misc::ValueCoder<Data>::encode(data);
 		}
 	virtual void write(IO::File& file) const
-		{
-		Misc::Marshaller<Data>::write(data,file);
-		}
-	virtual void write(Comm::MulticastPipe& file) const
-		{
-		Misc::Marshaller<Data>::write(data,file);
-		}
-	virtual void write(Comm::ClusterPipe& file) const
 		{
 		Misc::Marshaller<Data>::write(data,file);
 		}
@@ -131,14 +119,6 @@ class ArrayWriter:public WriterBase // Generic class for array values that can b
 		string=Misc::FixedArrayValueCoder<Data>::encode(elements,numElements);
 		}
 	virtual void write(IO::File& file) const
-		{
-		Misc::FixedArrayMarshaller<Data>::write(elements,numElements,file);
-		}
-	virtual void write(Comm::MulticastPipe& file) const
-		{
-		Misc::FixedArrayMarshaller<Data>::write(elements,numElements,file);
-		}
-	virtual void write(Comm::ClusterPipe& file) const
 		{
 		Misc::FixedArrayMarshaller<Data>::write(elements,numElements,file);
 		}

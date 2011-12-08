@@ -1,7 +1,7 @@
 /***********************************************************************
 ByteVolFile - Class to encapsulate operations on scalar-valued data sets
 stored in byte-valued .vol files.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,7 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#include <Misc/File.h>
+#include <IO/File.h>
+#include <IO/OpenFile.h>
 #include <Plugins/FactoryManager.h>
 
 #include <Concrete/ByteVolFile.h>
@@ -38,17 +39,18 @@ ByteVolFile::ByteVolFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* ByteVolFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* ByteVolFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Open the volume file: */
-	Misc::File file(args[0].c_str(),"rb",Misc::File::BigEndian);
+	IO::FilePtr file(openFile(args[0],pipe));
+	file->setEndianness(Misc::BigEndian);
 	
 	/* Read the volume file header: */
 	int volSize[3];
-	file.read(volSize,3);
-	int borderSize=file.read<int>();
+	file->read(volSize,3);
+	int borderSize=file->read<int>();
 	float domainSize[3];
-	file.read(domainSize,3);
+	file->read(domainSize,3);
 	
 	/* Create the data set: */
 	DS::Index numVertices;
@@ -62,7 +64,7 @@ Visualization::Abstract::DataSet* ByteVolFile::load(const std::vector<std::strin
 	result->getDs().setData(numVertices,cellSize);
 	
 	/* Read the vertex values from file: */
-	file.read(result->getDs().getVertices().getArray(),result->getDs().getVertices().getNumElements());
+	file->read(result->getDs().getVertices().getArray(),result->getDs().getVertices().getNumElements());
 	
 	return result;
 	}

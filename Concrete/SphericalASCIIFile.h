@@ -1,7 +1,7 @@
 /***********************************************************************
 SphericalASCIIFile - Class to read multivariate scalar data in spherical
 coordinates from simple ASCII files.
-Copyright (c) 2008-2009 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -50,7 +50,7 @@ class SphericalASCIIFile:public BaseModule
 	SphericalASCIIFile(void); // Default constructor
 	
 	/* Methods: */
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	virtual Visualization::Abstract::DataSetRenderer* getRenderer(const Visualization::Abstract::DataSet* dataSet) const;
 	};
 

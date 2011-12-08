@@ -52,7 +52,7 @@ class MultiCitcomtFile:public BaseModule
 	MultiCitcomtFile(void); // Default constructor
 	
 	/* Methods: */
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	virtual Visualization::Abstract::DataSetRenderer* getRenderer(const Visualization::Abstract::DataSet* dataSet) const;
 	virtual int getNumScalarAlgorithms(void) const;
 	virtual int getNumVectorAlgorithms(void) const;

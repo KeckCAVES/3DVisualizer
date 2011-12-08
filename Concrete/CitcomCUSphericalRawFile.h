@@ -2,7 +2,7 @@
 CitcomCUSphericalRawFile - Class reading raw files produced by parallel
 regional CITCOMCU simulations. Raw files are binary files stored on each
 processing node describing the grid and result values.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -51,7 +51,7 @@ class CitcomCUSphericalRawFile:public BaseModule
 	CitcomCUSphericalRawFile(void); // Default constructor
 	
 	/* Methods: */
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	virtual Visualization::Abstract::DataSetRenderer* getRenderer(const Visualization::Abstract::DataSet* dataSet) const;
 	};
 

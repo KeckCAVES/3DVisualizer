@@ -1,7 +1,7 @@
 /***********************************************************************
 Extractor - Helper class to drive multithreaded incremental or immediate
 extraction of visualization elements from a data set.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,10 +23,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef EXTRACTOR_INCLUDED
 #define EXTRACTOR_INCLUDED
 
+#include <utility>
 #include <Misc/Autopointer.h>
 #include <Threads/Mutex.h>
 #include <Threads/Cond.h>
 #include <Threads/Thread.h>
+#include <Threads/TripleBuffer.h>
 
 /* Forward declarations: */
 class GLContextData;
@@ -53,7 +55,7 @@ class Extractor
 	/* Persistent state: */
 	Algorithm* extractor; // Visualization element extractor
 	
-	/* Persisten extractor thread state: */
+	/* Persistent extractor thread state: */
 	private:
 	#ifdef __APPLE__
 	volatile bool terminate; // Flag to tell the extractor thread to shut itself down
@@ -71,10 +73,7 @@ class Extractor
 	volatile unsigned int seedRequestID; // ID of current seed request
 	
 	/* Extractor thread communication output: */
-	volatile int lockedIndex; // Index of locked element
-	volatile int mostRecentIndex; // Index of most recently extracted element
-	ElementPointer trackedElements[3]; // Triple-buffer of currently tracked visualization elements
-	unsigned int trackedElementIDs[3]; // Seed request IDs associated with the currently tracked visualization elements
+	Threads::TripleBuffer<std::pair<ElementPointer,unsigned int> > trackedElements; // Triple-buffer of currently tracked visualization elements and their IDs
 	
 	/* Private methods: */
 	private:

@@ -2,7 +2,7 @@
 CitcomCUSphericalRawFile - Class reading raw files produced by parallel
 regional CITCOMCU simulations. Raw files are binary files stored on each
 processing node describing the grid and result values.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -21,20 +21,23 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/CitcomCUSphericalRawFile.h>
+
 #include <string.h>
 #include <stdio.h>
 #include <iostream>
 #include <iomanip>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
-#include <Misc/File.h>
+#include <Misc/StandardValueCoders.h>
 #include <Plugins/FactoryManager.h>
+#include <IO/File.h>
+#include <IO/OpenFile.h>
+#include <IO/ValueSource.h>
 #include <Math/Math.h>
 
 #include <Concrete/SphericalCoordinateTransformer.h>
 #include <Concrete/EarthDataSet.h>
-
-#include <Concrete/CitcomCUSphericalRawFile.h>
 
 namespace Visualization {
 
@@ -49,8 +52,10 @@ CitcomCUSphericalRawFile::CitcomCUSphericalRawFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* CitcomCUSphericalRawFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* CitcomCUSphericalRawFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
+	bool master=pipe==0||pipe->isMaster();
+	
 	/* Create the result data set: */
 	Misc::SelfDestructPointer<EarthDataSet<DataSet> > result(new EarthDataSet<DataSet>(args));
 	result->setFlatteningFactor(0.0);
@@ -68,42 +73,61 @@ Visualization::Abstract::DataSet* CitcomCUSphericalRawFile::load(const std::vect
 		++argIt;
 		}
 	
-	/* Open the header file: */
-	Misc::File headerFile(((*argIt)+".hdr").c_str(),"rt");
-	
 	DS::Index numVertices;
 	DS::Index numCpus;
 	
+	/* Open the header file: */
+	{
+	IO::ValueSource headerSource(openFile((*argIt)+".hdr",pipe));
+	
 	/* Check the grid type: */
-	char line[256];
-	headerFile.gets(line,sizeof(line));
-	if(strcasecmp(line,"multigrid\n")==0)
+	std::string gridType=headerSource.readString();
+	if(gridType=="multigrid")
 		{
-		/* Read description of multigrid mesh: */
-		headerFile.gets(line,sizeof(line));
-		DS::Index numBlocks;
-		int numLevels;
-		if(sscanf(line,"%d %d %d %d",&numBlocks[0],&numBlocks[1],&numBlocks[2],&numLevels)!=4)
+		try
+			{
+			/* Read description of multigrid mesh: */
+			DS::Index numBlocks;
+			for(int i=0;i<3;++i)
+				numBlocks[i]=headerSource.readInteger();
+			int numLevels=headerSource.readInteger();
+			
+			/* Compute the number of nodes: */
+			for(int i=0;i<3;++i)
+				numVertices[i]=(numBlocks[i]<<(numLevels-1))+1;
+			}
+		catch(IO::ValueSource::NumberError err)
+			{
 			Misc::throwStdErr("CitcomCUSphericalRawFile::load: Invalid multigrid definition in header file %s",((*argIt)+".hdr").c_str());
-		
-		/* Compute the number of nodes: */
-		for(int i=0;i<3;++i)
-			numVertices[i]=(numBlocks[i]<<(numLevels-1))+1;
+			}
 		}
-	else if(strcasecmp(line,"conj-grad\n")==0)
+	else if(gridType=="conj-grad")
 		{
-		/* Read description of conjugate-gradient mesh: */
-		headerFile.gets(line,sizeof(line));
-		if(sscanf(line,"%d %d %d",&numVertices[0],&numVertices[1],&numVertices[2])!=3)
-			Misc::throwStdErr("CitcomCUSphericalRawFile::load: Invalid multigrid definition in header file %s",((*argIt)+".hdr").c_str());
+		try
+			{
+			/* Read description of conjugate-gradient mesh: */
+			for(int i=0;i<3;++i)
+				numVertices[i]=headerSource.readInteger();
+			}
+		catch(IO::ValueSource::NumberError err)
+			{
+			Misc::throwStdErr("CitcomCUSphericalRawFile::load: Invalid conjugate gradient definition in header file %s",((*argIt)+".hdr").c_str());
+			}
 		}
 	else
-		Misc::throwStdErr("CitcomCUSphericalRawFile::load: Unrecognized mesh type in header file %s",((*argIt)+".hdr").c_str());
+		Misc::throwStdErr("CitcomCUSphericalRawFile::load: Unrecognized mesh type %s in header file %s",gridType.c_str(),((*argIt)+".hdr").c_str());
 	
-	/* Read the number of CPUs: */
-	headerFile.gets(line,sizeof(line));
-	if(sscanf(line,"%d %d %d",&numCpus[0],&numCpus[1],&numCpus[2])!=3)
-		Misc::throwStdErr("CitcomCUSphericalRawFile::load: Invalid multigrid definition in header file %s",((*argIt)+".hdr").c_str());
+	try
+		{
+		/* Read the number of CPUs: */
+		for(int i=0;i<3;++i)
+			numCpus[i]=headerSource.readInteger();
+		}
+	catch(IO::ValueSource::NumberError err)
+		{
+		Misc::throwStdErr("CitcomCUSphericalRawFile::load: Invalid number of CPUs in header file %s",((*argIt)+".hdr").c_str());
+		}
+	}
 	
 	/* Initialize the data set: */
 	DS& dataSet=result->getDs();
@@ -136,7 +160,8 @@ Visualization::Abstract::DataSet* CitcomCUSphericalRawFile::load(const std::vect
 		gridVertices[i]=new float[totalCpuNumVertices];
 	
 	/* Read grid and value files from each CPU and merge them into the data set: */
-	std::cout<<"Reading grid vertex positions...   0%"<<std::flush;
+	if(master)
+		std::cout<<"Reading grid vertex positions...   0%"<<std::flush;
 	int cpuCounter=0;
 	for(DS::Index cpuIndex(0);cpuIndex[0]<numCpus[0];cpuIndex.preInc(numCpus),++cpuCounter)
 		{
@@ -150,11 +175,15 @@ Visualization::Abstract::DataSet* CitcomCUSphericalRawFile::load(const std::vect
 		for(int i=0;i<3;++i)
 			{
 			/* Read the grid file into the temporary array, skipping the first (bogus) element: */
-			char gridFileName[1024];
-			snprintf(gridFileName,sizeof(gridFileName),"%s.%c.%d",argIt->c_str(),'x'+i,cpuNumber);
-			Misc::File gridFile(gridFileName,"rb",Misc::File::LittleEndian);
-			gridFile.seekSet(sizeof(float));
-			gridFile.read(gridVertices[i],totalCpuNumVertices);
+			std::string gridFileName=*argIt;
+			gridFileName.push_back('.');
+			gridFileName.push_back('x'+i);
+			gridFileName.push_back('.');
+			gridFileName.append(Misc::ValueCoder<int>::encode(cpuNumber));
+			IO::FilePtr gridFile(openFile(gridFileName,pipe));
+			gridFile->setEndianness(Misc::LittleEndian);
+			gridFile->skip<float>(1);
+			gridFile->read(gridVertices[i],totalCpuNumVertices);
 			}
 		
 		/* Prepare the spherical-to-Cartesian formula: */
@@ -193,19 +222,22 @@ Visualization::Abstract::DataSet* CitcomCUSphericalRawFile::load(const std::vect
 						dataSet.getVertexValue(2,gIndex)=Scalar(r);
 						}
 					}
-		
-		std::cout<<"\b\b\b\b"<<std::setw(3)<<((cpuCounter+1)*100)/numCpus.calcIncrement(-1)<<"%"<<std::flush;
+		if(master)
+			std::cout<<"\b\b\b\b"<<std::setw(3)<<((cpuCounter+1)*100)/numCpus.calcIncrement(-1)<<"%"<<std::flush;
 		}
-	std::cout<<"\b\b\b\bdone"<<std::endl;
+	if(master)
+		std::cout<<"\b\b\b\bdone"<<std::endl;
 
 	/* Delete the grid vertex arrays: */
 	for(int i=0;i<3;++i)
 		delete[] gridVertices[i];
 	
 	/* Finalize the grid structure: */
-	std::cout<<"Finalizing grid structure..."<<std::flush;
+	if(master)
+		std::cout<<"Finalizing grid structure..."<<std::flush;
 	dataSet.finalizeGrid();
-	std::cout<<" done"<<std::endl;
+	if(master)
+		std::cout<<" done"<<std::endl;
 	
 	/* Read the time step index given on the command line: */
 	++argIt;
@@ -238,46 +270,41 @@ Visualization::Abstract::DataSet* CitcomCUSphericalRawFile::load(const std::vect
 			if(nextVector)
 				{
 				/* Add another vector variable to the data value: */
-				int vectorVariableIndex=dataValue.getNumVectorVariables();
-				dataValue.addVectorVariable(argIt->c_str());
-				std::cout<<"Reading vector variable "<<*argIt<<"...   0%"<<std::flush;
+				int vectorVariableIndex=dataValue.addVectorVariable(argIt->c_str());
+				if(master)
+					std::cout<<"Reading vector variable "<<*argIt<<"...   0%"<<std::flush;
 				
 				/* Add seven new slices to the data set (3 components spherical and Cartesian each plus Cartesian magnitude): */
-				static const char* componentNames[6]={"Colatitude","Longitude","Radius","X","Y","Z"};
-				char variableName[256];
-				for(int i=0;i<6;++i)
+				static const char* componentNames[7]={" Colatitude"," Longitude"," Radius"," X"," Y"," Z"," Magnitude"};
+				for(int i=0;i<7;++i)
 					{
-					/* Add a component scalar variable to the data value: */
-					snprintf(variableName,sizeof(variableName),"%s %s",argIt->c_str(),componentNames[i]);
-					dataValue.addScalarVariable(variableName);
 					dataSet.addSlice();
+					dataValue.addScalarVariable(((*argIt)+componentNames[i]).c_str());
 					}
 				
 				/* Set the vector variables' component indices: */
 				for(int i=0;i<3;++i)
 					dataValue.setVectorVariableScalarIndex(vectorVariableIndex,i,sliceIndex+3+i);
-				
-				/* Add a magnitude scalar variable to the data value: */
-				snprintf(variableName,sizeof(variableName),"%s Magnitude",argIt->c_str());
-				dataValue.addScalarVariable(variableName);
-				dataSet.addSlice();
 				}
 			else
 				{
 				/* Add another scalar variable to the data value: */
+				dataSet.addSlice();
 				if(logNextScalar)
 					{
-					char variableName[256];
-					snprintf(variableName,sizeof(variableName),"log(%s)",argIt->c_str());
-					dataValue.addScalarVariable(variableName);
-					std::cout<<"Reading scalar variable "<<variableName<<"...   0%"<<std::flush;
+					std::string scalarName="log(";
+					scalarName.append(*argIt);
+					scalarName.push_back(')');
+					dataValue.addScalarVariable(scalarName.c_str());
+					if(master)
+						std::cout<<"Reading scalar variable "<<scalarName<<"...   0%"<<std::flush;
 					}
 				else
 					{
 					dataValue.addScalarVariable(argIt->c_str());
-					std::cout<<"Reading scalar variable "<<*argIt<<"...   0%"<<std::flush;
+					if(master)
+						std::cout<<"Reading scalar variable "<<*argIt<<"...   0%"<<std::flush;
 					}
-				dataSet.addSlice();
 				}
 			
 			/* Create a temporary array for the data values: */
@@ -293,12 +320,18 @@ Visualization::Abstract::DataSet* CitcomCUSphericalRawFile::load(const std::vect
 					cpuBase[i]=(cpuNumVertices[i]-1)*cpuIndex[i];
 				int cpuNumber=(cpuIndex[1]*numCpus[0]+cpuIndex[0])*numCpus[2]+cpuIndex[2];
 				
-				/* Open the data file: */
-				char dataFileName[1024];
-				snprintf(dataFileName,sizeof(dataFileName),"%s.%s.%d.%d",args[0].c_str(),argIt->c_str(),cpuNumber,timeStepIndex);
-				Misc::File dataFile(dataFileName,"rb",Misc::File::LittleEndian);
-				dataFile.seekSet(sizeof(float));
-				dataFile.read(dataValues,nextVector?totalCpuNumVertices*3:totalCpuNumVertices);
+				/* Read the data file into the temporary array, skipping the first (bogus) element: */
+				std::string dataFileName=args[0];
+				dataFileName.push_back('.');
+				dataFileName.append(*argIt);
+				dataFileName.push_back('.');
+				dataFileName.append(Misc::ValueCoder<int>::encode(cpuNumber));
+				dataFileName.push_back('.');
+				dataFileName.append(Misc::ValueCoder<int>::encode(timeStepIndex));
+				IO::FilePtr dataFile(openFile(dataFileName,pipe));
+				dataFile->setEndianness(Misc::LittleEndian);
+				dataFile->skip<float>(1);
+				dataFile->read(dataValues,nextVector?totalCpuNumVertices*3:totalCpuNumVertices);
 				
 				/* Write the CPU's data values: */
 				DS::Index index;
@@ -338,10 +371,11 @@ Visualization::Abstract::DataSet* CitcomCUSphericalRawFile::load(const std::vect
 								++dvPtr;
 								}
 							}
-				
-				std::cout<<"\b\b\b\b"<<std::setw(3)<<((cpuCounter+1)*100)/numCpus.calcIncrement(-1)<<"%"<<std::flush;
+				if(master)
+					std::cout<<"\b\b\b\b"<<std::setw(3)<<((cpuCounter+1)*100)/numCpus.calcIncrement(-1)<<"%"<<std::flush;
 				}
-			std::cout<<"\b\b\b\bdone"<<std::endl;
+			if(master)
+				std::cout<<"\b\b\b\bdone"<<std::endl;
 			
 			/* Delete the temporary array: */
 			delete[] dataValues;

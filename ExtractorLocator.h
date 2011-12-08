@@ -1,7 +1,7 @@
 /***********************************************************************
 ExtractorLocator - Class for locators applying visualization algorithms
 to data sets.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -53,10 +53,12 @@ class ExtractorLocator:public BaseLocator,public Extractor
 	Locator* locator; // A locator for the visualization algorithm
 	bool dragging; // Flag if the tool's button is currently pressed
 	unsigned int lastSeedRequestID; // ID used to identify the last issued seed request
+	volatile float completionPercentage; // Completion percentage of long-running operations
+	volatile bool completionPercentageUpdated; // Flag if the completion percentage has been updated
 	
 	/* Private methods: */
 	GLMotif::PopupWindow* createBusyDialog(const char* algorithmName); // Creates the busy dialog
-	void busyFunction(float completionPercentage); // Called during long-running operations
+	void busyFunction(float newCompletionPercentage); // Called during long-running operations
 	
 	/* Constructors and destructors: */
 	public:

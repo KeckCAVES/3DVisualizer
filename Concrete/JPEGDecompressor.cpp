@@ -1,6 +1,6 @@
 /***********************************************************************
 JPEGDecompressor - Class to decompress lossless JPEG images.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -37,7 +37,7 @@ namespace {
 Helper functions:
 ****************/
 
-inline int readNextMarker(Misc::CharacterSource& source)
+inline int readNextMarker(IO::File& source)
 	{
 	enum State
 		{
@@ -75,18 +75,17 @@ inline int readNextMarker(Misc::CharacterSource& source)
 	return result;
 	}
 
-inline int readShort(Misc::CharacterSource& source)
+inline int readShort(IO::File& source)
 	{
 	/* Read the integer in MSB-first order: */
 	return (int(source.getChar())<<8)+int(source.getChar());
 	}
 
-inline void skipVariable(Misc::CharacterSource& source)
+inline void skipVariable(IO::File& source)
 	{
 	/* Skip the variable's value: */
 	int length=readShort(source)-2;
-	for(int i=0;i<length;++i)
-		source.getChar();
+	source.skip<char>(length);
 	}
 
 }
@@ -127,8 +126,7 @@ void JPEGDecompressor::processDht(void)
 		
 		/* Read the Huffman code value array: */
 		unsigned char huffmanValues[256];
-		for(int i=0;i<numHuffmanValues;++i)
-			huffmanValues[i]=source.getChar();
+		source.read(huffmanValues,numHuffmanValues);
 		
 		/* Decrement the leftover variable length: */
 		length-=1+16+numHuffmanValues;
@@ -310,7 +308,7 @@ void JPEGDecompressor::processRestart(short nextMarkerNumber)
 		Misc::throwStdErr("JPEGDecompressor::processRestart: wrong number in restart marker");
 	}
 
-JPEGDecompressor::JPEGDecompressor(Misc::CharacterSource& sSource)
+JPEGDecompressor::JPEGDecompressor(IO::File& sSource)
 	:source(sSource),
 	 numComponents(0),
 	 numBits(0),

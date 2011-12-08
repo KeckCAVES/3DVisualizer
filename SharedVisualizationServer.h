@@ -2,7 +2,7 @@
 SharedVisualizationServer - Server for collaborative data exploration in
 spatially distributed VR environments, implemented as a plug-in of the
 Vrui remote collaboration infrastructure.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -28,14 +28,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <vector>
 #include <Misc/HashTable.h>
 #include <Threads/Mutex.h>
-#include <Collaboration/CollaborationPipe.h>
 #include <Collaboration/ProtocolServer.h>
 
-#include "SharedVisualizationPipe.h"
+#include "SharedVisualizationProtocol.h"
 
-namespace Collaboration {
-
-class SharedVisualizationServer:public ProtocolServer,public SharedVisualizationPipe
+class SharedVisualizationServer:public Collaboration::ProtocolServer,private SharedVisualizationProtocol
 	{
 	/* Embedded classes: */
 	private:
@@ -45,7 +42,7 @@ class SharedVisualizationServer:public ProtocolServer,public SharedVisualization
 		public:
 		unsigned int requestID; // Seed request ID
 		size_t parametersSize; // Size of parameter blob in bytes
-		unsigned char* parameters; // Parameter blob
+		Byte* parameters; // Parameter blob
 		
 		/* Constructors and destructors: */
 		SeedRequest(void) // Creates empty seed request
@@ -63,8 +60,8 @@ class SharedVisualizationServer:public ProtocolServer,public SharedVisualization
 			}
 		
 		/* Methods: */
-		SeedRequest& receive(CollaborationPipe& pipe); // Reads seed request from pipe
-		void send(CollaborationPipe& pipe) const; // Writes seed request to pipe
+		SeedRequest& receive(Comm::NetPipe& pipe); // Reads seed request from pipe
+		void send(Comm::NetPipe& pipe) const; // Writes seed request to pipe
 		};
 	
 	struct LocatorState // Type for states of locators
@@ -87,12 +84,12 @@ class SharedVisualizationServer:public ProtocolServer,public SharedVisualization
 		{
 		/* Elements: */
 		public:
-		CollaborationPipe::MessageIdType action; // What kind of action, values taken from respective protocol messages
+		MessageIdType action; // What kind of action, values taken from respective protocol messages
 		LocatorHash::Iterator locatorIt;
 		unsigned int requestID; // Request ID for seed and finalization actions
 		
 		/* Constructors and destructors: */
-		LocatorAction(CollaborationPipe::MessageIdType sAction,const LocatorHash::Iterator& sLocatorIt,unsigned int sRequestID)
+		LocatorAction(MessageIdType sAction,const LocatorHash::Iterator& sLocatorIt,unsigned int sRequestID)
 			:action(sAction),locatorIt(sLocatorIt),requestID(sRequestID)
 			{
 			}
@@ -106,7 +103,7 @@ class SharedVisualizationServer:public ProtocolServer,public SharedVisualization
 		public:
 		std::string algorithmName; // Name of the algorithm which created the element
 		size_t parametersSize; // Size of element parameter blob in bytes
-		unsigned char* parameters; // Element parameter blob
+		Byte* parameters; // Element parameter blob
 		bool enabled; // Flag whether the element is currently enabled (visible)
 		
 		/* Constructors and destructors: */
@@ -121,12 +118,12 @@ class SharedVisualizationServer:public ProtocolServer,public SharedVisualization
 			}
 		
 		/* Methods: */
-		void send(CollaborationPipe& pipe) const; // Writes visualization element to pipe
+		void send(Comm::NetPipe& pipe) const; // Writes visualization element to pipe
 		};
 	
 	typedef Misc::HashTable<unsigned int,Element*> ElementHash; // Type for hash tables mapping element IDs to element objects
 	
-	class ClientState:public ProtocolServer::ClientState
+	class ClientState:public Collaboration::ProtocolServer::ClientState
 		{
 		friend class SharedVisualizationServer;
 		
@@ -154,14 +151,12 @@ class SharedVisualizationServer:public ProtocolServer,public SharedVisualization
 	/* Methods from ProtocolServer: */
 	virtual const char* getName(void) const;
 	virtual unsigned int getNumMessages(void) const;
-	virtual ProtocolServer::ClientState* receiveConnectRequest(unsigned int protocolMessageLength,CollaborationPipe& pipe);
-	virtual void receiveClientUpdate(ProtocolServer::ClientState* cs,CollaborationPipe& pipe);
-	virtual void sendClientConnect(ProtocolServer::ClientState* sourceCs,ProtocolServer::ClientState* destCs,CollaborationPipe& pipe);
-	virtual void sendServerUpdate(ProtocolServer::ClientState* destCs,CollaborationPipe& pipe);
-	virtual void sendServerUpdate(ProtocolServer::ClientState* sourceCs,ProtocolServer::ClientState* destCs,CollaborationPipe& pipe);
-	virtual void afterServerUpdate(ProtocolServer::ClientState* cs);
+	virtual Collaboration::ProtocolServer::ClientState* receiveConnectRequest(unsigned int protocolMessageLength,Comm::NetPipe& pipe);
+	virtual void receiveClientUpdate(Collaboration::ProtocolServer::ClientState* cs,Comm::NetPipe& pipe);
+	virtual void sendClientConnect(Collaboration::ProtocolServer::ClientState* sourceCs,Collaboration::ProtocolServer::ClientState* destCs,Comm::NetPipe& pipe);
+	virtual void sendServerUpdate(Collaboration::ProtocolServer::ClientState* destCs,Comm::NetPipe& pipe);
+	virtual void sendServerUpdate(Collaboration::ProtocolServer::ClientState* sourceCs,Collaboration::ProtocolServer::ClientState* destCs,Comm::NetPipe& pipe);
+	virtual void afterServerUpdate(Collaboration::ProtocolServer::ClientState* cs);
 	};
-
-}
 
 #endif

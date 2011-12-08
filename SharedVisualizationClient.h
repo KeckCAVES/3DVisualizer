@@ -2,7 +2,7 @@
 SharedVisualizationClient - Client for collaborative data exploration in
 spatially distributed VR environments, implemented as a plug-in of the
 Vrui remote collaboration infrastructure.
-Copyright (c) 2009-2010 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -27,12 +27,10 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <vector>
 #include <Misc/HashTable.h>
 #include <Threads/Mutex.h>
-#include <Collaboration/CollaborationPipe.h>
 #include <Collaboration/ProtocolClient.h>
 
+#include "SharedVisualizationProtocol.h"
 #include "Extractor.h"
-
-#include "SharedVisualizationPipe.h"
 
 /* Forward declarations: */
 namespace Visualization {
@@ -45,9 +43,7 @@ class Element;
 class ExtractorLocator;
 class Visualizer;
 
-namespace Collaboration {
-
-class SharedVisualizationClient:public ProtocolClient,public SharedVisualizationPipe
+class SharedVisualizationClient:public Collaboration::ProtocolClient,private SharedVisualizationProtocol
 	{
 	/* Embedded classes: */
 	public:
@@ -66,7 +62,7 @@ class SharedVisualizationClient:public ProtocolClient,public SharedVisualization
 		virtual void update(void);
 		
 		/* New methods: */
-		void readSeedRequest(CollaborationPipe& pipe); // Reads a seed request from the given pipe and posts it to the extractor
+		void readSeedRequest(Comm::NetPipe& pipe); // Reads a seed request from the given pipe and posts it to the extractor
 		};
 	
 	typedef Misc::HashTable<unsigned int,RemoteLocator*> RemoteLocatorHash; // Hash table to map locator IDs to remote locator objects
@@ -107,12 +103,12 @@ class SharedVisualizationClient:public ProtocolClient,public SharedVisualization
 		{
 		/* Elements: */
 		public:
-		CollaborationPipe::MessageIdType action; // What kind of action, values taken from respective protocol messages
+		MessageIdType action; // What kind of action, values taken from respective protocol messages
 		LocatorHash::Iterator locatorIt;
 		unsigned int requestID; // Request ID for seed and finalization actions
 		
 		/* Constructors and destructors: */
-		LocatorAction(CollaborationPipe::MessageIdType sAction,const LocatorHash::Iterator& sLocatorIt,unsigned int sRequestID)
+		LocatorAction(MessageIdType sAction,const LocatorHash::Iterator& sLocatorIt,unsigned int sRequestID)
 			:action(sAction),locatorIt(sLocatorIt),requestID(sRequestID)
 			{
 			}
@@ -129,8 +125,8 @@ class SharedVisualizationClient:public ProtocolClient,public SharedVisualization
 	unsigned int mostRecentSeedRequestID; // ID of most recently posted seed request
 	
 	/* Private methods: */
-	void receiveRemoteLocator(RemoteClientState* rcs,CollaborationPipe& pipe); // Creates a new remote locator by reading from the given pipe, and adds it to the hash table
-	RemoteLocator* findRemoteLocator(RemoteClientState* rcs,CollaborationPipe& pipe); // Returns a pointer to a remote locator whose ID was read from the given pipe, or 0 if not found
+	void receiveRemoteLocator(RemoteClientState* rcs,Comm::NetPipe& pipe); // Creates a new remote locator by reading from the given pipe, and adds it to the hash table
+	RemoteLocator* findRemoteLocator(RemoteClientState* rcs,Comm::NetPipe& pipe); // Returns a pointer to a remote locator whose ID was read from the given pipe, or 0 if not found
 	
 	/* Constructors and destructors: */
 	public:
@@ -140,11 +136,11 @@ class SharedVisualizationClient:public ProtocolClient,public SharedVisualization
 	/* Methods from ProtocolClient: */
 	virtual const char* getName(void) const;
 	virtual unsigned int getNumMessages(void) const;
-	virtual void sendConnectRequest(CollaborationPipe& pipe);
-	virtual void sendClientUpdate(CollaborationPipe& pipe);
-	virtual ProtocolClient::RemoteClientState* receiveClientConnect(CollaborationPipe& pipe);
-	virtual void receiveServerUpdate(CollaborationPipe& pipe);
-	virtual void receiveServerUpdate(ProtocolClient::RemoteClientState* rcs,CollaborationPipe& pipe);
+	virtual void sendConnectRequest(Comm::NetPipe& pipe);
+	virtual ProtocolClient::RemoteClientState* receiveClientConnect(Comm::NetPipe& pipe);
+	virtual bool receiveServerUpdate(Comm::NetPipe& pipe);
+	virtual bool receiveServerUpdate(ProtocolClient::RemoteClientState* rcs,Comm::NetPipe& pipe);
+	virtual void sendClientUpdate(Comm::NetPipe& pipe);
 	virtual void rejectedByServer(void);
 	virtual void frame(ProtocolClient::RemoteClientState* rcs);
 	virtual void glRenderAction(const ProtocolClient::RemoteClientState* rcs,GLContextData& contextData) const;
@@ -155,7 +151,5 @@ class SharedVisualizationClient:public ProtocolClient,public SharedVisualization
 	void postFinalizationRequest(ExtractorLocator* locator,unsigned int finalSeedRequestID); // Notifies server that the given seed request ID is the final one for a current seeding operation on the given locator
 	void destroyLocator(ExtractorLocator* locator); // Unregisters an extractor locator before it is destroyed
 	};
-
-}
 
 #endif

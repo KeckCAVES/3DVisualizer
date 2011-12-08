@@ -73,7 +73,7 @@ MultiVolFile::MultiVolFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* MultiVolFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* MultiVolFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Create the result data set: */
 	Misc::SelfDestructPointer<DataSet> result(new DataSet);

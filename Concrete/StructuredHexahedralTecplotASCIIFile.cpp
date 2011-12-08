@@ -1,7 +1,7 @@
 /***********************************************************************
 StructuredHexahedralTecplotASCIIFile - Class reading structured
 hexahedral multi-block Tecplot files in ASCII format.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -31,8 +31,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iostream>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
-#include <IO/File.h>
 #include <IO/OpenFile.h>
+#include <Cluster/MulticastPipe.h>
 #include <Plugins/FactoryManager.h>
 
 #include <Concrete/TecplotASCIIFileHeaderParser.h>
@@ -50,8 +50,10 @@ StructuredHexahedralTecplotASCIIFile::StructuredHexahedralTecplotASCIIFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
+	bool master=pipe==0||pipe->isMaster();
+	
 	/* Create the result data set: */
 	Misc::SelfDestructPointer<DataSet> result(new DataSet);
 	DS& dataSet=result->getDs();
@@ -109,8 +111,7 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 		Misc::throwStdErr("StructuredHexahedralTecplotASCIIFile::load: No scalar or vector variables specified");
 	
 	/* Create a parser and open the input file: */
-	IO::AutoFile dataFile(IO::openFile(dataFileName));
-	TecplotASCIIFileHeaderParser parser(*dataFile);
+	TecplotASCIIFileHeaderParser parser(openFile(dataFileName,pipe));
 	
 	/* Create an array of ignore flags for the file's columns: */
 	int numVariables=int(parser.getNumVariables());
@@ -180,26 +181,19 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 		/* Add a vector variable: */
 		int vectorVariableIndex=dataValue.addVectorVariable(vectorNames[i].c_str());
 		
-		/* Add three new scalar slices and scalar variables: */
-		for(int j=0;j<3;++j)
+		/* Add four new scalar slices and scalar variables (three components plus magnitude): */
+		for(int j=0;j<4;++j)
 			{
-			/* Add a new scalar slice and scalar variable: */
 			vectorSliceIndices[i*4+j]=dataSet.addSlice();
-			std::string componentName=vectorNames[i];
-			componentName.push_back(' ');
-			componentName.push_back('X'+j);
-			dataValue.setVectorVariableScalarIndex(vectorVariableIndex,j,dataValue.addScalarVariable(componentName.c_str()));
+			int variableIndex=dataValue.addScalarVariable(makeVectorSliceName(vectorNames[i],j).c_str());
+			if(j<3)
+				dataValue.setVectorVariableScalarIndex(vectorVariableIndex,j,variableIndex);
 			}
-		
-		/* Add a magnitude slice: */
-		vectorSliceIndices[i*4+3]=dataSet.addSlice();
-		std::string componentName=vectorNames[i];
-		componentName.append(" Magnitude");
-		dataValue.setVectorVariableScalarIndex(vectorVariableIndex,3,dataValue.addScalarVariable(componentName.c_str()));
 		}
 	
 	/* Read zones from the file until end-of-file: */
-	std::cout<<"Reading input file "<<parser.getTitle()<<std::endl;
+	if(master)
+		std::cout<<"Reading input file "<<parser.getTitle()<<std::endl;
 	double* columnBuffer=new double[numVariables];
 	int zoneIndex=0;
 	while(true)
@@ -211,7 +205,8 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 			Misc::throwStdErr("StructuredHexahedralTecplotASCIIFile::load: File %s has unsupported zone layout");
 		
 		DS::Index numZoneVertices(parser.getZoneSize());
-		std::cout<<"Reading grid zone "<<parser.getZoneName()<<" of size "<<numZoneVertices[0]<<" x "<<numZoneVertices[1]<<" x "<<numZoneVertices[2]<<"..."<<std::flush;
+		if(master)
+			std::cout<<"Reading grid zone "<<parser.getZoneName()<<" of size "<<numZoneVertices[0]<<" x "<<numZoneVertices[1]<<" x "<<numZoneVertices[2]<<"..."<<std::flush;
 		
 		/* Add a new grid to the data set: */
 		int gridIndex=dataSet.addGrid(numZoneVertices);
@@ -266,8 +261,8 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 						dataSet.getVertexValue(vectorSliceIndices[i*4+3],gridIndex,index)=vector.mag();
 						}
 					}
-		
-		std::cout<<" done"<<std::endl;
+		if(master)
+			std::cout<<" done"<<std::endl;
 		
 		/* Read the next zone header: */
 		if(!parser.readNextZoneHeader())
@@ -283,9 +278,11 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 	delete[] columnBuffer;
 	
 	/* Finalize the grid structure: */
-	std::cout<<"Finalizing grid structure..."<<std::flush;
+	if(master)
+		std::cout<<"Finalizing grid structure..."<<std::flush;
 	dataSet.finalizeGrid();
-	std::cout<<" done"<<std::endl;
+	if(master)
+		std::cout<<" done"<<std::endl;
 	
 	/* Return the result data set: */
 	return result.releaseTarget();

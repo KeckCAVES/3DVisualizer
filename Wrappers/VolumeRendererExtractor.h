@@ -107,7 +107,7 @@ class VolumeRendererExtractor:public Visualization::Abstract::Algorithm
 	
 	/* Constructors and destructors: */
 	public:
-	VolumeRendererExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates a volume renderer extractor
+	VolumeRendererExtractor(Visualization::Abstract::VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe); // Creates a volume renderer extractor
 	virtual ~VolumeRendererExtractor(void);
 	
 	/* Methods from Visualization::Abstract::Algorithm: */

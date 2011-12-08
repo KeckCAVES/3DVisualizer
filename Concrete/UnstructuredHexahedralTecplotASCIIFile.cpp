@@ -1,7 +1,7 @@
 /***********************************************************************
 UnstructuredHexahedralTecplotASCIIFile - Class reading unstructured
 hexahedral Tecplot files in ASCII format.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/UnstructuredHexahedralTecplotASCIIFile.h>
+
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
@@ -28,12 +30,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iostream>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
-#include <IO/OpenFile.h>
 #include <Plugins/FactoryManager.h>
+#include <IO/OpenFile.h>
+#include <Cluster/MulticastPipe.h>
 
 #include <Concrete/TecplotASCIIFileHeaderParser.h>
-
-#include <Concrete/UnstructuredHexahedralTecplotASCIIFile.h>
 
 namespace Visualization {
 
@@ -48,8 +49,10 @@ UnstructuredHexahedralTecplotASCIIFile::UnstructuredHexahedralTecplotASCIIFile(v
 	{
 	}
 
-Visualization::Abstract::DataSet* UnstructuredHexahedralTecplotASCIIFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* UnstructuredHexahedralTecplotASCIIFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
+	bool master=pipe==0||pipe->isMaster();
+	
 	/* Create the result data set: */
 	Misc::SelfDestructPointer<DataSet> result(new DataSet);
 	DS& dataSet=result->getDs();
@@ -104,8 +107,7 @@ Visualization::Abstract::DataSet* UnstructuredHexahedralTecplotASCIIFile::load(c
 		Misc::throwStdErr("UnstructuredHexahedralTecplotASCIIFile::load: No scalar or vector variables specified");
 	
 	/* Create a parser and open the input file: */
-	IO::AutoFile dataFile(IO::openFile(dataFileName));
-	TecplotASCIIFileHeaderParser parser(*dataFile);
+	TecplotASCIIFileHeaderParser parser(openFile(dataFileName,pipe));
 	
 	/* Create an array of ignore flags for the file's columns: */
 	int numVariables=int(parser.getNumVariables());
@@ -175,26 +177,19 @@ Visualization::Abstract::DataSet* UnstructuredHexahedralTecplotASCIIFile::load(c
 		/* Add a vector variable: */
 		int vectorVariableIndex=dataValue.addVectorVariable(vectorNames[i].c_str());
 		
-		/* Add three new scalar slices and scalar variables: */
-		for(int j=0;j<3;++j)
+		/* Add four new scalar slices and scalar variables (three components plus magnitude): */
+		for(int j=0;j<4;++j)
 			{
-			/* Add a new scalar slice and scalar variable: */
 			vectorSliceIndices[i*4+j]=dataSet.addSlice();
-			std::string componentName=vectorNames[i];
-			componentName.push_back(' ');
-			componentName.push_back('X'+j);
-			dataValue.setVectorVariableScalarIndex(vectorVariableIndex,j,dataValue.addScalarVariable(componentName.c_str()));
+			int variableIndex=dataValue.addScalarVariable(makeVectorSliceName(vectorNames[i],j).c_str());
+			if(j<3)
+				dataValue.setVectorVariableScalarIndex(vectorVariableIndex,j,variableIndex);
 			}
-		
-		/* Add a magnitude slice: */
-		vectorSliceIndices[i*4+3]=dataSet.addSlice();
-		std::string componentName=vectorNames[i];
-		componentName.append(" Magnitude");
-		dataValue.setVectorVariableScalarIndex(vectorVariableIndex,3,dataValue.addScalarVariable(componentName.c_str()));
 		}
 	
 	/* Read zones from the file until end-of-file: */
-	std::cout<<"Reading input file "<<parser.getTitle()<<std::endl;
+	if(master)
+		std::cout<<"Reading input file "<<parser.getTitle()<<std::endl;
 	double* columnBuffer=new double[numVariables];
 	while(true)
 		{
@@ -206,7 +201,8 @@ Visualization::Abstract::DataSet* UnstructuredHexahedralTecplotASCIIFile::load(c
 		if(parser.getZoneLayout()!=TecplotASCIIFileHeaderParser::INTERLEAVED)
 			Misc::throwStdErr("UnstructuredHexahedralTecplotASCIIFile::load: File %s has unsupported zone layout");
 		
-		std::cout<<"Reading grid zone "<<parser.getZoneName()<<" with "<<parser.getZoneNumVertices()<<" vertices and "<<parser.getZoneNumElements()<<" cells..."<<std::flush;
+		if(master)
+			std::cout<<"Reading grid zone "<<parser.getZoneName()<<" with "<<parser.getZoneNumVertices()<<" vertices and "<<parser.getZoneNumElements()<<" cells..."<<std::flush;
 		
 		/* Prepare the data set for reading: */
 		dataSet.reserveVertices(dataSet.getTotalNumVertices()+parser.getZoneNumVertices());
@@ -273,8 +269,8 @@ Visualization::Abstract::DataSet* UnstructuredHexahedralTecplotASCIIFile::load(c
 			/* Add the cell to the data set: */
 			dataSet.addCell(cellVertices);
 			}
-		
-		std::cout<<" done"<<std::endl;
+		if(master)
+			std::cout<<" done"<<std::endl;
 		
 		/* Read the next zone header: */
 		if(!parser.readNextZoneHeader())
@@ -289,9 +285,11 @@ Visualization::Abstract::DataSet* UnstructuredHexahedralTecplotASCIIFile::load(c
 	delete[] columnBuffer;
 	
 	/* Finalize the grid structure: */
-	std::cout<<"Finalizing grid structure..."<<std::flush;
+	if(master)
+		std::cout<<"Finalizing grid structure..."<<std::flush;
 	dataSet.finalizeGrid();
-	std::cout<<" done"<<std::endl;
+	if(master)
+		std::cout<<" done"<<std::endl;
 	
 	/* Return the result data set: */
 	return result.releaseTarget();

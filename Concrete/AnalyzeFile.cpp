@@ -1,7 +1,7 @@
 /***********************************************************************
 AnalyzeFile - Class to encapsulate operations on scalar-valued data sets
 stored in Analyze 7.5 format.
-Copyright (c) 2006-2007 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,7 +20,10 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#include <Misc/File.h>
+#include <string>
+#include <IO/File.h>
+#include <IO/SeekableFile.h>
+#include <IO/OpenFile.h>
 #include <Plugins/FactoryManager.h>
 
 #include <Concrete/AnalyzeFile.h>
@@ -48,7 +51,7 @@ struct HeaderKey
 	char hkeyUn0;
 	
 	/* Methods: */
-	void read(Misc::File& file)
+	void read(IO::File& file)
 		{
 		file.read(headerSize);
 		file.read(dataType,10);
@@ -80,7 +83,7 @@ struct ImageDimension
 	int glMin;
 	
 	/* Methods: */
-	void read(Misc::File& file)
+	void read(IO::File& file)
 		{
 		file.read(dim,8);
 		file.read(unused,7);
@@ -104,7 +107,7 @@ Helper functions:
 ****************/
 
 template <class ScalarParam>
-void readArray(Misc::File& file,Misc::Array<float,3>& array)
+void readArray(IO::File& file,Misc::Array<float,3>& array)
 	{
 	/* Create a temporary array to read a slice of source data: */
 	size_t sliceSize=array.getSize(1)*array.getSize(2);
@@ -138,35 +141,36 @@ AnalyzeFile::AnalyzeFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* AnalyzeFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* AnalyzeFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Open the Analyze 7.5 header file: */
-	char headerFileName[2048];
-	snprintf(headerFileName,sizeof(headerFileName),"%s.hdr",args[0].c_str());
-	Misc::File::Endianness endianness=Misc::File::LittleEndian;
-	Misc::File headerFile(headerFileName,"rb",endianness);
+	std::string headerFileName=args[0];
+	headerFileName.append(".hdr");
+	IO::SeekableFilePtr headerFile(openSeekableFile(headerFileName,pipe));
 	
-	/* Read the header key: */
+	/* Read the header key as little-endian: */
 	HeaderKey hk;
-	hk.read(headerFile);
+	Misc::Endianness endianness=Misc::LittleEndian;
+	headerFile->setEndianness(endianness);
+	hk.read(*headerFile);
 	
 	/* Check the header size: */
 	if(hk.headerSize!=348)
 		{
 		/* Must be wrong endianness; re-read: */
-		endianness=Misc::File::BigEndian;
-		headerFile.setEndianness(endianness);
-		headerFile.seekSet(0);
-		hk.read(headerFile);
+		endianness=Misc::BigEndian;
+		headerFile->setEndianness(endianness);
+		headerFile->setReadPosAbs(0);
+		hk.read(*headerFile);
 		
 		/* Re-check header size: */
 		if(hk.headerSize!=348)
-			Misc::throwStdErr("AnalyzeFile::load: Illegal header size in input file %s",headerFileName);
+			Misc::throwStdErr("AnalyzeFile::load: Illegal header size in input file %s",headerFileName.c_str());
 		}
 	
 	/* Read the image dimensions: */
 	ImageDimension imageDim;
-	imageDim.read(headerFile);
+	imageDim.read(*headerFile);
 	
 	/* Create the data set: */
 	DS::Index numVertices;
@@ -180,35 +184,36 @@ Visualization::Abstract::DataSet* AnalyzeFile::load(const std::vector<std::strin
 	result->getDs().setData(numVertices,cellSize);
 	
 	/* Open the image file: */
-	char imageFileName[2048];
-	snprintf(imageFileName,sizeof(imageFileName),"%s.img",args[0].c_str());
-	Misc::File imageFile(imageFileName,"rb",endianness);
+	std::string imageFileName=args[0];
+	imageFileName.append(".img");
+	IO::FilePtr imageFile(openFile(imageFileName,pipe));
+	imageFile->setEndianness(endianness);
 	
 	/* Read the vertex values from file: */
 	switch(imageDim.dataType)
 		{
 		case 2: // unsigned char
-			readArray<unsigned char>(imageFile,result->getDs().getVertices());
+			readArray<unsigned char>(*imageFile,result->getDs().getVertices());
 			break;
 		
 		case 4: // signed short
-			readArray<signed short int>(imageFile,result->getDs().getVertices());
+			readArray<signed short int>(*imageFile,result->getDs().getVertices());
 			break;
 		
 		case 8: // signed int
-			readArray<signed int>(imageFile,result->getDs().getVertices());
+			readArray<signed int>(*imageFile,result->getDs().getVertices());
 			break;
 		
 		case 16: // float
-			readArray<float>(imageFile,result->getDs().getVertices());
+			readArray<float>(*imageFile,result->getDs().getVertices());
 			break;
 		
 		case 64: // double
-			readArray<double>(imageFile,result->getDs().getVertices());
+			readArray<double>(*imageFile,result->getDs().getVertices());
 			break;
 		
 		default:
-			Misc::throwStdErr("AnalyzeFile::load: Unsupported data type %d in input file %s",imageDim.dataType,imageFileName);
+			Misc::throwStdErr("AnalyzeFile::load: Unsupported data type %d in input file %s",imageDim.dataType,imageFileName.c_str());
 		}
 	
 	return result;

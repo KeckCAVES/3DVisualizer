@@ -79,7 +79,7 @@ GocadVoxetFile::GocadVoxetFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* GocadVoxetFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* GocadVoxetFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Parse the command line: */
 	bool saveCoords=false;
@@ -115,8 +115,7 @@ Visualization::Abstract::DataSet* GocadVoxetFile::load(const std::vector<std::st
 	dataValue.initialize(&dataSet,0);
 	
 	/* Open the voxet file: */
-	IO::AutoFile voxetFile(IO::openFile(fileName.c_str()));
-	IO::ValueSource voxet(*voxetFile);
+	IO::ValueSource voxet(openFile(fileName.c_str(),pipe));
 	voxet.setPunctuation("{}");
 	voxet.setQuotes("\"");
 	voxet.skipWs();
@@ -257,8 +256,8 @@ Visualization::Abstract::DataSet* GocadVoxetFile::load(const std::vector<std::st
 			
 			/* Read the property values from the property file: */
 			std::cout<<"Reading property from file "<<propertyFileName<<"..."<<std::flush;
-			IO::AutoFile propertyFile(IO::openFile(propertyFileName.c_str()));
-			propertyFile->setEndianness(IO::File::BigEndian);
+			IO::FilePtr propertyFile(openFile(propertyFileName.c_str(),pipe));
+			propertyFile->setEndianness(Misc::BigEndian);
 			Value* slicePtr=dataSet.getSliceArray(sliceIndex);
 			Value* tempArray=new Value[numVertices[0]];
 			DS::Index index;

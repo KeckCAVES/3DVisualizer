@@ -35,7 +35,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Misc/ThrowStdErr.h>
 #include <Misc/File.h>
 #include <Misc/LargeFile.h>
-#include <Comm/MulticastPipe.h>
+#include <Cluster/MulticastPipe.h>
 #include <Plugins/FactoryManager.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
@@ -103,7 +103,7 @@ VanKekenFile::VanKekenFile(void)
 	}
 
 #if 1
-Visualization::Abstract::DataSet* VanKekenFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* VanKekenFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	bool master=pipe==0||pipe->isMaster();
 	
@@ -122,7 +122,7 @@ Visualization::Abstract::DataSet* VanKekenFile::load(const std::vector<std::stri
 			if(pipe!=0)
 				{
 				pipe->write<int>(0);
-				pipe->finishMessage();
+				pipe->flush();
 				}
 			Misc::throwStdErr("VanKekenFile::load: Grid file %s and data file %s have mismatching sizes",args[0].c_str(),args[1].c_str());
 			}
@@ -155,7 +155,7 @@ Visualization::Abstract::DataSet* VanKekenFile::load(const std::vector<std::stri
 				if(pipe!=0)
 					{
 					pipe->write<int>(0);
-					pipe->finishMessage();
+					pipe->flush();
 					}
 				delete result;
 				Misc::throwStdErr("VanKekenFile::load: Grid file %s and data file %s have mismatching sizes",args[0].c_str(),args[1].c_str());
@@ -196,7 +196,7 @@ Visualization::Abstract::DataSet* VanKekenFile::load(const std::vector<std::stri
 			}
 		std::cout<<"\b\b\b\bdone"<<std::endl;
 		if(pipe!=0)
-			pipe->finishMessage();
+			pipe->flush();
 		
 		/* Finalize the grid structure: */
 		std::cout<<"Finalizing grid structure..."<<std::flush;
@@ -252,7 +252,7 @@ Visualization::Abstract::DataSet* VanKekenFile::load(const std::vector<std::stri
 	return result;
 	}
 #else
-Visualization::Abstract::DataSet* VanKekenFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* VanKekenFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Read all coordinate and value file names from the given directory: */
 	std::vector<GridFile> coordFiles;

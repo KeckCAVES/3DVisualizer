@@ -138,7 +138,7 @@ class ArrowRakeExtractor:public Visualization::Abstract::Algorithm
 	
 	/* Constructors and destructors: */
 	public:
-	ArrowRakeExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates an arrow rake extractor
+	ArrowRakeExtractor(Visualization::Abstract::VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe); // Creates an arrow rake extractor
 	virtual ~ArrowRakeExtractor(void);
 	
 	/* Methods from Visualization::Abstract::Algorithm: */

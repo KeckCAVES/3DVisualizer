@@ -2,7 +2,7 @@
 CitcomSRegionalASCIIFile - Class reading ASCII files produced by
 parallel regional CitcomS simulations. These are the uncombined files
 produced by each CPU in a parallel run.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -51,7 +51,7 @@ class CitcomSRegionalASCIIFile:public BaseModule
 	CitcomSRegionalASCIIFile(void); // Default constructor
 	
 	/* Methods: */
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	virtual Visualization::Abstract::DataSetRenderer* getRenderer(const Visualization::Abstract::DataSet* dataSet) const;
 	};
 

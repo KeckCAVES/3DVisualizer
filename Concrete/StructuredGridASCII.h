@@ -2,7 +2,7 @@
 StructuredGridASCII - Class defining lowest-common-denominator ASCII
 file format for curvilinear grids in Cartesian or spherical coordinates.
 Vertex positions and attributes are stored in separate files.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -51,7 +51,7 @@ class StructuredGridASCII:public BaseModule
 	StructuredGridASCII(void); // Default constructor
 	
 	/* Methods: */
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	};
 
 }

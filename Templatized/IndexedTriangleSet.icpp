@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #define VISUALIZATION_TEMPLATIZED_INDEXEDTRIANGLESET_IMPLEMENTATION
 
 #include <Misc/ThrowStdErr.h>
-#include <Comm/MulticastPipe.h>
+#include <Cluster/MulticastPipe.h>
 #define GL_GLEXT_PROTOTYPES 1
 #include <GL/gl.h>
 #include <GL/GLVertexArrayParts.h>
@@ -101,7 +101,7 @@ IndexedTriangleSet<VertexParam>::addNewVertexChunk(
 			pipe->write<unsigned int>((unsigned int)numUnsentVertices);
 			pipe->write<unsigned int>(0U);
 			pipe->write<Vertex>(vertexTail->vertices+tailNumSentVertices,numUnsentVertices);
-			pipe->finishMessage();
+			pipe->flush();
 			}
 		
 		tailNumSentVertices=0;
@@ -144,7 +144,7 @@ IndexedTriangleSet<VertexParam>::addNewIndexChunk(
 				tailNumSentVertices+=numUnsentVertices;
 				}
 			pipe->write<Index>(indexTail->indices+tailNumSentTriangles*3,numUnsentTriangles*3);
-			pipe->finishMessage();
+			pipe->flush();
 			}
 		
 		tailNumSentTriangles=0;
@@ -166,7 +166,7 @@ IndexedTriangleSet<VertexParam>::addNewIndexChunk(
 template <class VertexParam>
 inline
 IndexedTriangleSet<VertexParam>::IndexedTriangleSet(
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:pipe(sPipe),
 	 version(0),
 	 numVertices(0),numTriangles(0),
@@ -355,7 +355,7 @@ IndexedTriangleSet<VertexParam>::flush(
 		/* Send a flush signal: */
 		pipe->write<unsigned int>(0);
 		pipe->write<unsigned int>(0);
-		pipe->finishMessage();
+		pipe->flush();
 		}
 	}
 

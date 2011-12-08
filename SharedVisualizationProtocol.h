@@ -1,7 +1,7 @@
 /***********************************************************************
-SharedVisualizationPipe - Common interface between shared visualization
-servers and clients.
-Copyright (c) 2009 Oliver Kreylos
+SharedVisualizationProtocol - Common interface between a shared
+visualization server and a shared visualization client.
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,12 +20,12 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#ifndef SHAREDVISUALIZATIONPIPE_INCLUDED
-#define SHAREDVISUALIZATIONPIPE_INCLUDED
+#ifndef SHAREDVISUALIZATIONPROTOCOL_INCLUDED
+#define SHAREDVISUALIZATIONPROTOCOL_INCLUDED
 
-namespace Collaboration {
+#include <Collaboration/Protocol.h>
 
-struct SharedVisualizationPipe
+class SharedVisualizationProtocol:public Collaboration::Protocol
 	{
 	/* Embedded classes: */
 	public:
@@ -44,7 +44,5 @@ struct SharedVisualizationPipe
 	static const char* protocolName; // Network name of shared Visualizer protocol
 	static const unsigned int protocolVersion; // Specific version number of protocol implementation
 	};
-
-}
 
 #endif

@@ -1,7 +1,7 @@
 /***********************************************************************
 HuffmanTable - Class representing a table for Huffman compression/
 decompression.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

@@ -1,7 +1,7 @@
 /***********************************************************************
 DicomFile - Class to represent and extract images from DICOM interchange
 files.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,7 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_CONCRETE_DICOMFILE_INCLUDED
 #define VISUALIZATION_CONCRETE_DICOMFILE_INCLUDED
 
-#include <Misc/File.h>
+#include <IO/SeekableFile.h>
+#include <IO/Directory.h>
 
 namespace Visualization {
 
@@ -56,6 +57,8 @@ class DicomFile
 		IMAGE_RAW,IMAGE_RLE,IMAGE_JPEG_LOSSY,IMAGE_JPEG_LOSSLESS
 		};
 	
+	typedef IO::SeekableFile::Offset Offset; // Type for file positions
+	
 	struct ImageDescriptor // Structure describing the contents of a DICOM image file
 		{
 		/* Elements: */
@@ -70,7 +73,7 @@ class DicomFile
 		int pixelBits; // Number of bits allocated for each pixel
 		int pixelBitsUsed; // Number of bits used per pixel
 		int pixelBitsMSB; // Index of pixel high bit in pixel cell
-		Misc::File::Offset imageOffset; // Offset of start of raw image data in DICOM file
+		Offset imageOffset; // Offset of start of raw image data in DICOM file
 		size_t imageDataSize; // Size of raw image data
 		
 		/* Constructors and destructors: */
@@ -194,7 +197,7 @@ class DicomFile
 	
 	/* Elements: */
 	private:
-	Misc::File dcmFile; // The underlying file object
+	IO::SeekableFilePtr dcmFile; // The underlying file object
 	VrMode vrMode; // The file's value representation mode
 	FileType fileType; // The file's media storage SOP class
 	ImageType imageType; // Type of image stored in the file
@@ -202,7 +205,7 @@ class DicomFile
 	
 	/* Constructors and destructors: */
 	public:
-	DicomFile(const char* dcmFileName); // Opens the DICOM file of the given name
+	DicomFile(const char* dcmFileName,IO::SeekableFilePtr sDcmFile); // Reads the DICOM file of the given name through the provided seekable file abstraction
 	~DicomFile(void); // Closes the DICOM file
 	
 	/* Methods: */
@@ -223,7 +226,7 @@ class DicomFile
 		return imageMode;
 		}
 	ImageDescriptor* readImageDescriptor(void); // Returns image descriptor for a DICOM image file
-	static ImageStackDescriptor* readImageStackDescriptor(const char* directoryName); // Assembles image stack descriptor for all DICOM image files in the given directory, or 0 if the images are inconsistent
+	static ImageStackDescriptor* readImageStackDescriptor(IO::DirectoryPtr directory); // Assembles image stack descriptor for all DICOM image files in the given directory, or 0 if the images are inconsistent
 	template <class DestPixelTypeParam>
 	void readImage(const ImageDescriptor& id,DestPixelTypeParam* imageBuffer,const ptrdiff_t imageBufferStrides[2]); // Reads the image described in an image descriptor into a 2D array
 	Directory* readDirectory(void); // Returns the directory structure of a DICOM directory file

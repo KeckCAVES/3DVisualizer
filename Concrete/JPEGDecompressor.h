@@ -1,6 +1,6 @@
 /***********************************************************************
 JPEGDecompressor - Class to decompress lossless JPEG images.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_CONCRETE_JPEGDECOMPRESSOR_INCLUDED
 #define VISUALIZATION_CONCRETE_JPEGDECOMPRESSOR_INCLUDED
 
-#include <Misc/CharacterSource.h>
+#include <IO/File.h>
 
 /* Forward declarations: */
 namespace Visualization {
@@ -69,7 +69,7 @@ class JPEGDecompressor
 		};
 	
 	/* Elements: */
-	Misc::CharacterSource& source; // Source for compressed JPEG data
+	IO::File& source; // Source for compressed JPEG data
 	int imageSize[2]; // Width and height of uncompressed image
 	int numComponents; // Number of components per pixel
 	int numBits; // Number of bits per pixel component
@@ -91,7 +91,7 @@ class JPEGDecompressor
 	
 	/* Constructors and destructors: */
 	public:
-	JPEGDecompressor(Misc::CharacterSource& sSource); // Creates a decompressor for the given compressed JPEG stream by reading the stream's header
+	JPEGDecompressor(IO::File& sSource); // Creates a decompressor for the given compressed JPEG stream by reading the stream's header
 	~JPEGDecompressor(void); // Destroys the decompressor after use
 	
 	/* Methods: */

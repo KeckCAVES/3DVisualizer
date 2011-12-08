@@ -84,7 +84,7 @@ EarthTomographyGrid::EarthTomographyGrid(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* EarthTomographyGrid::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* EarthTomographyGrid::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Read all grid file names from the given directory: */
 	std::vector<GridFile> gridFiles;

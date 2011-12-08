@@ -1,7 +1,7 @@
 /***********************************************************************
 ByteVolFile - Class to encapsulate operations on scalar-valued data sets
 stored in byte-valued .vol files.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -52,7 +52,7 @@ class ByteVolFile:public BaseModule
 	
 	/* Methods: */
 	public:
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	};
 
 }

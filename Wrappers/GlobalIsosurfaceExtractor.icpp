@@ -120,7 +120,7 @@ template <class DataSetWrapperParam>
 inline
 GlobalIsosurfaceExtractor<DataSetWrapperParam>::GlobalIsosurfaceExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:Abstract::Algorithm(sVariableManager,sPipe),
 	 parameters(sVariableManager->getCurrentScalarVariable()),
 	 ise(getDs(sVariableManager->getDataSetByScalarVariable(parameters.scalarVariableIndex)),getSe(sVariableManager->getScalarExtractor(parameters.scalarVariableIndex))),
@@ -230,7 +230,7 @@ GlobalIsosurfaceExtractor<DataSetWrapperParam>::createElement(
 	ise.setExtractionMode(myParameters->smoothShading?ISE::SMOOTH:ISE::FLAT);
 	
 	/* Extract the isosurface into the visualization element: */
-	ise.extractIsosurface(myParameters->isovalue,result->getSurface());
+	ise.extractIsosurface(myParameters->isovalue,result->getSurface(),this);
 	
 	/* Return the result: */
 	return result;

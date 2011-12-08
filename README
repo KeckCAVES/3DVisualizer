@@ -1,5 +1,5 @@
 ========================================================================
-README for 3D Visualizer version 1.8
+README for 3D Visualizer version 1.9
 Copyright (c) 2005-2011 Oliver Kreylos
 ========================================================================
 
@@ -28,9 +28,10 @@ Science Foundation.
 Requirements
 ============
 
-3D Visualizer requires Vrui version 2.1 build 001 or newer.
-To read images in PNG format, libpng has to be installed, and Vrui has
-to be configured with support for PNG images (see Vrui README file).
+3D Visualizer version 1.9 requires Vrui version 2.2 build 002 or newer.
+To read images in PNG, JPEG, or TIFF formats, libpng, libjpeg, or
+libtiff have to be installed, respectively, and Vrui has to be
+configured with support for these image formats (see Vrui README file).
 
 Installation Guide
 ==================
@@ -46,7 +47,8 @@ be used; installation (to a system directory such as /usr/local) is
 only recommended if 3D Visualizer will be used from multiple user
 accounts.
 
-0. Install Vrui from ~/src/Vrui-2.1-<build> (see Vrui README file).
+0. Install Vrui from ~/src/Vrui-<version>-<build> (see Vrui README
+   file).
 
 1. Change into ~/src directory and unpack the 3D Visualizer tarball:
    > cd ~/src
@@ -57,7 +59,7 @@ accounts.
 2. Change into 3D Visualizer base directory:
    > cd 3DVisualizer-<version>
 
-3. Adapt makefile if Vrui installation path is *not* ~/Vrui-2.1 by
+3. Adapt makefile if Vrui installation path is *not* ~/Vrui-2.2 by
    setting the VRUIDIR variable to the correct location. VRUIDIR is
    *not* the directory containing Vrui's sources (and the Vrui README
    file), but the directory specified via the INSTALLDIR variable in
@@ -68,7 +70,8 @@ accounts.
    different location, for example /usr/local. Set INSTALLDIR to the
    desired target location. 3D Visualizer will be then be installed in
    $(INSTALLDIR)/bin, $(INSTALLDIR)/lib (or $(INSTALLDIR)/lib64 on
-   64-bit Linux systems), and $(INSTALLDIR)/share.
+   64-bit Linux systems), and
+   $(INSTALLDIR)/share/3DVisualizer-<version>.
    Important note: Do not use ~ as a shortcut for the user's home
    directory here; use $(HOME) instead. For example, write
    INSTALLDIR = $(HOME)/apps
@@ -128,5 +131,5 @@ directory, (see steps 4 and 6 above).
    > ./bin/3DVisualizer -palette AlaskaData/slab2.pal
      -class MultiCitcomtFile AlaskaData/slab2.dat Temp "log(Visc)"
 
-6. See Vrui-2.1 documentation or 3D Visualizer's user's guide on Vrui's
-   basic user interface and how to use 3D Visualizer.
+6. See Vrui's HTML documentation or 3D Visualizer's user's guide on
+   Vrui's basic user interface and how to use 3D Visualizer.

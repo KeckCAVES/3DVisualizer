@@ -1,7 +1,7 @@
 /***********************************************************************
 Extractor - Helper class to drive multithreaded incremental or immediate
 extraction of visualization elements from a data set.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Misc/Time.h>
 #include <Realtime/AlarmTimer.h>
-#include <Comm/MulticastPipe.h>
+#include <Cluster/MulticastPipe.h>
 #include <Vrui/Vrui.h>
 
 #include <Abstract/Parameters.h>
@@ -41,10 +41,10 @@ void* Extractor::masterExtractorThreadMethod(void)
 	{
 	/* Enable asynchronous cancellation of this thread: */
 	Threads::Thread::setCancelState(Threads::Thread::CANCEL_ENABLE);
-	Threads::Thread::setCancelType(Threads::Thread::CANCEL_ASYNCHRONOUS);
+	// Threads::Thread::setCancelType(Threads::Thread::CANCEL_ASYNCHRONOUS);
 	
 	/* Create a data sink for the multicast pipe: */
-	Visualization::Abstract::BinaryParametersSink<Comm::MulticastPipe> sink(extractor->getVariableManager(),*extractor->getPipe(),true);
+	Visualization::Abstract::BinaryParametersSink sink(extractor->getVariableManager(),*extractor->getPipe(),true);
 	
 	/* Handle extraction requests until interrupted: */
 	Realtime::AlarmTimer alarm;
@@ -57,14 +57,10 @@ void* Extractor::masterExtractorThreadMethod(void)
 		{
 		Threads::Mutex::Lock seedRequestLock(seedRequestMutex);
 		#ifdef __APPLE__
+		while(!terminate&&seedParameters==0)
+			seedRequestCond.wait(seedRequestMutex);
 		if(terminate)
 			return 0;
-		while(seedParameters==0)
-			{
-			seedRequestCond.wait(seedRequestMutex);
-			if(terminate)
-				return 0;
-			}
 		#else
 		while(seedParameters==0)
 			seedRequestCond.wait(seedRequestMutex);
@@ -78,11 +74,8 @@ void* Extractor::masterExtractorThreadMethod(void)
 		requestID=seedRequestID;
 		}
 		
-		/* Get the next free visualization element: */
-		int nextIndex=(lockedIndex+1)%3;
-		if(nextIndex==mostRecentIndex)
-			nextIndex=(nextIndex+1)%3;
-		
+		/* Start a new visualization element: */
+		std::pair<ElementPointer,unsigned int>& element=trackedElements.startNewValue();
 		if(parameters->isValid())
 			{
 			/* Prepare for extracting a new visualization element: */
@@ -93,14 +86,14 @@ void* Extractor::masterExtractorThreadMethod(void)
 				
 				/* Send the extraction parameters to the slaves: */
 				parameters->write(sink);
-				extractor->getPipe()->finishMessage();
+				extractor->getPipe()->flush();
 				}
 			
 			if(extractor->hasIncrementalCreator())
 				{
 				/* Start the visualization element: */
-				trackedElements[nextIndex]=extractor->startElement(parameters);
-				trackedElementIDs[nextIndex]=requestID;
+				element.first=extractor->startElement(parameters);
+				element.second=requestID;
 				
 				/* Continue extracting the visualization element until it is done: */
 				bool keepGrowing;
@@ -111,8 +104,8 @@ void* Extractor::masterExtractorThreadMethod(void)
 					keepGrowing=!extractor->continueElement(alarm);
 					
 					/* Push this visualization element to the main thread: */
-					mostRecentIndex=nextIndex;
-					Vrui::requestUpdate();
+					trackedElements.postNewValue();
+					update();
 					
 					/* Check if there is another seed request: */
 					if(keepGrowing)
@@ -125,7 +118,7 @@ void* Extractor::masterExtractorThreadMethod(void)
 						{
 						/* Tell the slave nodes whether the current visualization element is finished: */
 						extractor->getPipe()->write<unsigned int>(keepGrowing?1:0);
-						extractor->getPipe()->finishMessage();
+						extractor->getPipe()->flush();
 						}
 					}
 				while(keepGrowing);
@@ -136,18 +129,18 @@ void* Extractor::masterExtractorThreadMethod(void)
 			else
 				{
 				/* Extract the visualization element: */
-				trackedElements[nextIndex]=extractor->createElement(parameters);
-				trackedElementIDs[nextIndex]=requestID;
+				element.first=extractor->createElement(parameters);
+				element.second=requestID;
 				
 				if(extractor->getPipe()!=0)
 					{
 					/* Tell the slave nodes that the current visualization element is finished: */
 					extractor->getPipe()->write<unsigned int>(0);
-					extractor->getPipe()->finishMessage();
+					extractor->getPipe()->flush();
 					}
 				
 				/* Push this visualization element to the main thread: */
-				mostRecentIndex=nextIndex;
+				trackedElements.postNewValue();
 				update();
 				}
 			}
@@ -158,16 +151,19 @@ void* Extractor::masterExtractorThreadMethod(void)
 				/* Notify the slave nodes that there is no visualization element: */
 				extractor->getPipe()->write<unsigned int>(0);
 				extractor->getPipe()->write<unsigned int>(requestID);
-				extractor->getPipe()->finishMessage();
+				extractor->getPipe()->flush();
 				}
 			
 			/* Store an invalid visualization element: */
-			trackedElements[nextIndex]=0;
-			trackedElementIDs[nextIndex]=requestID;
+			element.first=0;
+			element.second=requestID;
 			
 			/* Push this visualization element to the main thread: */
-			mostRecentIndex=nextIndex;
+			trackedElements.postNewValue();
 			update();
+			
+			/* Delete the unused extraction parameters: */
+			delete parameters;
 			}
 		}
 	
@@ -178,10 +174,10 @@ void* Extractor::slaveExtractorThreadMethod(void)
 	{
 	/* Enable asynchronous cancellation of this thread: */
 	Threads::Thread::setCancelState(Threads::Thread::CANCEL_ENABLE);
-	Threads::Thread::setCancelType(Threads::Thread::CANCEL_ASYNCHRONOUS);
+	// Threads::Thread::setCancelType(Threads::Thread::CANCEL_ASYNCHRONOUS);
 	
 	/* Create a data source for the multicast pipe: */
-	Visualization::Abstract::BinaryParametersSource<Comm::MulticastPipe> source(extractor->getVariableManager(),*extractor->getPipe(),true);
+	Visualization::Abstract::BinaryParametersSource source(extractor->getVariableManager(),*extractor->getPipe(),true);
 	
 	/* Receive visualization elements from master until interrupted: */
 	while(true)
@@ -197,11 +193,8 @@ void* Extractor::slaveExtractorThreadMethod(void)
 			return 0;
 		#endif
 		
-		/* Get the next free visualization element: */
-		int nextIndex=(lockedIndex+1)%3;
-		if(nextIndex==mostRecentIndex)
-			nextIndex=(nextIndex+1)%3;
-		
+		/* Start a new visualization element: */
+		std::pair<ElementPointer,unsigned int>& element=trackedElements.startNewValue();
 		if(requestID!=0)
 			{
 			/* Receive the new element's parameters from the master: */
@@ -209,8 +202,8 @@ void* Extractor::slaveExtractorThreadMethod(void)
 			parameters->read(source);
 			
 			/* Start receiving the visualization element from the master: */
-			trackedElements[nextIndex]=extractor->startSlaveElement(parameters);
-			trackedElementIDs[nextIndex]=requestID;
+			element.first=extractor->startSlaveElement(parameters);
+			element.second=requestID;
 			
 			/* Receive fragments of the visualization element until finished: */
 			do
@@ -218,7 +211,7 @@ void* Extractor::slaveExtractorThreadMethod(void)
 				extractor->continueSlaveElement();
 				
 				/* Push this visualization element to the main thread: */
-				mostRecentIndex=nextIndex;
+				trackedElements.postNewValue();
 				update();
 				}
 			while(extractor->getPipe()->read<unsigned int>()!=0);
@@ -229,11 +222,11 @@ void* Extractor::slaveExtractorThreadMethod(void)
 			unsigned int requestID=extractor->getPipe()->read<unsigned int>();
 			
 			/* Store an invalid visualization element: */
-			trackedElements[nextIndex]=0;
-			trackedElementIDs[nextIndex]=requestID;
+			element.first=0;
+			element.second=requestID;
 			
 			/* Push this visualization element to the main thread: */
-			mostRecentIndex=nextIndex;
+			trackedElements.postNewValue();
 			update();
 			}
 		}
@@ -248,14 +241,13 @@ Extractor::Extractor(Extractor::Algorithm* sExtractor)
 	 #endif
 	 finalElementPending(false),finalSeedRequestID(0),
 	 seedParameters(0),
-	 seedRequestID(0),
-	 lockedIndex(0),mostRecentIndex(0)
+	 seedRequestID(0)
 	{
 	/* Initialize the extraction thread communications: */
 	for(int i=0;i<3;++i)
 		{
-		trackedElements[i]=0;
-		trackedElementIDs[i]=0;
+		trackedElements.getBuffer(i).first=0;
+		trackedElements.getBuffer(i).second=0;
 		}
 	
 	if(extractor->isMaster())
@@ -313,6 +305,7 @@ void Extractor::seedRequest(unsigned int newSeedRequestID,Extractor::Parameters*
 	delete seedParameters;
 	seedParameters=newSeedParameters;
 	seedRequestID=newSeedRequestID;
+	
 	seedRequestCond.signal();
 	}
 
@@ -325,22 +318,22 @@ void Extractor::finalize(unsigned int newFinalSeedRequestID)
 Extractor::ElementPointer Extractor::checkUpdates(void)
 	{
 	/* Get the most recent visualization element from the extractor thread: */
-	if(lockedIndex!=mostRecentIndex)
+	if(trackedElements.hasNewValue())
 		{
-		/* Delete the previously locked visualization element: */
-		trackedElements[lockedIndex]=0;
-
+		/* Delete the currently locked visualization element: */
+		trackedElements.getLockedValue().first=0;
+		
 		/* Lock the most recent visualization element: */
-		lockedIndex=mostRecentIndex;
+		trackedElements.lockNewValue();
 		}
 	
 	/* Check if the final element from a concluded dragging operation or an immediate extraction has arrived: */
 	ElementPointer result=0;
-	if(finalElementPending&&trackedElementIDs[lockedIndex]==finalSeedRequestID)
+	if(finalElementPending&&trackedElements.getLockedValue().second==finalSeedRequestID)
 		{
 		/* Return the new element: */
-		result=trackedElements[lockedIndex];
-		trackedElements[lockedIndex]=0;
+		result=trackedElements.getLockedValue().first;
+		trackedElements.getLockedValue().first=0;
 		
 		/* Reset the finalization marker: */
 		finalElementPending=false;
@@ -352,8 +345,9 @@ Extractor::ElementPointer Extractor::checkUpdates(void)
 void Extractor::draw(GLContextData& contextData,bool transparent) const
 	{
 	/* Render the tracked visualization element if its transparency matches the parameter: */
-	if(trackedElements[lockedIndex]!=0&&trackedElements[lockedIndex]->usesTransparency()==transparent)
-		trackedElements[lockedIndex]->glRenderAction(contextData);
+	const Element* element=trackedElements.getLockedValue().first.getPointer();
+	if(element!=0&&element->usesTransparency()==transparent)
+		element->glRenderAction(contextData);
 	}
 
 void Extractor::update(void)

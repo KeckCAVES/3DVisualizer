@@ -84,7 +84,7 @@ SeismicTomographyModel::SeismicTomographyModel(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* SeismicTomographyModel::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* SeismicTomographyModel::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Parse the module command line: */
 	bool haveNumVertices=false;

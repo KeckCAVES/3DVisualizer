@@ -148,7 +148,7 @@ template <class DataSetWrapperParam>
 inline
 SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::SeededColoredIsosurfaceExtractor(
 	Visualization::Abstract::VariableManager* sVariableManager,
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:Abstract::Algorithm(sVariableManager,sPipe),
 	 parameters(sVariableManager->getCurrentScalarVariable(),sVariableManager->getCurrentScalarVariable()),
 	 cise(getDs(sVariableManager,parameters.scalarVariableIndex,parameters.colorScalarVariableIndex),getSe(sVariableManager->getScalarExtractor(parameters.scalarVariableIndex)),getSe(sVariableManager->getScalarExtractor(parameters.colorScalarVariableIndex))),

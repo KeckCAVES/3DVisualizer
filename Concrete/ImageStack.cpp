@@ -1,7 +1,7 @@
 /***********************************************************************
 ImageStack - Class to represent scalar-valued Cartesian data sets stored
 as stacks of color or greyscale images.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -22,15 +22,15 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Concrete/ImageStack.h>
 
-#include <ctype.h>
-#include <string.h>
 #include <stdio.h>
+#include <string>
 #include <iostream>
 #include <iomanip>
 #include <Misc/ThrowStdErr.h>
-#include <Misc/File.h>
-#include <Misc/Timer.h>
 #include <Plugins/FactoryManager.h>
+#include <IO/OpenFile.h>
+#include <IO/ValueSource.h>
+#include <Cluster/MulticastPipe.h>
 #include <Math/Math.h>
 #include <Images/RGBImage.h>
 #include <Images/ReadImageFile.h>
@@ -226,91 +226,76 @@ ImageStack::ImageStack(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* ImageStack::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* ImageStack::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
+	bool master=pipe==0||pipe->isMaster();
+	
 	/* Parse arguments: */
 	bool medianFilter=false;
 	bool lowpassFilter=false;
 	for(unsigned int i=1;i<args.size();++i)
 		{
-		if(strcasecmp(args[i].c_str(),"MEDIANFILTER")==0)
+		if(args[i]=="MedianFilter")
 			medianFilter=true;
-		else if(strcasecmp(args[i].c_str(),"LOWPASSFILTER")==0)
+		else if(args[i]=="LowpassFilter")
 			lowpassFilter=true;
 		}
 	
-	/* Open the metadata file: */
-	Misc::File file(args[0].c_str(),"rt");
+	/* Open the meta file: */
+	IO::ValueSource metaSource(openFile(args[0],pipe));
+	metaSource.setPunctuation("=");
+	metaSource.skipWs();
 	
 	/* Parse the image stack layout: */
-	DS::Index numVertices;
-	DS::Size cellSize;
-	char* sliceDirectory=0;
-	char* sliceFileNameTemplate=0;
+	DS::Index numVertices(0,0,0);
+	DS::Size cellSize(0,0,0);
+	std::string sliceDirectory;
+	std::string sliceFileNameTemplate;
 	int sliceIndexStart=0;
 	int sliceIndexFactor=1;
 	int regionOrigin[2]={0,0};
-	while(!file.eof())
+	while(!metaSource.eof())
 		{
-		/* Read the next line from the file: */
-		char line[256];
-		file.gets(line,sizeof(line));
+		/* Read the tag: */
+		std::string tag=metaSource.readString();
 		
-		/* Search for the first equal sign in the line: */
-		char* eqPtr=0;
-		for(eqPtr=line;*eqPtr!='\0'&&*eqPtr!='=';++eqPtr)
-			;
+		/* Check for the equal sign: */
+		if(!metaSource.isLiteral('='))
+			Misc::throwStdErr("ImageStack::load: Missing \"=\" in metafile %s",args[0].c_str());
 		
-		if(*eqPtr=='=')
+		/* Process the tag: */
+		if(tag=="numSlices")
+			numVertices[0]=metaSource.readInteger();
+		else if(tag=="imageSize")
 			{
-			/* Extract the tag name to the left of the equal sign: */
-			char* tagStart;
-			for(tagStart=line;isspace(*tagStart);++tagStart)
-				;
-			char* tagEnd;
-			for(tagEnd=eqPtr;isspace(tagEnd[-1])&&tagEnd>tagStart;--tagEnd)
-				;
-			
-			/* Extract the value to the right of the equal sign: */
-			char* valueStart;
-			for(valueStart=eqPtr+1;*valueStart!='\0'&&isspace(*valueStart);++valueStart)
-				;
-			char* valueEnd;
-			for(valueEnd=valueStart;*valueEnd!='\0';++valueEnd)
-				;
-			for(;isspace(valueEnd[-1])&&valueEnd>valueStart;--valueEnd)
-				;
-			
-			if(tagEnd>tagStart&&valueEnd>valueStart)
-				{
-				*tagEnd='\0';
-				*valueEnd='\0';
-				if(strcasecmp(tagStart,"numSlices")==0)
-					sscanf(valueStart,"%d",&numVertices[0]);
-				else if(strcasecmp(tagStart,"imageSize")==0)
-					sscanf(valueStart,"%d %d",&numVertices[2],&numVertices[1]);
-				else if(strcasecmp(tagStart,"regionOrigin")==0)
-					sscanf(valueStart,"%d %d",&regionOrigin[0],&regionOrigin[1]);
-				else if(strcasecmp(tagStart,"sampleSpacing")==0)
-					sscanf(valueStart,"%f %f %f",&cellSize[0],&cellSize[2],&cellSize[1]);
-				else if(strcasecmp(tagStart,"sliceDirectory")==0)
-					{
-					delete[] sliceDirectory;
-					sliceDirectory=new char[valueEnd-valueStart+1];
-					strcpy(sliceDirectory,valueStart);
-					}
-				else if(strcasecmp(tagStart,"sliceFileNameTemplate")==0)
-					{
-					delete[] sliceFileNameTemplate;
-					sliceFileNameTemplate=new char[valueEnd-valueStart+1];
-					strcpy(sliceFileNameTemplate,valueStart);
-					}
-				else if(strcasecmp(tagStart,"sliceIndexStart")==0)
-					sscanf(valueStart,"%d",&sliceIndexStart);
-				else if(strcasecmp(tagStart,"sliceIndexFactor")==0)
-					sscanf(valueStart,"%d",&sliceIndexFactor);
-				}
+			numVertices[2]=metaSource.readInteger();
+			numVertices[1]=metaSource.readInteger();
 			}
+		else if(tag=="regionOrigin")
+			{
+			regionOrigin[0]=metaSource.readInteger();
+			regionOrigin[1]=metaSource.readInteger();
+			}
+		else if(tag=="sampleSpacing")
+			{
+			cellSize[0]=DS::Scalar(metaSource.readNumber());
+			cellSize[2]=DS::Scalar(metaSource.readNumber());
+			cellSize[1]=DS::Scalar(metaSource.readNumber());
+			}
+		else if(tag=="sliceDirectory")
+			{
+			sliceDirectory=metaSource.readString();
+			if(!sliceDirectory.empty()&&sliceDirectory[sliceDirectory.size()-1]!='/')
+				sliceDirectory.push_back('/');
+			}
+		else if(tag=="sliceFileNameTemplate")
+			sliceFileNameTemplate=metaSource.readString();
+		else if(tag=="sliceIndexStart")
+			sliceIndexStart=metaSource.readInteger();
+		else if(tag=="sliceIndexFactor")
+			sliceIndexFactor=metaSource.readInteger();
+		else
+			Misc::throwStdErr("ImageStack::load: Unknown tag %s in metafile %s",tag.c_str(),args[0].c_str());
 		}
 	
 	/* Create the data set: */
@@ -318,21 +303,25 @@ Visualization::Abstract::DataSet* ImageStack::load(const std::vector<std::string
 	result->getDs().setData(numVertices,cellSize);
 	
 	/* Load all image slices: */
-	std::cout<<"Reading image slices...   0%"<<std::flush;
+	if(master)
+		std::cout<<"Reading image slices...   0%"<<std::flush;
 	DataSet::DS::Array& vertices=result->getDs().getVertices();
 	unsigned char* vertexPtr=vertices.getArray();
 	for(int i=0;i<numVertices[0];++i)
 		{
 		/* Generate the slice file name: */
+		std::string fullSliceFileName=sliceDirectory;
 		char sliceFileName[1024];
-		snprintf(sliceFileName,sizeof(sliceFileName),sliceFileNameTemplate,i*sliceIndexFactor+sliceIndexStart);
+		snprintf(sliceFileName,sizeof(sliceFileName),sliceFileNameTemplate.c_str(),i*sliceIndexFactor+sliceIndexStart);
+		fullSliceFileName.append(sliceFileName);
+		fullSliceFileName=getFullPath(fullSliceFileName);
 		
 		/* Load the slice as an RGB image: */
-		Images::RGBImage slice=Images::readImageFile(sliceFileName);
+		Images::RGBImage slice=Images::readImageFile(fullSliceFileName.c_str());
 		
 		/* Check if the slice conforms: */
 		if(slice.getSize(0)<(unsigned int)(regionOrigin[0]+numVertices[2])||slice.getSize(1)<(unsigned int)(regionOrigin[1]+numVertices[1]))
-			Misc::throwStdErr("ImageStack::load: Size of slice file \"%s\" does not match image stack size",sliceFileName);
+			Misc::throwStdErr("ImageStack::load: Size of slice file \"%s\" does not match image stack size",fullSliceFileName.c_str());
 		
 		/* Convert the slice's pixels to greyscale and copy them into the data set: */
 		for(int y=regionOrigin[1];y<regionOrigin[1]+numVertices[1];++y)
@@ -342,15 +331,17 @@ Visualization::Abstract::DataSet* ImageStack::load(const std::vector<std::string
 				float value=float(pixel[0])*0.299f+float(pixel[1])*0.587+float(pixel[2])*0.114f;
 				*vertexPtr=(unsigned char)(Math::floor(value+0.5f));
 				}
-		
-		std::cout<<"\b\b\b\b"<<std::setw(3)<<((i+1)*100)/numVertices[0]<<"%"<<std::flush;
+		if(master)
+			std::cout<<"\b\b\b\b"<<std::setw(3)<<((i+1)*100)/numVertices[0]<<"%"<<std::flush;
 		}
-	std::cout<<"\b\b\b\bdone"<<std::endl;
+	if(master)
+		std::cout<<"\b\b\b\bdone"<<std::endl;
 	
 	if(medianFilter||lowpassFilter)
 		{
 		/* Run a median + lowpass filter on all slice triples to reduce random speckle: */
-		std::cout<<"Filtering image stack...   0%"<<std::flush;
+		if(master)
+			std::cout<<"Filtering image stack...   0%"<<std::flush;
 		unsigned char* filtered=new unsigned char[numVertices[0]];
 		ptrdiff_t vPtrInc=vertices.getIncrement(0);
 		for(int y=0;y<numVertices[1];++y)
@@ -412,35 +403,14 @@ Visualization::Abstract::DataSet* ImageStack::load(const std::vector<std::string
 						*vPtr=filtered[z];
 					}
 				}
-			
-			std::cout<<"\b\b\b\b"<<std::setw(3)<<((y+1)*100)/numVertices[1]<<"%"<<std::flush;
+			if(master)
+				std::cout<<"\b\b\b\b"<<std::setw(3)<<((y+1)*100)/numVertices[1]<<"%"<<std::flush;
 			}
-		std::cout<<"\b\b\b\bdone"<<std::endl;
+		if(master)
+			std::cout<<"\b\b\b\bdone"<<std::endl;
 		
 		delete[] filtered;
 		}
-	
-	#if 0
-	/* Filter the 3D image: */
-	Misc::Timer t;
-	// minimumFilter(vertices,3);
-	// maximumFilter(vertices,3);
-	// sphereFilter(vertices,5,200);
-	t.elapse();
-	std::cout<<"Filter time: "<<t.getTime()*1000.0<<" ms"<<std::endl;
-	
-	{
-	/* Save filtered result to a .vol file: */
-	Misc::File volFile("Filtered.vol","wb",Misc::File::BigEndian);
-	volFile.write<int>(vertices.getSize().getComponents(),3);
-	volFile.write<int>(0);
-	float domainSize[3];
-	for(int i=0;i<3;++i)
-		domainSize[i]=float(cellSize[i])*float(vertices.getSize(i)-1);
-	volFile.write<float>(domainSize,3);
-	volFile.write<unsigned char>(vertices.getArray(),vertices.getNumElements());
-	}
-	#endif
 	
 	return result;
 	}

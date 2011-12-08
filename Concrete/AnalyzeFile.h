@@ -1,7 +1,7 @@
 /***********************************************************************
 AnalyzeFile - Class to encapsulate operations on scalar-valued data sets
 stored in Analyze 7.5 format.
-Copyright (c) 2006-2007 Oliver Kreylos
+Copyright (c) 2006-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -51,7 +51,7 @@ class AnalyzeFile:public BaseModule
 	AnalyzeFile(void); // Default constructor
 	
 	/* Methods: */
-	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const;
+	virtual Visualization::Abstract::DataSet* load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const;
 	};
 
 }

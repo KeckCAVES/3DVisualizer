@@ -1,7 +1,7 @@
 /***********************************************************************
 Visualizer - Test application for the new visualization component
 framework.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -38,7 +38,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <IO/File.h>
 #include <IO/OpenFile.h>
 #include <IO/ValueSource.h>
-#include <Comm/MulticastPipe.h>
+#include <Cluster/MulticastPipe.h>
 #include <Geometry/OrthogonalTransformation.h>
 #include <GL/gl.h>
 #include <GL/GLColorTemplates.h>
@@ -56,9 +56,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/TextField.h>
 #include <GLMotif/Button.h>
 #include <GLMotif/CascadeButton.h>
+#include <SceneGraph/NodeCreator.h>
+#include <SceneGraph/VRMLFile.h>
+#include <SceneGraph/GLRenderState.h>
 #include <Vrui/Vrui.h>
-#include <Vrui/OpenFile.h>
 #include <Vrui/CoordinateManager.h>
+#include <Vrui/OpenFile.h>
 #ifdef VISUALIZER_USE_COLLABORATION
 #include <Collaboration/CollaborationClient.h>
 #endif
@@ -93,17 +96,38 @@ GLMotif::Popup* Visualizer::createRenderingModesMenu(void)
 	{
 	GLMotif::Popup* renderingModesMenuPopup=new GLMotif::Popup("RenderingModesMenuPopup",Vrui::getWidgetManager());
 	
-	GLMotif::RadioBox* renderingModes=new GLMotif::RadioBox("RenderingModes",renderingModesMenuPopup,false);
-	renderingModes->setSelectionMode(GLMotif::RadioBox::ALWAYS_ONE);
+	GLMotif::SubMenu* renderingModesMenu=new GLMotif::SubMenu("RenderingModesMenu",renderingModesMenuPopup,false);
+	
+	GLMotif::RadioBox* renderingModes=new GLMotif::RadioBox("RenderingModes",renderingModesMenu,false);
+	renderingModes->setSelectionMode(GLMotif::RadioBox::ATMOST_ONE);
 	
 	int numRenderingModes=dataSetRenderer->getNumRenderingModes();
 	for(int i=0;i<numRenderingModes;++i)
 		renderingModes->addToggle(dataSetRenderer->getRenderingModeName(i));
 	
-	renderingModes->setSelectedToggle(dataSetRenderer->getRenderingMode());
+	if(renderDataSet)
+		renderingModes->setSelectedToggle(dataSetRenderer->getRenderingMode());
 	renderingModes->getValueChangedCallbacks().add(this,&Visualizer::changeRenderingModeCallback);
 	
 	renderingModes->manageChild();
+	
+	if(!sceneGraphs.empty())
+		{
+		new GLMotif::Separator("SceneGraphsSeparator",renderingModesMenu,GLMotif::Separator::HORIZONTAL,0.0f,GLMotif::Separator::LOWERED);
+		
+		/* Create a set of toggle buttons to enable/disable individual additional scene graphs: */
+		int i=0;
+		for(std::vector<SG>::iterator sgIt=sceneGraphs.begin();sgIt!=sceneGraphs.end();++sgIt,++i)
+			{
+			char sgName[40];
+			snprintf(sgName,sizeof(sgName),"SceneGraph%d",i+1);
+			GLMotif::ToggleButton* sgToggle=new GLMotif::ToggleButton(sgName,renderingModesMenu,sgIt->name.c_str());
+			sgToggle->setToggle(sgIt->render);
+			sgToggle->getValueChangedCallbacks().add(this,&Visualizer::toggleSceneGraphCallback,i);
+			}
+		}
+	
+	renderingModesMenu->manageChild();
 	
 	return renderingModesMenuPopup;
 	}
@@ -341,18 +365,17 @@ GLMotif::PopupMenu* Visualizer::createMainMenu(void)
 void Visualizer::loadElements(const char* elementFileName,bool ascii)
 	{
 	/* Open a pipe for cluster communication: */
-	Comm::MulticastPipe* pipe=Vrui::openPipe();
+	Cluster::MulticastPipe* pipe=Vrui::openPipe();
 	
 	if(pipe==0||pipe->isMaster())
 		{
 		/* Create a data sink to send element parameters to the slaves: */
-		Visualization::Abstract::BinaryParametersSink<Comm::MulticastPipe> sink(variableManager,*pipe,true);
+		Visualization::Abstract::BinaryParametersSink sink(variableManager,*pipe,true);
 		
 		if(ascii)
 			{
 			/* Open the element file: */
-			IO::AutoFile elementFileSource(IO::openFile(elementFileName));
-			IO::ValueSource elementFile(*elementFileSource);
+			IO::ValueSource elementFile(IO::openFile(elementFileName));
 			elementFile.setPunctuation("");
 			elementFile.setQuotes("\"");
 			elementFile.skipWs();
@@ -368,11 +391,11 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 					{
 					/* Send the algorithm name to the slaves: */
 					Misc::Marshaller<std::string>::write(algorithmName,*pipe);
-					pipe->finishMessage(); // Redundant!!!
+					pipe->flush(); // Redundant!!!
 					}
 				
 				/* Create an extractor for the given name: */
-				Comm::MulticastPipe* algorithmPipe=Vrui::openPipe();
+				Cluster::MulticastPipe* algorithmPipe=Vrui::openPipe();
 				Algorithm* algorithm=module->getAlgorithm(algorithmName.c_str(),variableManager,algorithmPipe);
 				
 				/* Extract an element using the given extractor: */
@@ -393,7 +416,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 							/* Send the extraction parameters to the slaves: */
 							pipe->write<int>(1);
 							parameters->write(sink);
-							pipe->finishMessage();
+							pipe->flush();
 							}
 						
 						/* Extract the element: */
@@ -408,7 +431,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 							{
 							/* Tell the slaves there was a problem: */
 							pipe->write<int>(0);
-							pipe->finishMessage();
+							pipe->flush();
 							}
 						
 						std::cout<<"Cancelled due to exception "<<err.what()<<"...";
@@ -430,9 +453,9 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 		else
 			{
 			/* Open the element file and create a data source to read from it: */
-			IO::AutoFile elementFile(IO::openFile(elementFileName));
-			elementFile->setEndianness(IO::File::LittleEndian);
-			Visualization::Abstract::BinaryParametersSource<IO::File> source(variableManager,*elementFile,false);
+			IO::FilePtr elementFile(IO::openFile(elementFileName));
+			elementFile->setEndianness(Misc::LittleEndian);
+			Visualization::Abstract::BinaryParametersSource source(variableManager,*elementFile,false);
 			
 			/* Read all elements from the file: */
 			while(!elementFile->eof())
@@ -447,7 +470,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 					}
 				
 				/* Create an extractor for the given name: */
-				Comm::MulticastPipe* algorithmPipe=Vrui::openPipe();
+				Cluster::MulticastPipe* algorithmPipe=Vrui::openPipe();
 				Algorithm* algorithm=module->getAlgorithm(algorithmName.c_str(),variableManager,algorithmPipe);
 				
 				/* Extract an element using the given extractor: */
@@ -467,7 +490,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 							/* Send the extraction parameters to the slaves: */
 							pipe->write<int>(1);
 							parameters->write(sink);
-							pipe->finishMessage();
+							pipe->flush();
 							}
 						
 						/* Extract the element: */
@@ -482,7 +505,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 							{
 							/* Tell the slaves there was a problem: */
 							pipe->write<int>(0);
-							pipe->finishMessage();
+							pipe->flush();
 							}
 						
 						std::cout<<"Cancelled due to exception "<<err.what()<<"...";
@@ -506,7 +529,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 			{
 			/* Send an empty algorithm name to signal end-of-file to the slaves: */
 			Misc::Marshaller<std::string>::write("",*pipe);
-			pipe->finishMessage();
+			pipe->flush();
 			}
 		}
 	else
@@ -514,7 +537,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 		std::cout<<"Ready to receive elements"<<std::endl;
 
 		/* Create a data source to read elements' parameters: */
-		Visualization::Abstract::BinaryParametersSource<Comm::MulticastPipe> source(variableManager,*pipe,true);
+		Visualization::Abstract::BinaryParametersSource source(variableManager,*pipe,true);
 		
 		/* Receive all visualization elements from the master: */
 		while(true)
@@ -529,7 +552,7 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 			std::cout<<"Received algorithm "<<algorithmName<<std::endl;
 			
 			/* Create an extractor for the given name: */
-			Comm::MulticastPipe* algorithmPipe=Vrui::openPipe();
+			Cluster::MulticastPipe* algorithmPipe=Vrui::openPipe();
 			Algorithm* algorithm=module->getAlgorithm(algorithmName.c_str(),variableManager,algorithmPipe);
 			
 			/* Extract an element using the given extractor: */
@@ -576,7 +599,9 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	:Vrui::Application(argc,argv,appDefaults),
 	 moduleManager(VISUALIZER_MODULENAMETEMPLATE),
 	 module(0),dataSet(0),variableManager(0),
-	 dataSetRenderer(0),coordinateTransformer(0),
+	 renderDataSet(true),dataSetRenderer(0),
+	 renderSceneGraphs(false),
+	 coordinateTransformer(0),
 	 firstScalarAlgorithmIndex(0),firstVectorAlgorithmIndex(0),
 	 #ifdef VISUALIZER_USE_COLLABORATION
 	 collaborationClient(0),sharedVisualizationClient(0),
@@ -588,6 +613,7 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	 inLoadPalette(false),inLoadElements(false)
 	{
 	/* Parse the command line: */
+	std::string baseDirectory="";
 	std::string moduleClassName="";
 	std::vector<std::string> dataSetArgs;
 	const char* argColorMapName=0;
@@ -629,6 +655,52 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 				else
 					std::cerr<<"Missing element file name after -load"<<std::endl;
 				}
+			else if(strcasecmp(argv[i]+1,"sceneGraph")==0)
+				{
+				++i;
+				if(i<argc)
+					{
+					try
+						{
+						/* Create a node creator: */
+						SceneGraph::NodeCreator nodeCreator;
+						
+						/* Create the scene graph's root node: */
+						SG sg;
+						sg.root=new SceneGraph::GroupNode;
+						
+						/* Load the VRML file: */
+						SceneGraph::VRMLFile vrmlFile(argv[i],Vrui::openFile(argv[i]),nodeCreator,Vrui::getClusterMultiplexer());
+						vrmlFile.parse(sg.root);
+						
+						/* Store the scene graph's name: */
+						char* nameStart=argv[i];
+						char* nameEnd=0;
+						for(char* nPtr=argv[i];*nPtr!='\0';++nPtr)
+							{
+							if(*nPtr=='/')
+								{
+								nameStart=nPtr+1;
+								nameEnd=0;
+								}
+							if(*nPtr=='.')
+								nameEnd=nPtr;
+							}
+						sg.name=nameEnd!=0?std::string(nameStart,nameEnd):std::string(nameStart);
+						
+						/* Store the scene graph in the list: */
+						sg.render=true;
+						sceneGraphs.push_back(sg);
+						renderSceneGraphs=true;
+						}
+					catch(std::runtime_error err)
+						{
+						std::cerr<<"Ignoring scene graph "<<argv[i]<<" due to exception "<<err.what()<<std::endl;
+						}
+					}
+				else
+					std::cerr<<"Missing scene graph file name after -sceneGraph"<<std::endl;
+				}
 			#ifdef VISUALIZER_USE_COLLABORATION
 			else if(strcasecmp(argv[i]+1,"share")==0)
 				{
@@ -660,7 +732,7 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 					collaborationClient=new Collaboration::CollaborationClient(cfg);
 					
 					/* Register the shared Visualizer protocol: */
-					collaborationClient->registerProtocol(new Collaboration::SharedVisualizationClient(this));
+					collaborationClient->registerProtocol(new SharedVisualizationClient(this));
 					}
 				catch(std::runtime_error err)
 					{
@@ -673,9 +745,16 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 			}
 		else
 			{
+			/* Set the base directory to the directory containing the meta-input file: */
+			char* slashPtr=0;
+			for(char* aPtr=argv[i];*aPtr!='\0';++aPtr)
+				if(*aPtr=='/')
+					slashPtr=aPtr;
+			if(slashPtr!=0)
+				baseDirectory=std::string(argv[i],slashPtr+1);
+			
 			/* Read the meta-input file of the given name: */
-			IO::AutoFile metaInputFileSource(Vrui::openFile(argv[i]));
-			IO::ValueSource metaInputFile(*metaInputFileSource);
+			IO::ValueSource metaInputFile(Vrui::openFile(argv[i]));
 			metaInputFile.skipWs();
 			
 			/* Read the module class name: */
@@ -702,10 +781,11 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 		{
 		/* Load the appropriate visualization module: */
 		module=moduleManager.loadClass(moduleClassName.c_str());
+		module->setBaseDirectory(baseDirectory);
 		
 		/* Load a data set: */
 		Misc::Timer t;
-		Comm::MulticastPipe* pipe=Vrui::openPipe(); // Implicit synchronization point
+		Cluster::MulticastPipe* pipe=Vrui::openPipe(); // Implicit synchronization point
 		dataSet=module->load(dataSetArgs,pipe);
 		delete pipe; // Implicit synchronization point
 		t.elapse();
@@ -763,7 +843,7 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 			}
 		
 		/* Get a pointer to the shared Visualizer protocol: */
-		sharedVisualizationClient=dynamic_cast<Collaboration::SharedVisualizationClient*>(collaborationClient->getProtocol(Collaboration::SharedVisualizationClient::protocolName));
+		sharedVisualizationClient=dynamic_cast<SharedVisualizationClient*>(collaborationClient->getProtocol(SharedVisualizationProtocol::protocolName));
 		
 		/* Add a close button to the client dialog: */
 		collaborationClient->getDialog()->setCloseButton(true);
@@ -861,7 +941,7 @@ void Visualizer::toolCreationCallback(Vrui::ToolManager::ToolCreationCallbackDat
 			else
 				{
 				/* Create an extractor locator: */
-				Comm::MulticastPipe* algorithmPipe=Vrui::openPipe();
+				Cluster::MulticastPipe* algorithmPipe=Vrui::openPipe();
 				Algorithm* extractor=module->getAlgorithm(algorithmName.c_str(),variableManager,algorithmPipe);
 				if(extractor!=0)
 					{
@@ -985,20 +1065,40 @@ void Visualizer::display(GLContextData& contextData) const
 	elementList->renderElements(contextData,false);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->glRenderAction(contextData);
-
+	
+	if(renderSceneGraphs)
+		{
+		/* Save OpenGL state: */
+		glPushAttrib(GL_ENABLE_BIT|GL_LIGHTING_BIT|GL_TEXTURE_BIT);
+		
+		/* Create a render state to traverse the scene graph: */
+		SceneGraph::GLRenderState renderState(contextData,Vrui::getHeadPosition(),Vrui::getInverseNavigationTransformation().transform(Vrui::getUpDirection()));
+		
+		/* Render all additional scene graphs: */
+		for(std::vector<SG>::const_iterator sgIt=sceneGraphs.begin();sgIt!=sceneGraphs.end();++sgIt)
+			if(sgIt->render)
+				sgIt->root->glRenderAction(renderState);
+		
+		/* Restore OpenGL state: */
+		glPopAttrib();
+		}
+	
 	/* Render all transparent visualization elements: */
 	elementList->renderElements(contextData,true);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->glRenderActionTransparent(contextData);
 	
-	/* Render the data set: */
-	GLfloat lineWidth;
-	glGetFloatv(GL_LINE_WIDTH,&lineWidth);
-	if(lineWidth!=1.0f)
-		glLineWidth(1.0f);
-	glColor(dataSetRenderColor);
-	dataSetRenderer->glRenderAction(contextData);
-	glLineWidth(lineWidth);
+	if(renderDataSet)
+		{
+		/* Render the data set: */
+		GLfloat lineWidth;
+		glGetFloatv(GL_LINE_WIDTH,&lineWidth);
+		if(lineWidth!=1.0f)
+			glLineWidth(1.0f);
+		glColor(dataSetRenderColor);
+		dataSetRenderer->glRenderAction(contextData);
+		glLineWidth(lineWidth);
+		}
 	
 	/* Disable all cutting planes: */
 	cuttingPlaneIndex=0;
@@ -1026,8 +1126,28 @@ void Visualizer::sound(ALContextData& contextData) const
 
 void Visualizer::changeRenderingModeCallback(GLMotif::RadioBox::ValueChangedCallbackData* cbData)
 	{
-	/* Set the new rendering mode: */
-	dataSetRenderer->setRenderingMode(cbData->radioBox->getToggleIndex(cbData->newSelectedToggle));
+	if(cbData->newSelectedToggle!=0)
+		{
+		/* Enable data set rendering and set the new rendering mode: */
+		renderDataSet=true;
+		dataSetRenderer->setRenderingMode(cbData->radioBox->getToggleIndex(cbData->newSelectedToggle));
+		}
+	else
+		{
+		/* Disable data set rendering: */
+		renderDataSet=false;
+		}
+	}
+
+void Visualizer::toggleSceneGraphCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData,const int& sceneGraphIndex)
+	{
+	/* Disable/enable the affected scene graph: */
+	sceneGraphs[sceneGraphIndex].render=cbData->set;
+	
+	/* Update the overall scene graph rendering flag: */
+	renderSceneGraphs=false;
+	for(std::vector<SG>::iterator sgIt=sceneGraphs.begin();!renderSceneGraphs&&sgIt!=sceneGraphs.end();++sgIt)
+		renderSceneGraphs=sgIt->render;
 	}
 
 void Visualizer::changeScalarVariableCallback(GLMotif::RadioBox::ValueChangedCallbackData* cbData)
@@ -1056,7 +1176,7 @@ void Visualizer::loadPaletteCallback(Misc::CallbackData*)
 	if(!inLoadPalette)
 		{
 		/* Create a file selection dialog to select a palette file: */
-		GLMotif::FileSelectionDialog* fsDialog=new GLMotif::FileSelectionDialog(Vrui::getWidgetManager(),"Load Palette File...",0,".pal",Vrui::openPipe());
+		GLMotif::FileSelectionDialog* fsDialog=new GLMotif::FileSelectionDialog(Vrui::getWidgetManager(),"Load Palette File...",Vrui::openDirectory("."),".pal");
 		fsDialog->getOKCallbacks().add(this,&Visualizer::loadPaletteOKCallback);
 		fsDialog->getCancelCallbacks().add(this,&Visualizer::loadPaletteCancelCallback);
 		Vrui::popupPrimaryWidget(fsDialog);
@@ -1069,7 +1189,7 @@ void Visualizer::loadPaletteOKCallback(GLMotif::FileSelectionDialog::OKCallbackD
 	try
 		{
 		/* Load the palette file: */
-		variableManager->loadPalette(cbData->selectedFileName.c_str());
+		variableManager->loadPalette(cbData->selectedDirectory->getPath(cbData->selectedFileName).c_str());
 		}
 	catch(std::runtime_error)
 		{
@@ -1077,7 +1197,7 @@ void Visualizer::loadPaletteOKCallback(GLMotif::FileSelectionDialog::OKCallbackD
 		}
 	
 	/* Destroy the file selection dialog: */
-	Vrui::getWidgetManager()->deleteWidget(cbData->fileSelectionDialog);
+	cbData->fileSelectionDialog->close();
 	inLoadPalette=false;
 	}
 
@@ -1141,7 +1261,7 @@ void Visualizer::loadElementsCallback(Misc::CallbackData*)
 	if(!inLoadElements)
 		{
 		/* Create a file selection dialog to select an element file: */
-		GLMotif::FileSelectionDialog* fsDialog=new GLMotif::FileSelectionDialog(Vrui::getWidgetManager(),"Load Visualization Elements...",0,".asciielem;.binelem",Vrui::openPipe());
+		GLMotif::FileSelectionDialog* fsDialog=new GLMotif::FileSelectionDialog(Vrui::getWidgetManager(),"Load Visualization Elements...",Vrui::openDirectory("."),".asciielem;.binelem");
 		fsDialog->getOKCallbacks().add(this,&Visualizer::loadElementsOKCallback);
 		fsDialog->getCancelCallbacks().add(this,&Visualizer::loadElementsCancelCallback);
 		Vrui::popupPrimaryWidget(fsDialog);
@@ -1154,15 +1274,15 @@ void Visualizer::loadElementsOKCallback(GLMotif::FileSelectionDialog::OKCallback
 	try
 		{
 		/* Determine the type of the element file: */
-		if(Misc::hasCaseExtension(cbData->selectedFileName.c_str(),".asciielem"))
+		if(Misc::hasCaseExtension(cbData->selectedFileName,".asciielem"))
 			{
 			/* Load the ASCII elements file: */
-			loadElements(cbData->selectedFileName.c_str(),true);
+			loadElements(cbData->selectedDirectory->getPath(cbData->selectedFileName).c_str(),true);
 			}
-		else if(Misc::hasCaseExtension(cbData->selectedFileName.c_str(),".binelem"))
+		else if(Misc::hasCaseExtension(cbData->selectedFileName,".binelem"))
 			{
 			/* Load the binary elements file: */
-			loadElements(cbData->selectedFileName.c_str(),false);
+			loadElements(cbData->selectedDirectory->getPath(cbData->selectedFileName).c_str(),false);
 			}
 		}
 	catch(std::runtime_error err)

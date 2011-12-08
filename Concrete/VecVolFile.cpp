@@ -40,7 +40,7 @@ VecVolFile::VecVolFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* VecVolFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* VecVolFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
 	/* Open the volume file: */
 	Misc::File file(args[0].c_str(),"rb",Misc::File::BigEndian);

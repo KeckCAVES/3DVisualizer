@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLObject.h>
 
 /* Forward declarations: */
-namespace Comm {
+namespace Cluster {
 class MulticastPipe;
 }
 
@@ -98,7 +98,7 @@ class MultiPolyline:public GLObject
 	/* Elements: */
 	private:
 	unsigned int numPolylines; // Number of individual polylines
-	Comm::MulticastPipe* pipe; // Pipe to stream polyline data in a cluster environment (owned by caller)
+	Cluster::MulticastPipe* pipe; // Pipe to stream polyline data in a cluster environment (owned by caller)
 	unsigned int version; // Version number of the multipolyline (incremented on each clear operation)
 	Polyline* polylines; // Array of individual polylines
 	size_t maxNumVertices; // Maximum number of vertices in any individual polyline
@@ -108,7 +108,7 @@ class MultiPolyline:public GLObject
 	
 	/* Constructors and destructors: */
 	public:
-	MultiPolyline(unsigned int sNumPolylines,Comm::MulticastPipe* sPipe); // Creates empty multi-polyline for given multicast pipe (or 0 in single-machine environment)
+	MultiPolyline(unsigned int sNumPolylines,Cluster::MulticastPipe* sPipe); // Creates empty multi-polyline for given multicast pipe (or 0 in single-machine environment)
 	private:
 	MultiPolyline(const MultiPolyline& source); // Prohibit copy constructor
 	MultiPolyline& operator=(const MultiPolyline& source); // Prohibit assignment operator

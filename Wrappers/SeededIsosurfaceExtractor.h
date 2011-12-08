@@ -135,7 +135,7 @@ class SeededIsosurfaceExtractor:public Visualization::Abstract::Algorithm
 	
 	/* Constructors and destructors: */
 	public:
-	SeededIsosurfaceExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates an isosurface extractor
+	SeededIsosurfaceExtractor(Visualization::Abstract::VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe); // Creates an isosurface extractor
 	virtual ~SeededIsosurfaceExtractor(void);
 	
 	/* Methods from Visualization::Abstract::Algorithm: */

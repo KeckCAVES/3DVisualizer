@@ -42,7 +42,7 @@ MultiStreamline<DataSetWrapperParam>::MultiStreamline(
 	Visualization::Abstract::Parameters* sParameters,
 	unsigned int numStreamlines,
 	const GLColorMap* sColorMap,
-	Comm::MulticastPipe* pipe)
+	Cluster::MulticastPipe* pipe)
 	:Visualization::Abstract::Element(sParameters),
 	 colorMap(sColorMap),
 	 multiPolyline(numStreamlines,pipe)

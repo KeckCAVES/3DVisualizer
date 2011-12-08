@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 /* Forward declarations: */
 namespace Visualization {
+namespace Abstract {
+class Algorithm;
+}
 namespace Templatized {
 template <class CellTopologyParam>
 class IsosurfaceCaseTable;
@@ -112,7 +115,7 @@ class IsosurfaceExtractor
 		scalarExtractor=newScalarExtractor;
 		}
 	void setExtractionMode(ExtractionMode newExtractionMode); // Sets the current isosurface extraction mode
-	void extractIsosurface(VScalar newIsovalue,Isosurface& newIsosurface); // Extracts a global isosurface for the given isovalue and stores it in the given isosurface
+	void extractIsosurface(VScalar newIsovalue,Isosurface& newIsosurface,Visualization::Abstract::Algorithm* algorithm); // Extracts a global isosurface for the given isovalue and stores it in the given isosurface
 	void extractSeededIsosurface(const Locator& seedLocator,Isosurface& newIsosurface); // Extracts a seeded isosurface for the given isovalue from the given cell and stores it in the given isosurface
 	void startSeededIsosurface(const Locator& seedLocator,Isosurface& newIsosurface); // Starts extracting a seeded isosurface for the given isovalue from the given cell
 	template <class ContinueFunctorParam>

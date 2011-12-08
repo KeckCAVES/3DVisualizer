@@ -1,7 +1,7 @@
 /***********************************************************************
 SphericalASCIIFile - Class to read multivariate scalar data in spherical
 coordinates from simple ASCII files.
-Copyright (c) 2008-2009 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -31,10 +31,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iomanip>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
+#include <Plugins/FactoryManager.h>
 #include <IO/File.h>
 #include <IO/OpenFile.h>
 #include <IO/ValueSource.h>
-#include <Plugins/FactoryManager.h>
+#include <Cluster/MulticastPipe.h>
 #include <Math/Math.h>
 #include <Math/Constants.h>
 
@@ -81,8 +82,10 @@ SphericalASCIIFile::SphericalASCIIFile(void)
 	{
 	}
 
-Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std::string>& args,Comm::MulticastPipe* pipe) const
+Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std::string>& args,Cluster::MulticastPipe* pipe) const
 	{
+	bool master=pipe==0||pipe->isMaster();
+	
 	/* Parse the command line: */
 	const char* dataFileName=0;
 	int numHeaderLines=0;
@@ -205,8 +208,7 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 		Misc::throwStdErr("SphericalASCIIFile::load: No scalar or vector data values specified");
 	
 	/* Open the data file: */
-	IO::AutoFile dataFile(IO::openFile(dataFileName));
-	IO::ValueSource reader(*dataFile);
+	IO::ValueSource reader(openFile(dataFileName,pipe));
 	reader.setPunctuation('\n',true);
 	
 	/* Skip the data file header: */
@@ -243,7 +245,7 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 	int vectorVariableIndex=0;
 	for(std::vector<VectorVariable>::const_iterator vIt=vectors.begin();vIt!=vectors.end();++vIt,++vectorVariableIndex)
 		{
-		static const char* vectorComponentNames[7]={"Longitude","Latitude","Radius","X","Y","Z","Magnitude"};
+		static const char* vectorComponentNames[7]={" Longitude"," Latitude"," Radius"," X"," Y"," Z"," Magnitude"};
 		for(int i=0;i<7;++i)
 			{
 			if(i==1)
@@ -265,7 +267,8 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 	double* columns=new double[maxColumnIndex+1];
 	
 	/* Read all node positions and values: */
-	std::cout<<"Reading grid vertex positions and values...   0%"<<std::flush;
+	if(master)
+		std::cout<<"Reading grid vertex positions and values...   0%"<<std::flush;
 	DS::GridArray& grid=dataSet.getGrid();
 	DS::Index index;
 	int index0Min,index0Max,index0Increment;
@@ -367,16 +370,20 @@ Visualization::Abstract::DataSet* SphericalASCIIFile::load(const std::vector<std
 					}
 				}
 		
-		std::cout<<"\b\b\b\b"<<std::setw(3)<<((index[nodeCountOrder[0]]+1)*100)/numVertices[nodeCountOrder[0]]<<"%"<<std::flush;
+		if(master)
+			std::cout<<"\b\b\b\b"<<std::setw(3)<<((index[nodeCountOrder[0]]+1)*100)/numVertices[nodeCountOrder[0]]<<"%"<<std::flush;
 		}
-	std::cout<<"\b\b\b\bdone"<<std::endl;
+	if(master)
+		std::cout<<"\b\b\b\bdone"<<std::endl;
 	
 	delete[] columns;
 	
 	/* Finalize the grid structure: */
-	std::cout<<"Finalizing grid structure..."<<std::flush;
+	if(master)
+		std::cout<<"Finalizing grid structure..."<<std::flush;
 	dataSet.finalizeGrid();
-	std::cout<<" done"<<std::endl;
+	if(master)
+		std::cout<<" done"<<std::endl;
 	
 	/* Return the result data set: */
 	return result.releaseTarget();

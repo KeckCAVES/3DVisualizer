@@ -2,7 +2,7 @@
 SharedVisualizationServer - Server for collaborative data exploration in
 spatially distributed VR environments, implemented as a plug-in of the
 Vrui remote collaboration infrastructure.
-Copyright (c) 2009 Oliver Kreylos
+Copyright (c) 2009-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -21,39 +21,38 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
-#include <SharedVisualizationServer.h>
+#include "SharedVisualizationServer.h"
 
 #ifdef VERBOSE
 #include <iostream>
 #endif
 #include <Misc/ThrowStdErr.h>
-
-namespace Collaboration {
+#include <Comm/NetPipe.h>
 
 /*******************************************************
 Methods of class SharedVisualizationServer::SeedRequest:
 *******************************************************/
 
-SharedVisualizationServer::SeedRequest& SharedVisualizationServer::SeedRequest::receive(CollaborationPipe& pipe)
+SharedVisualizationServer::SeedRequest& SharedVisualizationServer::SeedRequest::receive(Comm::NetPipe& pipe)
 	{
-	requestID=pipe.read<unsigned int>();
-	unsigned int newParametersSize=pipe.read<unsigned int>();
+	requestID=pipe.read<Card>();
+	unsigned int newParametersSize=pipe.read<Card>();
 	if(newParametersSize!=parametersSize)
 		{
 		delete[] parameters;
 		parametersSize=newParametersSize;
-		parameters=new unsigned char[parametersSize];
+		parameters=new Byte[parametersSize];
 		}
-	pipe.read<unsigned char>(parameters,parametersSize);
+	pipe.read(parameters,parametersSize);
 	
 	return *this;
 	}
 
-void SharedVisualizationServer::SeedRequest::send(CollaborationPipe& pipe) const
+void SharedVisualizationServer::SeedRequest::send(Comm::NetPipe& pipe) const
 	{
-	pipe.write<unsigned int>(requestID);
-	pipe.write<unsigned int>(parametersSize);
-	pipe.write<unsigned char>(parameters,parametersSize);
+	pipe.write<Card>(requestID);
+	pipe.write<Card>(parametersSize);
+	pipe.write<Byte>(parameters,parametersSize);
 	}
 
 /********************************************************
@@ -72,19 +71,19 @@ Methods of class SharedVisualizationServer::Element:
 
 SharedVisualizationServer::Element::Element(const SharedVisualizationServer::LocatorState& ls)
 	:algorithmName(ls.algorithmName),
-	 parametersSize(ls.seedRequest.parametersSize),parameters(new unsigned char[parametersSize]),
+	 parametersSize(ls.seedRequest.parametersSize),parameters(new Byte[parametersSize]),
 	 enabled(true)
 	{
 	/* Copy the seed request's parameters blob: */
 	memcpy(parameters,ls.seedRequest.parameters,parametersSize);
 	}
 
-void SharedVisualizationServer::Element::send(CollaborationPipe& pipe) const
+void SharedVisualizationServer::Element::send(Comm::NetPipe& pipe) const
 	{
-	pipe.write<std::string>(algorithmName);
-	pipe.write<unsigned int>(parametersSize);
-	pipe.write<unsigned char>(parameters,parametersSize);
-	pipe.write<unsigned char>(enabled?1:0);
+	SharedVisualizationProtocol::write(algorithmName,pipe);
+	pipe.write<Card>(parametersSize);
+	pipe.write<Byte>(parameters,parametersSize);
+	pipe.write<Byte>(enabled?1:0);
 	}
 
 /*******************************************************
@@ -131,10 +130,10 @@ unsigned int SharedVisualizationServer::getNumMessages(void) const
 	return MESSAGES_END;
 	}
 
-ProtocolServer::ClientState* SharedVisualizationServer::receiveConnectRequest(unsigned int protocolMessageLength,CollaborationPipe& pipe)
+Collaboration::ProtocolServer::ClientState* SharedVisualizationServer::receiveConnectRequest(unsigned int protocolMessageLength,Comm::NetPipe& pipe)
 	{
 	/* Receive the client's protocol version: */
-	unsigned int clientProtocolVersion=pipe.read<unsigned int>();
+	unsigned int clientProtocolVersion=pipe.read<Card>();
 	
 	/* Check for the correct version number: */
 	if(clientProtocolVersion==protocolVersion)
@@ -143,22 +142,22 @@ ProtocolServer::ClientState* SharedVisualizationServer::receiveConnectRequest(un
 		return 0;
 	}
 
-void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState* cs,CollaborationPipe& pipe)
+void SharedVisualizationServer::receiveClientUpdate(Collaboration::ProtocolServer::ClientState* cs,Comm::NetPipe& pipe)
 	{
 	ClientState* myCs=dynamic_cast<ClientState*>(cs);
 	if(myCs==0)
 		Misc::throwStdErr("SharedVisualizationServer::receiveClientUpdate: Mismatching client state object type");
 	
 	/* Receive a list of locator action messages from the client: */
-	CollaborationPipe::MessageIdType message;
-	while((message=pipe.readMessage())!=UPDATE_END)
+	MessageIdType message;
+	while((message=readMessage(pipe))!=UPDATE_END)
 		switch(message)
 			{
 			case CREATE_LOCATOR:
 				{
 				/* Read the new locator's ID and algorithm name: */
-				unsigned int locatorID=pipe.read<unsigned int>();
-				std::string algorithmName=pipe.read<std::string>();
+				unsigned int locatorID=pipe.read<Card>();
+				std::string algorithmName=read<std::string>(pipe);
 				
 				/* Add a new locator to the list: */
 				LocatorState* newLocator=new LocatorState(algorithmName);
@@ -177,7 +176,7 @@ void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState*
 			case SEED_REQUEST:
 				{
 				/* Read the locator's ID: */
-				unsigned int locatorID=pipe.read<unsigned int>();
+				unsigned int locatorID=pipe.read<Card>();
 				
 				/* Find the locator's state: */
 				LocatorHash::Iterator locatorIt=myCs->locators.findEntry(locatorID);
@@ -204,7 +203,7 @@ void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState*
 			case FINALIZATION_REQUEST:
 				{
 				/* Read the locator's ID: */
-				unsigned int locatorID=pipe.read<unsigned int>();
+				unsigned int locatorID=pipe.read<Card>();
 				
 				/* Find the locator's state: */
 				LocatorHash::Iterator locatorIt=myCs->locators.findEntry(locatorID);
@@ -216,7 +215,7 @@ void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState*
 					}
 				
 				/* Store the final seed request ID: */
-				locatorIt->getDest()->finalSeedRequestID=pipe.read<unsigned int>();
+				locatorIt->getDest()->finalSeedRequestID=pipe.read<Card>();
 				
 				#ifdef VERBOSE
 				std::cout<<"SharedVisualizationServer: Received finalization request "<<locatorIt->getDest()->finalSeedRequestID<<" from locator "<<locatorID<<std::endl;
@@ -231,7 +230,7 @@ void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState*
 			case DESTROY_LOCATOR:
 				{
 				/* Read the locator's ID: */
-				unsigned int locatorID=pipe.read<unsigned int>();
+				unsigned int locatorID=pipe.read<Card>();
 				
 				/* Find the locator's state: */
 				LocatorHash::Iterator locatorIt=myCs->locators.findEntry(locatorID);
@@ -257,7 +256,7 @@ void SharedVisualizationServer::receiveClientUpdate(ProtocolServer::ClientState*
 			}
 	}
 
-void SharedVisualizationServer::sendClientConnect(ProtocolServer::ClientState* sourceCs,ProtocolServer::ClientState* destCs,CollaborationPipe& pipe)
+void SharedVisualizationServer::sendClientConnect(Collaboration::ProtocolServer::ClientState* sourceCs,Collaboration::ProtocolServer::ClientState* destCs,Comm::NetPipe& pipe)
 	{
 	ClientState* mySourceCs=dynamic_cast<ClientState*>(sourceCs);
 	ClientState* myDestCs=dynamic_cast<ClientState*>(destCs);
@@ -266,16 +265,16 @@ void SharedVisualizationServer::sendClientConnect(ProtocolServer::ClientState* s
 	
 	/* Send the existing locators of the source client to the destination client: */
 	unsigned int numLocators=mySourceCs->locators.getNumEntries();
-	pipe.write<unsigned int>(numLocators);
+	pipe.write<Card>(numLocators);
 	for(LocatorHash::Iterator lIt=mySourceCs->locators.begin();!lIt.isFinished();++lIt)
 		{
 		/* Send the locator's ID and algorithm name: */
-		pipe.write<unsigned int>(lIt->getSource());
-		pipe.write<std::string>(lIt->getDest()->algorithmName);
+		pipe.write<Card>(lIt->getSource());
+		write(lIt->getDest()->algorithmName,pipe);
 		}
 	}
 
-void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* destCs,CollaborationPipe& pipe)
+void SharedVisualizationServer::sendServerUpdate(Collaboration::ProtocolServer::ClientState* destCs,Comm::NetPipe& pipe)
 	{
 	ClientState* myDestCs=dynamic_cast<ClientState*>(destCs);
 	if(myDestCs==0)
@@ -287,8 +286,8 @@ void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* de
 		Threads::Mutex::Lock elementListLock(elementListMutex);
 		for(ElementHash::Iterator eIt=elements.begin();!eIt.isFinished();++eIt)
 			{
-			pipe.writeMessage(CREATE_ELEMENT);
-			pipe.write<unsigned int>(eIt->getSource());
+			writeMessage(CREATE_ELEMENT,pipe);
+			pipe.write<Card>(eIt->getSource());
 			eIt->getDest()->send(pipe);
 			}
 		
@@ -296,10 +295,10 @@ void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* de
 		}
 	
 	/* Terminate the per-server action list: */
-	pipe.writeMessage(UPDATE_END);
+	writeMessage(UPDATE_END,pipe);
 	}
 
-void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* sourceCs,ProtocolServer::ClientState* destCs,CollaborationPipe& pipe)
+void SharedVisualizationServer::sendServerUpdate(Collaboration::ProtocolServer::ClientState* sourceCs,Collaboration::ProtocolServer::ClientState* destCs,Comm::NetPipe& pipe)
 	{
 	ClientState* mySourceCs=dynamic_cast<ClientState*>(sourceCs);
 	ClientState* myDestCs=dynamic_cast<ClientState*>(destCs);
@@ -313,11 +312,11 @@ void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* so
 			{
 			case CREATE_LOCATOR:
 				/* Send a creation message: */
-				pipe.writeMessage(CREATE_LOCATOR);
+				writeMessage(CREATE_LOCATOR,pipe);
 				
 				/* Send the new locator's ID and algorithm name: */
-				pipe.write<unsigned int>(aIt->locatorIt->getSource());
-				pipe.write<std::string>(aIt->locatorIt->getDest()->algorithmName);
+				pipe.write<Card>(aIt->locatorIt->getSource());
+				write(aIt->locatorIt->getDest()->algorithmName,pipe);
 				
 				break;
 			
@@ -326,10 +325,10 @@ void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* so
 				if(aIt->requestID==aIt->locatorIt->getDest()->seedRequest.requestID)
 					{
 					/* Send a seed request message: */
-					pipe.writeMessage(SEED_REQUEST);
+					writeMessage(SEED_REQUEST,pipe);
 					
 					/* Send the locator's ID and seed parameters: */
-					pipe.write<unsigned int>(aIt->locatorIt->getSource());
+					pipe.write<Card>(aIt->locatorIt->getSource());
 					aIt->locatorIt->getDest()->seedRequest.send(pipe);
 					}
 				
@@ -340,21 +339,21 @@ void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* so
 				if(aIt->requestID==aIt->locatorIt->getDest()->finalSeedRequestID)
 					{
 					/* Send a finalization request message: */
-					pipe.writeMessage(FINALIZATION_REQUEST);
+					writeMessage(FINALIZATION_REQUEST,pipe);
 					
 					/* Send the locator's ID and final seed request ID: */
-					pipe.write<unsigned int>(aIt->locatorIt->getSource());
-					pipe.write<unsigned int>(aIt->locatorIt->getDest()->finalSeedRequestID);
+					pipe.write<Card>(aIt->locatorIt->getSource());
+					pipe.write<Card>(aIt->locatorIt->getDest()->finalSeedRequestID);
 					}
 				
 				break;
 			
 			case DESTROY_LOCATOR:
 				/* Send a destruction message: */
-				pipe.writeMessage(DESTROY_LOCATOR);
+				writeMessage(DESTROY_LOCATOR,pipe);
 				
 				/* Send the locator's ID: */
-				pipe.write<unsigned int>(aIt->locatorIt->getSource());
+				pipe.write<Card>(aIt->locatorIt->getSource());
 				
 				break;
 			
@@ -364,10 +363,10 @@ void SharedVisualizationServer::sendServerUpdate(ProtocolServer::ClientState* so
 		}
 	
 	/* Terminate the action list: */
-	pipe.writeMessage(UPDATE_END);
+	writeMessage(UPDATE_END,pipe);
 	}
 
-void SharedVisualizationServer::afterServerUpdate(ProtocolServer::ClientState* cs)
+void SharedVisualizationServer::afterServerUpdate(Collaboration::ProtocolServer::ClientState* cs)
 	{
 	ClientState* myCs=dynamic_cast<ClientState*>(cs);
 	if(myCs==0)
@@ -386,8 +385,6 @@ void SharedVisualizationServer::afterServerUpdate(ProtocolServer::ClientState* c
 	myCs->actions.clear();
 	}
 
-}
-
 /****************
 DSO entry points:
 ****************/
@@ -396,7 +393,7 @@ extern "C" {
 
 Collaboration::ProtocolServer* createObject(Collaboration::ProtocolServerLoader& objectLoader)
 	{
-	return new Collaboration::SharedVisualizationServer;
+	return new SharedVisualizationServer;
 	}
 
 void destroyObject(Collaboration::ProtocolServer* object)

@@ -60,7 +60,7 @@ class Slice:public Visualization::Abstract::Element
 	
 	/* Constructors and destructors: */
 	public:
-	Slice(Visualization::Abstract::Parameters* sParameters,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty slice for the given parameters
+	Slice(Visualization::Abstract::Parameters* sParameters,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty slice for the given parameters
 	private:
 	Slice(const Slice& source); // Prohibit copy constructor
 	Slice& operator=(const Slice& source); // Prohibit assignment operator

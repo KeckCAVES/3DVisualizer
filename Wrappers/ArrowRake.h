@@ -31,7 +31,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/Element.h>
 
 /* Forward declarations: */
-namespace Comm {
+namespace Cluster {
 class MulticastPipe;
 }
 class GLColorMap;
@@ -86,7 +86,7 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 	/* Elements: */
 	private:
 	const GLColorMap* colorMap; // Color map to color arrow glyphs
-	Comm::MulticastPipe* pipe; // Pipe to stream arrow rake data in a cluster environment (owned by caller)
+	Cluster::MulticastPipe* pipe; // Pipe to stream arrow rake data in a cluster environment (owned by caller)
 	Rake rake; // Array containing the arrow definitions
 	Scalar lengthScale; // Arrow length scale
 	Scalar shaftRadius; // Radius of the shafts of the arrow glyphs
@@ -95,7 +95,7 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 	
 	/* Constructors and destructors: */
 	public:
-	ArrowRake(Visualization::Abstract::Parameters* sParameters,const Index& sRakeSize,Scalar sLengthScale,Scalar sShaftRadius,unsigned int sNumArrowVertices,const GLColorMap* sColorMap,Comm::MulticastPipe* pipe); // Creates an empty arrow rake for the given parameters
+	ArrowRake(Visualization::Abstract::Parameters* sParameters,const Index& sRakeSize,Scalar sLengthScale,Scalar sShaftRadius,unsigned int sNumArrowVertices,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty arrow rake for the given parameters
 	private:
 	ArrowRake(const ArrowRake& source); // Prohibit copy constructor
 	ArrowRake& operator=(const ArrowRake& source); // Prohibit assignment operator

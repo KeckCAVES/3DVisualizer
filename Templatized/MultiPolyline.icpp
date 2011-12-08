@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_TEMPLATIZED_MULTIPOLYLINE_IMPLEMENTATION
 
-#include <Comm/MulticastPipe.h>
+#include <Cluster/MulticastPipe.h>
 #include <GL/gl.h>
 #include <GL/GLVertexArrayParts.h>
 #define GLVERTEX_NONSTANDARD_TEMPLATES
@@ -120,7 +120,7 @@ MultiPolyline<VertexParam>::addNewChunk(
 			pipe->write<unsigned int>(polylineIndex);
 			pipe->write<unsigned int>((unsigned int)numUnsentVertices);
 			pipe->write<Vertex>(p.tail->vertices+p.tailNumSentVertices,numUnsentVertices);
-			pipe->finishMessage();
+			pipe->flush();
 			}
 		
 		p.tailNumSentVertices=0;
@@ -153,7 +153,7 @@ template <class VertexParam>
 inline
 MultiPolyline<VertexParam>::MultiPolyline(
 	unsigned int sNumPolylines,
-	Comm::MulticastPipe* sPipe)
+	Cluster::MulticastPipe* sPipe)
 	:numPolylines(sNumPolylines),
 	 pipe(sPipe),
 	 version(0),
@@ -285,7 +285,7 @@ MultiPolyline<VertexParam>::flush(
 		
 		/* Send a flush signal: */
 		pipe->write<unsigned int>(numPolylines);
-		pipe->finishMessage();
+		pipe->flush();
 		}
 	}
 

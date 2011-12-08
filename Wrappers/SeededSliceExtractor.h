@@ -123,7 +123,7 @@ class SeededSliceExtractor:public Visualization::Abstract::Algorithm
 	
 	/* Constructors and destructors: */
 	public:
-	SeededSliceExtractor(Visualization::Abstract::VariableManager* sVariableManager,Comm::MulticastPipe* sPipe); // Creates a slice extractor
+	SeededSliceExtractor(Visualization::Abstract::VariableManager* sVariableManager,Cluster::MulticastPipe* sPipe); // Creates a slice extractor
 	virtual ~SeededSliceExtractor(void);
 	
 	/* Methods from Visualization::Abstract::Algorithm: */
