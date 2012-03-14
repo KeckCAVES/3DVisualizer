@@ -23,10 +23,14 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_WRAPPERS_ISOSURFACE_IMPLEMENTATION
 
+#include <Wrappers/Isosurface.h>
+
 #include <GL/gl.h>
 #include <GL/GLMaterial.h>
 
-#include <Wrappers/Isosurface.h>
+#ifdef VISUALIZATION_USE_SHADERS
+#include <TwoSidedSurfaceShader.h>
+#endif
 
 namespace Visualization {
 
@@ -46,8 +50,15 @@ Isosurface<DataSetWrapperParam>::Isosurface(
 	:Visualization::Abstract::Element(sParameters),
 	 isovalue(sIsovalue),
 	 colorMap(sColorMap),
+	 #ifdef VISUALIZATION_USE_SHADERS
+	 shader(0),
+	 #endif
 	 surface(pipe)
 	{
+	#ifdef VISUALIZATION_USE_SHADERS
+	/* Acquire the shader: */
+	shader=TwoSidedSurfaceShader::acquireShader();
+	#endif
 	}
 
 template <class DataSetWrapperParam>
@@ -55,6 +66,10 @@ inline
 Isosurface<DataSetWrapperParam>::~Isosurface(
 	void)
 	{
+	#ifdef VISUALIZATION_USE_SHADERS
+	/* Release the shader: */
+	TwoSidedSurfaceShader::releaseShader(shader);
+	#endif
 	}
 
 template <class DataSetWrapperParam>
@@ -82,22 +97,37 @@ Isosurface<DataSetWrapperParam>::glRenderAction(
 	GLContextData& contextData) const
 	{
 	/* Set up OpenGL state for isosurface rendering: */
+	GLboolean lightingEnabled=false;
+	GLboolean normalizeEnabled=false;
+	GLboolean lightModelTwoSide=false;
+	GLboolean colorMaterialEnabled=false;
 	GLboolean cullFaceEnabled=glIsEnabled(GL_CULL_FACE);
 	if(cullFaceEnabled)
 		glDisable(GL_CULL_FACE);
-	GLboolean lightingEnabled=glIsEnabled(GL_LIGHTING);
-	if(!lightingEnabled)
-		glEnable(GL_LIGHTING);
-	GLboolean normalizeEnabled=glIsEnabled(GL_NORMALIZE);
-	if(!normalizeEnabled)
-		glEnable(GL_NORMALIZE);
-	GLboolean lightModelTwoSide;
-	glGetBooleanv(GL_LIGHT_MODEL_TWO_SIDE,&lightModelTwoSide);
-	if(!lightModelTwoSide)
-		glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,GL_TRUE);
-	GLboolean colorMaterialEnabled=glIsEnabled(GL_COLOR_MATERIAL);
-	if(colorMaterialEnabled)
-		glDisable(GL_COLOR_MATERIAL);
+	#ifdef VISUALIZATION_USE_SHADERS
+	if(shader!=0)
+		{
+		/* Enable the shader: */
+		shader->set(contextData);
+		}
+	else
+	#endif
+		{
+		lightingEnabled=glIsEnabled(GL_LIGHTING);
+		if(!lightingEnabled)
+			glEnable(GL_LIGHTING);
+		normalizeEnabled=glIsEnabled(GL_NORMALIZE);
+		if(!normalizeEnabled)
+			glEnable(GL_NORMALIZE);
+		glGetBooleanv(GL_LIGHT_MODEL_TWO_SIDE,&lightModelTwoSide);
+		if(!lightModelTwoSide)
+			glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,GL_TRUE);
+		colorMaterialEnabled=glIsEnabled(GL_COLOR_MATERIAL);
+		if(colorMaterialEnabled)
+			glDisable(GL_COLOR_MATERIAL);
+		}
+	
+	/* Set the isosurface material properties: */
 	GLMaterial frontMaterial=glGetMaterial(GLMaterialEnums::FRONT);
 	GLMaterial backMaterial=glGetMaterial(GLMaterialEnums::BACK);
 	GLMaterial::Color surfaceColor=(*colorMap)(isovalue);
@@ -106,17 +136,29 @@ Isosurface<DataSetWrapperParam>::glRenderAction(
 	/* Render the surface representation: */
 	surface.glRenderAction(contextData);
 	
-	/* Reset OpenGL state: */
+	/* Reset the isosurface material properties: */
 	glMaterial(GLMaterialEnums::FRONT,frontMaterial);
 	glMaterial(GLMaterialEnums::BACK,backMaterial);
-	if(colorMaterialEnabled)
-		glEnable(GL_COLOR_MATERIAL);
-	if(!lightModelTwoSide)
-		glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,GL_FALSE);
-	if(!normalizeEnabled)
-		glDisable(GL_NORMALIZE);
-	if(!lightingEnabled)
-		glDisable(GL_LIGHTING);
+	
+	/* Reset OpenGL state: */
+	#ifdef VISUALIZATION_USE_SHADERS
+	if(shader!=0)
+		{
+		/* Disable the shader: */
+		shader->reset(contextData);
+		}
+	else
+	#endif
+		{
+		if(colorMaterialEnabled)
+			glEnable(GL_COLOR_MATERIAL);
+		if(!lightModelTwoSide)
+			glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,GL_FALSE);
+		if(!normalizeEnabled)
+			glDisable(GL_NORMALIZE);
+		if(!lightingEnabled)
+			glDisable(GL_LIGHTING);
+		}
 	if(cullFaceEnabled)
 		glEnable(GL_CULL_FACE);
 	}

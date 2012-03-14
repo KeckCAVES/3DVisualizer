@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include "Extractor.h"
 
 #include <Misc/Time.h>
+#include <Threads/Config.h>
 #include <Realtime/AlarmTimer.h>
 #include <Cluster/MulticastPipe.h>
 #include <Vrui/Vrui.h>
@@ -56,7 +57,7 @@ void* Extractor::masterExtractorThreadMethod(void)
 		unsigned int requestID;
 		{
 		Threads::Mutex::Lock seedRequestLock(seedRequestMutex);
-		#ifdef __APPLE__
+		#if !THREADS_CONFIG_CAN_CANCEL
 		while(!terminate&&seedParameters==0)
 			seedRequestCond.wait(seedRequestMutex);
 		if(terminate)
@@ -183,12 +184,12 @@ void* Extractor::slaveExtractorThreadMethod(void)
 	while(true)
 		{
 		/* Wait for a new visualization element: */
-		#ifdef __APPLE__
+		#if !THREADS_CONFIG_CAN_CANCEL
 		if(terminate)
 			return 0;
 		#endif
 		unsigned int requestID=extractor->getPipe()->read<unsigned int>();
-		#ifdef __APPLE__
+		#if !THREADS_CONFIG_CAN_CANCEL
 		if(terminate)
 			return 0;
 		#endif
@@ -236,7 +237,7 @@ void* Extractor::slaveExtractorThreadMethod(void)
 
 Extractor::Extractor(Extractor::Algorithm* sExtractor)
 	:extractor(sExtractor),
-	 #ifdef __APPLE__
+	 #if !THREADS_CONFIG_CAN_CANCEL
 	 terminate(false),
 	 #endif
 	 finalElementPending(false),finalSeedRequestID(0),
@@ -265,7 +266,7 @@ Extractor::Extractor(Extractor::Algorithm* sExtractor)
 Extractor::~Extractor(void)
 	{
 	/* Stop the extraction thread: */
-	#ifdef __APPLE__
+	#if !THREADS_CONFIG_CAN_CANCEL
 	if(extractor->isMaster())
 		{
 		if(extractor->getPipe()!=0)

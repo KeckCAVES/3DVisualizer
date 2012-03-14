@@ -329,8 +329,8 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 					Misc::throwStdErr("StructuredGridASCII::load: Unknown header token %s in line %u in grid file %s",token.c_str(),lineIndex,argIt->c_str());
 				
 				/* Go to the next line: */
-				gridReader.skipLine();
-				gridReader.skipWs();
+				sliceReader.skipLine();
+				sliceReader.skipWs();
 				++lineIndex;
 				}
 			
@@ -436,8 +436,8 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 					}
 				
 				/* Go to the next line: */
-				gridReader.skipLine();
-				gridReader.skipWs();
+				sliceReader.skipLine();
+				sliceReader.skipWs();
 				++lineIndex;
 				}
 			if(master)

@@ -75,6 +75,7 @@ IsosurfaceExtractor<DataSetParam,ScalarExtractorParam,IsosurfaceParam>::extractF
 			vPtr[i].normal=normal.getComponents();
 			vPtr[i].position=edgeVertices[ctei[i]].getComponents();
 			}
+		
 		isosurface->addTriangle();
 		}
 	

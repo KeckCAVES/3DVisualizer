@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <utility>
 #include <Misc/Autopointer.h>
+#include <Threads/Config.h>
 #include <Threads/Mutex.h>
 #include <Threads/Cond.h>
 #include <Threads/Thread.h>
@@ -57,7 +58,7 @@ class Extractor
 	
 	/* Persistent extractor thread state: */
 	private:
-	#ifdef __APPLE__
+	#if !THREADS_CONFIG_CAN_CANCEL
 	volatile bool terminate; // Flag to tell the extractor thread to shut itself down
 	#endif
 	Threads::Thread extractorThread; // The visualization element extractor thread

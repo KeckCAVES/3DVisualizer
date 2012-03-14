@@ -834,6 +834,13 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 			{
 			/* Connect to the server: */
 			collaborationClient->connect();
+			
+			/* Get a pointer to the shared Visualizer protocol: */
+			sharedVisualizationClient=dynamic_cast<SharedVisualizationClient*>(collaborationClient->getProtocol(SharedVisualizationProtocol::protocolName));
+			
+			/* Add a close button to the client dialog: */
+			collaborationClient->getDialog()->setCloseButton(true);
+			collaborationClient->getDialog()->getCloseCallbacks().add(this,&Visualizer::clientDialogClosedCallback);
 			}
 		catch(std::runtime_error err)
 			{
@@ -841,13 +848,6 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 			delete collaborationClient;
 			collaborationClient=0;
 			}
-		
-		/* Get a pointer to the shared Visualizer protocol: */
-		sharedVisualizationClient=dynamic_cast<SharedVisualizationClient*>(collaborationClient->getProtocol(SharedVisualizationProtocol::protocolName));
-		
-		/* Add a close button to the client dialog: */
-		collaborationClient->getDialog()->setCloseButton(true);
-		collaborationClient->getDialog()->getCloseCallbacks().add(this,&Visualizer::clientDialogClosedCallback);
 		}
 	#endif
 	

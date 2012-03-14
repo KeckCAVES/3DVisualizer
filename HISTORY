@@ -93,3 +93,7 @@
   Modes menu.
 - Added direct handling of additional scene graphs, with ability to
   toggle visibility of individual scene graphs to Rendering Modes menu.
+
+3D Visualizer 1.10:
+- Added custom shader implementation of isosurface illumination model
+  for tremendous speed-ups on Nvidia Geforce-level cards.

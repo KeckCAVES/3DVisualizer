@@ -32,6 +32,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 /* Forward declarations: */
 class GLColorMap;
+#ifdef VISUALIZATION_USE_SHADERS
+class TwoSidedSurfaceShader;
+#endif
 
 namespace Visualization {
 
@@ -55,6 +58,9 @@ class Isosurface:public Visualization::Abstract::Element
 	private:
 	VScalar isovalue; // Isosurface's isovalue
 	const GLColorMap* colorMap; // Color map for isosurface vertex values
+	#ifdef VISUALIZATION_USE_SHADERS
+	TwoSidedSurfaceShader* shader; // Shader for the isosurface
+	#endif
 	Surface surface; // Representation of the isosurface
 	
 	/* Constructors and destructors: */

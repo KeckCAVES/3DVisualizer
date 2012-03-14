@@ -1,7 +1,7 @@
 ########################################################################
 # Makefile for 3D Visualizer, a generic visualization program for 3D
 # multivariate gridded data.
-# Copyright (c) 1999-2011 Oliver Kreylos
+# Copyright (c) 1999-2012 Oliver Kreylos
 #
 # This file is part of the WhyTools Build Environment.
 # 
@@ -25,7 +25,7 @@
 # matches the default Vrui installation; if Vrui's installation
 # directory was changed during Vrui's installation, the directory below
 # must be adapted.
-VRUI_MAKEDIR := $(HOME)/Vrui-2.2/share/make
+VRUI_MAKEDIR := $(HOME)/Vrui-2.3/share/make
 
 # Base installation directory for 3D Visualizer and its module
 # plug-ins. The module plug-ins cannot be moved from this location
@@ -70,6 +70,7 @@ MODULE_NAMES = SphericalASCIIFile \
 # List of other available modules:
 # Add any of these to the MODULE_NAMES list to build them
 UNSUPPORTED_MODULE_NAMES = AnalyzeFile \
+                           AvsUcdAsciiFile \
                            ByteVolFile \
                            GaleFEMVectorFile \
                            GocadVoxetFile \
@@ -100,7 +101,7 @@ PACKAGEROOT := $(shell pwd)
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.9
+VERSION = 1.10
 
 # Set up resource directories: */
 PLUGINSDIREXT = 3DVisualizer-$(VERSION)
@@ -132,13 +133,16 @@ LIBDESTDIR := $(PACKAGEROOT)/$(MYLIBEXT)
 PLUGINDESTDIR := $(LIBDESTDIR)/$(PLUGINSDIREXT)
 ifneq ($(USE_COLLABORATION),0)
   COLLABORATIONPLUGINDESTDIR := $(LIBDESTDIR)/CollaborationPlugins
+  
+  # Collaboration plug-ins are installed into Vrui's plug-in
+  # installation directory, not 3D Visualizer's:
+  COLLABORATIONPLUGININSTALLDIR := $(PLUGININSTALLDIR)/$(COLLABORATIONPLUGINSDIREXT)
 endif
 
 # Set up installation directory structure:
 EXECUTABLEINSTALLDIR = $(INSTALLDIR)/$(EXEDIR)
 PLUGININSTALLDIR = $(INSTALLDIR)/$(MYLIBEXT)/$(PLUGINSDIREXT)
 SHAREINSTALLDIR = $(INSTALLDIR)/$(RESOURCEDIR)
-COLLABORATIONPLUGININSTALLDIR = $(PLUGININSTALLDIR)/$(COLLABORATIONPLUGINSDIREXT)
 
 ########################################################################
 # Specify additional compiler and linker flags
@@ -266,7 +270,8 @@ VISUALIZER_SOURCES = $(ABSTRACT_SOURCES) \
                      PaletteEditor.cpp \
                      Visualizer.cpp
 ifneq ($(USE_SHADERS),0)
-  VISUALIZER_SOURCES += Polyhedron.cpp \
+  VISUALIZER_SOURCES += TwoSidedSurfaceShader.cpp \
+                        Polyhedron.cpp \
                         Raycaster.cpp \
                         SingleChannelRaycaster.cpp \
                         TripleChannelRaycaster.cpp
