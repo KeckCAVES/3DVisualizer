@@ -1,7 +1,7 @@
 ########################################################################
 # Makefile for 3D Visualizer, a generic visualization program for 3D
 # multivariate gridded data.
-# Copyright (c) 1999-2013 Oliver Kreylos
+# Copyright (c) 1999-2012 Oliver Kreylos
 #
 # This file is part of the WhyTools Build Environment.
 # 
@@ -25,10 +25,7 @@
 # matches the default Vrui installation; if Vrui's installation
 # directory was changed during Vrui's installation, the directory below
 # must be adapted.
-VRUI_MAKEDIR := $(HOME)/Vrui-3.0/share/make
-ifdef DEBUG
-  VRUI_MAKEDIR := $(VRUI_MAKEDIR)/debug
-endif
+VRUI_MAKEDIR := $(HOME)/Vrui-2.4/share/make
 
 # Base installation directory for 3D Visualizer and its module
 # plug-ins. The module plug-ins cannot be moved from this location
@@ -105,7 +102,7 @@ PACKAGEROOT := $(shell pwd)
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.14
+VERSION = 1.11
 
 # Set up resource directories: */
 PLUGINSDIREXT = 3DVisualizer-$(VERSION)
@@ -276,7 +273,6 @@ VISUALIZER_SOURCES = $(ABSTRACT_SOURCES) \
                      Visualizer.cpp
 ifneq ($(USE_SHADERS),0)
   VISUALIZER_SOURCES += TwoSidedSurfaceShader.cpp \
-                        TwoSided1DTexturedSurfaceShader.cpp \
                         Polyhedron.cpp \
                         Raycaster.cpp \
                         SingleChannelRaycaster.cpp \
@@ -341,10 +337,10 @@ endif
 $(call MODULENAME,%): $(OBJDIR)/pic/Concrete/%.o
 	@mkdir -p $(PLUGINDESTDIR)
 ifdef SHOWCOMMAND
-	$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $(filter %.o,$^) $(LINKDIRFLAGS) $(LINKLIBFLAGS)
+	$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $^ $(LINKDIRFLAGS) $(LINKLIBFLAGS)
 else
 	@echo Linking $@...
-	@$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $(filter %.o,$^) $(LINKDIRFLAGS) $(LINKLIBFLAGS)
+	@$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $^ $(LINKDIRFLAGS) $(LINKLIBFLAGS)
 endif
 
 # Dependencies and special flags for visualization modules:
@@ -375,10 +371,10 @@ $(call COLLABORATIONPLUGINNAME,%): PACKAGES += MYCOLLABORATIONSERVER
 $(call COLLABORATIONPLUGINNAME,%): $(OBJDIR)/pic/%.o
 	@mkdir -p $(COLLABORATIONPLUGINDESTDIR)
 ifdef SHOWCOMMAND
-	$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $(filter %.o,$^) $(LINKDIRFLAGS) $(LINKLIBFLAGS)
+	$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $^ $(LINKDIRFLAGS) $(LINKLIBFLAGS)
 else
 	@echo Linking $@...
-	@$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $(filter %.o,$^) $(LINKDIRFLAGS) $(LINKLIBFLAGS)
+	@$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $^ $(LINKDIRFLAGS) $(LINKLIBFLAGS)
 endif
 
 $(call COLLABORATIONPLUGINNAME,SharedVisualizationServer): $(OBJDIR)/pic/SharedVisualizationProtocol.o \

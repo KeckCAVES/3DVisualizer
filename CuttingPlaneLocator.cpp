@@ -34,7 +34,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 Methods of class CuttingPlaneLocator:
 ************************************/
 
-CuttingPlaneLocator::CuttingPlaneLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,const Misc::ConfigurationFileSection* cfg)
+CuttingPlaneLocator::CuttingPlaneLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg)
 	:BaseLocator(sLocatorTool,sApplication),
 	 cuttingPlane(0)
 	{

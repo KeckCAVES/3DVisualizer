@@ -108,7 +108,7 @@ class ArrayReader:public ReaderBase // Generic class for array values that can b
 	/* Methods from ReaderBase: */
 	virtual void read(const std::string& string) const
 		{
-		Misc::FixedArrayValueCoder<Data>(elements,numElements).decode(string.data(),string.data()+string.length());
+		Misc::FixedArrayValueCoder<Data>::decode(elements,numElements,string.data(),string.data()+string.length());
 		}
 	virtual void read(IO::File& file) const
 		{

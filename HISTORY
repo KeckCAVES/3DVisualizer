@@ -116,20 +116,3 @@
   cluster environments.
 - Added module class SCTFile for Cartesian single-channel volumetric
   data sets created by LLNL-developed reprojection code.
-
-3D Visualizer 1.12:
-- Bumped required Vrui version number to 2.5-001.
-- Fixed line parser error in StructuredHexahedralTecplotASCIIFile.
-- Small changes to build system in line with Vrui.
-- Fixed build error; forgot an object file. Pointed out by Rob Porritt.
-
-3D Visualizer 1.13:
-- Fixed matrix stack handling error in Visualizer::display that affected
-  rendering of embedded scene graphs.
-- Bumped required Vrui version number to 2.7-001.
-- Improved variable manager to properly handle "empty" scalar value
-  ranges.
-
-3D Visualizer 1.14:
-- Improved background frame buffer management in Raycaster.
-- Bumped required Vrui version number to 3.0-002.

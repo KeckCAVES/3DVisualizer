@@ -3,7 +3,7 @@ ConfigurationFileParametersSource - Class for parameter sources reading
 from a configuration file section.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2010-2013 Oliver Kreylos
+Copyright (c) 2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -41,11 +41,11 @@ class ConfigurationFileParametersSource:public ParametersSource
 	{
 	/* Elements: */
 	private:
-	const Misc::ConfigurationFileSection& cfg; // The configuration file section from which to read
+	Misc::ConfigurationFileSection& cfg; // The configuration file section from which to read
 	
 	/* Constructors and destructors: */
 	public:
-	ConfigurationFileParametersSource(VariableManager* sVariableManager,const Misc::ConfigurationFileSection& sCfg);
+	ConfigurationFileParametersSource(VariableManager* sVariableManager,Misc::ConfigurationFileSection& sCfg);
 	
 	/* Methods from ParametersSource: */
 	virtual void read(const char* name,const ReaderBase& value);

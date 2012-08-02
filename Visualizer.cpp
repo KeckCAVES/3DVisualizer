@@ -1,7 +1,7 @@
 /***********************************************************************
 Visualizer - Test application for the new visualization component
 framework.
-Copyright (c) 2005-2013 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -56,13 +56,12 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/TextField.h>
 #include <GLMotif/Button.h>
 #include <GLMotif/CascadeButton.h>
-#include <SceneGraph/GLRenderState.h>
 #include <SceneGraph/NodeCreator.h>
 #include <SceneGraph/VRMLFile.h>
+#include <SceneGraph/GLRenderState.h>
 #include <Vrui/Vrui.h>
 #include <Vrui/CoordinateManager.h>
 #include <Vrui/OpenFile.h>
-#include <Vrui/SceneGraphSupport.h>
 #ifdef VISUALIZER_USE_COLLABORATION
 #include <Collaboration/CollaborationClient.h>
 #endif
@@ -838,8 +837,7 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	coordinateTransformer=dataSet->getCoordinateTransformer();
 	
 	/* Set Vrui's application unit: */
-	if(dataSet->getUnit().unit!=Geometry::LinearUnit::UNKNOWN)
-		Vrui::getCoordinateManager()->setUnit(dataSet->getUnit());
+	Vrui::getCoordinateManager()->setUnit(dataSet->getUnit());
 	
 	/* Create cutting planes: */
 	numCuttingPlanes=6;
@@ -1053,19 +1051,22 @@ void Visualizer::frame(void)
 
 void Visualizer::display(GLContextData& contextData) const
 	{
-	#ifdef VISUALIZER_USE_COLLABORATION
-	if(collaborationClient!=0)
-		{
-		/* Call the collaboration client's display method: */
-		collaborationClient->display(contextData);
-		}
-	#endif
-	
 	/* Create an OpenGL state tracker: */
 	GLRenderState renderState(contextData);
 	
 	/* Prepare the variable manager for a rendering pass: */
 	variableManager->beginRenderPass(renderState);
+	
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		{
+		/* Associate the render state with the shared visualization protocol client's context data item: */
+		sharedVisualizationClient->associateRenderState(contextData,renderState);
+		
+		/* Call the collaboration client's display method: */
+		collaborationClient->display(contextData);
+		}
+	#endif
 	
 	/* Highlight all locators: */
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
@@ -1094,32 +1095,21 @@ void Visualizer::display(GLContextData& contextData) const
 	elementList->renderElements(renderState,false);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->renderLocator(renderState);
-	#ifdef VISUALIZER_USE_COLLABORATION
-	if(collaborationClient!=0)
-		sharedVisualizationClient->drawLocators(renderState,false);
-	#endif
 	
 	if(renderSceneGraphs)
 		{
 		/* Save OpenGL state: */
 		glPushAttrib(GL_ENABLE_BIT|GL_LIGHTING_BIT|GL_TEXTURE_BIT);
 		
-		/* Save the modelview matrix: */
-		renderState.setMatrixMode(1);
-		glPushMatrix();
-		
-		/* Create a render state to traverse the scene graphs: */
-		SceneGraph::GLRenderState* sgRenderState=Vrui::createRenderState(true,contextData);
+		/* Create a render state to traverse the scene graph: */
+		SceneGraph::GLRenderState renderState(contextData,Vrui::getHeadPosition(),Vrui::getInverseNavigationTransformation().transform(Vrui::getUpDirection()));
 		
 		/* Render all additional scene graphs: */
 		for(std::vector<SG>::const_iterator sgIt=sceneGraphs.begin();sgIt!=sceneGraphs.end();++sgIt)
 			if(sgIt->render)
-				sgIt->root->glRenderAction(*sgRenderState);
-		
-		delete sgRenderState;
+				sgIt->root->glRenderAction(renderState);
 		
 		/* Restore OpenGL state: */
-		glPopMatrix();
 		glPopAttrib();
 		}
 	
@@ -1127,10 +1117,6 @@ void Visualizer::display(GLContextData& contextData) const
 	elementList->renderElements(renderState,true);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->renderLocatorTransparent(renderState);
-	#ifdef VISUALIZER_USE_COLLABORATION
-	if(collaborationClient!=0)
-		sharedVisualizationClient->drawLocators(renderState,true);
-	#endif
 	
 	if(renderDataSet)
 		{

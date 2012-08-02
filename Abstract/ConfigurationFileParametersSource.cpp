@@ -3,7 +3,7 @@ ConfigurationFileParametersSource - Class for parameter sources reading
 from a configuration file section.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2010-2013 Oliver Kreylos
+Copyright (c) 2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -35,7 +35,7 @@ namespace Abstract {
 Methods of class ConfigurationFileParametersSource:
 **************************************************/
 
-ConfigurationFileParametersSource::ConfigurationFileParametersSource(VariableManager* sVariableManager,const Misc::ConfigurationFileSection& sCfg)
+ConfigurationFileParametersSource::ConfigurationFileParametersSource(VariableManager* sVariableManager,Misc::ConfigurationFileSection& sCfg)
 	:ParametersSource(sVariableManager),
 	 cfg(sCfg)
 	{
