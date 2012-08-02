@@ -1,7 +1,7 @@
 /***********************************************************************
 EarthRenderer - Class to render a configurable model of Earth using
 transparent surfaces and several interior components.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,6 +20,8 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Concrete/EarthRenderer.h>
+
 #include <Math/Math.h>
 #include <Math/Constants.h>
 #include <GL/gl.h>
@@ -30,7 +32,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Images/RGBImage.h>
 #include <Images/ReadImageFile.h>
 
-#include <Concrete/EarthRenderer.h>
+#include <GLRenderState.h>
 
 namespace Visualization {
 
@@ -408,38 +410,47 @@ void EarthRenderer::setInnerCoreOpacity(float newInnerCoreOpacity)
 	innerCoreMaterial.diffuse[3]=innerCoreOpacity;
 	}
 
-void EarthRenderer::glRenderAction(GLContextData& contextData) const
+void EarthRenderer::glRenderAction(GLRenderState& renderState) const
 	{
 	/* Get context data item: */
-	DataItem* dataItem=contextData.retrieveDataItem<DataItem>(this);
+	DataItem* dataItem=renderState.getContextData().retrieveDataItem<DataItem>(this);
 	
 	/* Save OpenGL state: */
-	glPushAttrib(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_LIGHTING_BIT|GL_POLYGON_BIT);
+	glPushAttrib(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 	
 	/* Render all opaque surfaces: */
-	glDisable(GL_CULL_FACE);
-	glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,GL_TRUE);
+	renderState.disableCulling();
+	if(surfaceOpacity>0.0f)
+		{
+		/* Reset the texture matrix: */
+		renderState.setMatrixMode(2);
+		glLoadIdentity();
+		renderState.updateMatrix();
+		}
 	if(surfaceOpacity==1.0f)
 		{
 		/* Set up OpenGL to render the Earth's surface: */
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D,dataItem->surfaceTextureObjectId);
-		glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
-		glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL,GL_SEPARATE_SPECULAR_COLOR);
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.disableColorMaterial();
 		glMaterial(GLMaterialEnums::FRONT_AND_BACK,surfaceMaterial);
+		renderState.setTextureLevel(2);
+		renderState.bindTexture(dataItem->surfaceTextureObjectId);
+		renderState.setTextureMode(GL_MODULATE);
+		renderState.setSeparateSpecularColor(true);
 		
 		/* Render the Earth's surface: */
 		renderSurface(dataItem);
-		
-		/* Reset OpenGL state: */
-		glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL,GL_SINGLE_COLOR);
-		glBindTexture(GL_TEXTURE_2D,0);
-		glDisable(GL_TEXTURE_2D);
 		}
 	if(outerCoreOpacity==1.0f)
 		{
 		/* Set up OpenGL to render the outer core: */
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.disableColorMaterial();
 		glMaterial(GLMaterialEnums::FRONT_AND_BACK,outerCoreMaterial);
+		renderState.setTextureLevel(0);
+		renderState.setSeparateSpecularColor(false);
 		
 		/* Render the outer core: */
 		renderOuterCore(dataItem);
@@ -447,54 +458,59 @@ void EarthRenderer::glRenderAction(GLContextData& contextData) const
 	if(innerCoreOpacity==1.0f)
 		{
 		/* Set up OpenGL to render the inner core: */
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.disableColorMaterial();
 		glMaterial(GLMaterialEnums::FRONT_AND_BACK,innerCoreMaterial);
+		renderState.setTextureLevel(0);
+		renderState.setSeparateSpecularColor(false);
 		
 		/* Render the inner core: */
 		renderInnerCore(dataItem);
 		}
 	
 	/* Render transparent surfaces in back-to-front order: */
-	glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 	glDepthMask(GL_FALSE);
 	
 	/* Render back parts of surfaces: */
-	glCullFace(GL_FRONT);
+	renderState.enableCulling(GL_FRONT);
 	if(surfaceOpacity>0.0f&&surfaceOpacity<1.0f)
 		{
 		/* Set up OpenGL to render the Earth's surface: */
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D,dataItem->surfaceTextureObjectId);
-		glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
-		glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL,GL_SEPARATE_SPECULAR_COLOR);
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.disableColorMaterial();
 		glMaterial(GLMaterialEnums::FRONT_AND_BACK,surfaceMaterial);
+		renderState.setTextureLevel(2);
+		renderState.bindTexture(dataItem->surfaceTextureObjectId);
+		renderState.setTextureMode(GL_MODULATE);
+		renderState.setSeparateSpecularColor(true);
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 		
 		/* Render the Earth's surface: */
 		renderSurface(dataItem);
-		
-		/* Reset OpenGL state: */
-		glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL,GL_SINGLE_COLOR);
-		glBindTexture(GL_TEXTURE_2D,0);
-		glDisable(GL_TEXTURE_2D);
 		}
 	if(gridOpacity>0.0f&&gridOpacity<1.0f)
 		{
-		glDisable(GL_LIGHTING);
+		renderState.setLineWidth(1.0f);
+		renderState.setLighting(false);
 		glBlendFunc(GL_SRC_ALPHA,GL_ONE);
-		glLineWidth(gridLineWidth);
 		glColor(gridColor);
 		
 		/* Render the latitude/longitude grid: */
 		renderGrid(dataItem);
-		
-		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-		glEnable(GL_LIGHTING);
 		}
 	if(outerCoreOpacity>0.0f&&outerCoreOpacity<1.0f)
 		{
 		/* Set up OpenGL to render the outer core: */
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.disableColorMaterial();
 		glMaterial(GLMaterialEnums::FRONT_AND_BACK,outerCoreMaterial);
+		renderState.setTextureLevel(0);
+		renderState.setSeparateSpecularColor(false);
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 		
 		/* Render the outer core: */
 		renderOuterCore(dataItem);
@@ -502,18 +518,30 @@ void EarthRenderer::glRenderAction(GLContextData& contextData) const
 	if(innerCoreOpacity>0.0f&&innerCoreOpacity<1.0f)
 		{
 		/* Set up OpenGL to render the inner core: */
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.disableColorMaterial();
 		glMaterial(GLMaterialEnums::FRONT_AND_BACK,innerCoreMaterial);
+		renderState.setTextureLevel(0);
+		renderState.setSeparateSpecularColor(false);
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 		
 		/* Render the inner core: */
 		renderInnerCore(dataItem);
 		}
 	
 	/* Render front parts of surfaces: */
-	glCullFace(GL_BACK);
+	renderState.enableCulling(GL_BACK);
 	if(innerCoreOpacity>0.0f&&innerCoreOpacity<1.0f)
 		{
 		/* Set up OpenGL to render the inner core: */
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.disableColorMaterial();
 		glMaterial(GLMaterialEnums::FRONT_AND_BACK,innerCoreMaterial);
+		renderState.setTextureLevel(0);
+		renderState.setSeparateSpecularColor(false);
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 		
 		/* Render the inner core: */
 		renderInnerCore(dataItem);
@@ -521,7 +549,13 @@ void EarthRenderer::glRenderAction(GLContextData& contextData) const
 	if(outerCoreOpacity>0.0f&&outerCoreOpacity<1.0f)
 		{
 		/* Set up OpenGL to render the outer core: */
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.disableColorMaterial();
 		glMaterial(GLMaterialEnums::FRONT_AND_BACK,outerCoreMaterial);
+		renderState.setTextureLevel(0);
+		renderState.setSeparateSpecularColor(false);
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 		
 		/* Render the outer core: */
 		renderOuterCore(dataItem);
@@ -529,25 +563,19 @@ void EarthRenderer::glRenderAction(GLContextData& contextData) const
 	if(surfaceOpacity>0.0f&&surfaceOpacity<1.0f)
 		{
 		/* Set up OpenGL to render the Earth's surface: */
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D,dataItem->surfaceTextureObjectId);
-		glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_MODULATE);
-		glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL,GL_SEPARATE_SPECULAR_COLOR);
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.disableColorMaterial();
 		glMaterial(GLMaterialEnums::FRONT_AND_BACK,surfaceMaterial);
+		renderState.setTextureLevel(2);
+		renderState.bindTexture(dataItem->surfaceTextureObjectId);
+		renderState.setTextureMode(GL_MODULATE);
+		renderState.setSeparateSpecularColor(true);
+		glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
 		
 		/* Render the Earth's surface: */
 		renderSurface(dataItem);
-		
-		/* Reset OpenGL state: */
-		glLightModeli(GL_LIGHT_MODEL_COLOR_CONTROL,GL_SINGLE_COLOR);
-		glBindTexture(GL_TEXTURE_2D,0);
-		glDisable(GL_TEXTURE_2D);
 		}
-	
-	/* Disable blending: */
-	glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,GL_FALSE);
-	glDepthMask(GL_TRUE);
-	glDisable(GL_BLEND);
 	
 	/* Restore OpenGL state: */
 	glPopAttrib();

@@ -2,7 +2,7 @@
 SharedVisualizationClient - Client for collaborative data exploration in
 spatially distributed VR environments, implemented as a plug-in of the
 Vrui remote collaboration infrastructure.
-Copyright (c) 2009-2011 Oliver Kreylos
+Copyright (c) 2009-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iostream>
 #include <Comm/NetPipe.h>
 #include <Cluster/MulticastPipe.h>
+#include <GL/GLContextData.h>
 #include <Vrui/Vrui.h>
 
 #include <Abstract/VariableManager.h>
@@ -38,6 +39,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/Element.h>
 #include <Abstract/Module.h>
 
+#include "GLRenderState.h"
 #include "Visualizer.h"
 #include "ExtractorLocator.h"
 #include "ElementList.h"
@@ -90,6 +92,19 @@ SharedVisualizationClient::RemoteClientState::~RemoteClientState(void)
 	/* Delete all remote locators: */
 	for(RemoteLocatorHash::Iterator lIt=locators.begin();!lIt.isFinished();++lIt)
 		delete lIt->getDest();
+	}
+
+/****************************************************
+Methods of class SharedVisualizationClient::DataItem:
+****************************************************/
+
+SharedVisualizationClient::DataItem::DataItem(void)
+	:currentRenderState(0)
+	{
+	}
+
+SharedVisualizationClient::DataItem::~DataItem(void)
+	{
 	}
 
 /******************************************
@@ -427,12 +442,21 @@ void SharedVisualizationClient::glRenderAction(const Collaboration::ProtocolClie
 	if(myRcs==0)
 		Misc::throwStdErr("SharedVisualizationClient::display: Mismatching remote client state object type");
 	
+	/* Retrieve a pointer to the render state from the context data item: */
+	GLRenderState& renderState=*(contextData.retrieveDataItem<DataItem>(this)->currentRenderState);
+	
 	/* Display the client's remote locators which have opaque current elements: */
 	{
 	Threads::Mutex::Lock locatorLock(myRcs->locatorMutex);
 	for(RemoteLocatorHash::ConstIterator lIt=myRcs->locators.begin();!lIt.isFinished();++lIt)
-		lIt->getDest()->draw(contextData,false);
+		lIt->getDest()->glRenderAction(renderState,false);
 	}
+	}
+
+void SharedVisualizationClient::initContext(GLContextData& contextData) const
+	{
+	/* Create a new data item and associate it with the given OpenGL context: */
+	contextData.addDataItem(this,new DataItem);
 	}
 
 void SharedVisualizationClient::createLocator(ExtractorLocator* locator)
@@ -499,4 +523,10 @@ void SharedVisualizationClient::destroyLocator(ExtractorLocator* locator)
 	/* Enqueue a locator list action: */
 	actions.push_back(LocatorAction(DESTROY_LOCATOR,locatorIt,0));
 	}
+	}
+
+void SharedVisualizationClient::associateRenderState(GLContextData& contextData,GLRenderState& renderState) const
+	{
+	/* Store a pointer to the render state in the context data item: */
+	contextData.retrieveDataItem<DataItem>(this)->currentRenderState=&renderState;
 	}

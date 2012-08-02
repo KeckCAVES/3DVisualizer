@@ -1,7 +1,7 @@
 /***********************************************************************
 EarthRenderer - Class to render a configurable model of Earth using
 transparent surfaces and several interior components.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -28,6 +28,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLColor.h>
 #include <GL/GLMaterial.h>
 #include <GL/GLObject.h>
+
+/* Forward declarations: */
+class GLRenderState;
 
 namespace Visualization {
 
@@ -89,7 +92,10 @@ class EarthRenderer:public GLObject
 	public:
 	EarthRenderer(double sScaleFactor);
 	
-	/* Methods: */
+	/* Methods from GLObject: */
+	virtual void initContext(GLContextData& contextData) const;
+	
+	/* New methods: */
 	static const double getRadius(void)
 		{
 		return a;
@@ -98,7 +104,6 @@ class EarthRenderer:public GLObject
 		{
 		return flatteningFactor;
 		}
-	virtual void initContext(GLContextData& contextData) const;
 	void setScaleFactor(double newScaleFactor);
 	void setFlatteningFactor(double newF);
 	void setSurfaceDetail(int newSurfaceDetail);
@@ -114,7 +119,7 @@ class EarthRenderer:public GLObject
 	void setInnerCoreDetail(int newInnerCoreDetail);
 	void setInnerCoreMaterial(const GLMaterial& newInnerCoreMaterial);
 	void setInnerCoreOpacity(float newInnerCoreOpacity);
-	void glRenderAction(GLContextData& contextData) const;
+	void glRenderAction(GLRenderState& renderState) const;
 	};
 
 }

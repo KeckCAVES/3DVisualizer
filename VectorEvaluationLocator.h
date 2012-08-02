@@ -1,7 +1,7 @@
 /***********************************************************************
 VectorEvaluationLocator - Class for locators evaluating vector
 properties of data sets.
-Copyright (c) 2008-2010 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -65,7 +65,7 @@ class VectorEvaluationLocator:public EvaluationLocator
 	virtual void motionCallback(Vrui::LocatorTool::MotionCallbackData* cbData);
 	
 	/* Methods from class BaseLocator: */
-	virtual void highlightLocator(GLContextData& contextData) const;
+	virtual void highlightLocator(GLRenderState& renderState) const;
 	
 	/* New methods: */
 	void arrowScaleCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);

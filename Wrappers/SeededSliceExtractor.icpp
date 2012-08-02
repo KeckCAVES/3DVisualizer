@@ -2,7 +2,7 @@
 SeededSliceExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized slice extractor
 implementation.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -182,7 +182,7 @@ SeededSliceExtractor<DataSetWrapperParam>::createElement(
 	int svi=myParameters->scalarVariableIndex;
 	
 	/* Create a new slice visualization element: */
-	Slice* result=new Slice(myParameters,getVariableManager()->getColorMap(svi),getPipe());
+	Slice* result=new Slice(getVariableManager(),myParameters,svi,getPipe());
 	
 	/* Update the slice extractor: */
 	sle.update(getDs(getVariableManager()->getDataSetByScalarVariable(svi)),getSe(getVariableManager()->getScalarExtractor(svi)));
@@ -210,7 +210,7 @@ SeededSliceExtractor<DataSetWrapperParam>::startElement(
 	int svi=myParameters->scalarVariableIndex;
 	
 	/* Create a new slice visualization element: */
-	currentSlice=new Slice(myParameters,getVariableManager()->getColorMap(svi),getPipe());
+	currentSlice=new Slice(getVariableManager(),myParameters,svi,getPipe());
 	
 	/* Update the slice extractor: */
 	sle.update(getDs(getVariableManager()->getDataSetByScalarVariable(svi)),getSe(getVariableManager()->getScalarExtractor(svi)));
@@ -258,7 +258,7 @@ SeededSliceExtractor<DataSetWrapperParam>::startSlaveElement(
 		Misc::throwStdErr("SeededSliceExtractor::startSlaveElement: Mismatching parameter object type");
 	
 	/* Create a new slice visualization element: */
-	currentSlice=new Slice(myParameters,getVariableManager()->getColorMap(myParameters->scalarVariableIndex),getPipe());
+	currentSlice=new Slice(getVariableManager(),myParameters,myParameters->scalarVariableIndex,getPipe());
 	
 	return currentSlice.getPointer();
 	}

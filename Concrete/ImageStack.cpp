@@ -243,7 +243,9 @@ Visualization::Abstract::DataSet* ImageStack::load(const std::vector<std::string
 	
 	/* Open the meta file: */
 	IO::ValueSource metaSource(openFile(args[0],pipe));
-	metaSource.setPunctuation("=");
+	metaSource.setPunctuation("#=");
+	metaSource.setQuote('"',true);
+	metaSource.setEscape('\\');
 	metaSource.skipWs();
 	
 	/* Parse the image stack layout: */
@@ -258,6 +260,17 @@ Visualization::Abstract::DataSet* ImageStack::load(const std::vector<std::string
 		{
 		/* Read the tag: */
 		std::string tag=metaSource.readString();
+		
+		/* Check for comments: */
+		if(tag=="#")
+			{
+			/* Skip the rest of the line: */
+			metaSource.skipLine();
+			metaSource.skipWs();
+			
+			/* Read the next tag: */
+			continue;
+			}
 		
 		/* Check for the equal sign: */
 		if(!metaSource.isLiteral('='))
@@ -317,7 +330,7 @@ Visualization::Abstract::DataSet* ImageStack::load(const std::vector<std::string
 		fullSliceFileName=getFullPath(fullSliceFileName);
 		
 		/* Load the slice as an RGB image: */
-		Images::RGBImage slice=Images::readImageFile(fullSliceFileName.c_str());
+		Images::RGBImage slice=Images::readImageFile(fullSliceFileName.c_str(),openFile(fullSliceFileName,pipe));
 		
 		/* Check if the slice conforms: */
 		if(slice.getSize(0)<(unsigned int)(regionOrigin[0]+numVertices[2])||slice.getSize(1)<(unsigned int)(regionOrigin[1]+numVertices[1]))

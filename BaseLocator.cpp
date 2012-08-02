@@ -1,6 +1,6 @@
 /***********************************************************************
 BaseLocator - Base class for locators in visualizer application.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -31,17 +31,17 @@ BaseLocator::BaseLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplicatio
 	{
 	}
 
-void BaseLocator::highlightLocator(GLContextData& contextData) const
+void BaseLocator::highlightLocator(GLRenderState& renderState) const
 	{
 	/* Render nothing */
 	}
 
-void BaseLocator::glRenderAction(GLContextData& contextData) const
+void BaseLocator::renderLocator(GLRenderState& renderState) const
 	{
 	/* Render nothing */
 	}
 
-void BaseLocator::glRenderActionTransparent(GLContextData& contextData) const
+void BaseLocator::renderLocatorTransparent(GLRenderState& renderState) const
 	{
 	/* Render nothing */
 	}

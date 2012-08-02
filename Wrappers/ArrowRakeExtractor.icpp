@@ -1,7 +1,7 @@
 /***********************************************************************
 ArrowRakeExtractor - Wrapper class extract rakes of arrows from vector
 fields.
-Copyright (c) 2008-2011 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -308,7 +308,7 @@ ArrowRakeExtractor<DataSetWrapperParam>::createElement(
 	int csvi=myParameters->colorScalarVariableIndex;
 	
 	/* Create a new arrow rake visualization element: */
-	ArrowRake* result=new ArrowRake(myParameters,myParameters->rakeSize,myParameters->lengthScale,myParameters->shaftRadius,myParameters->numArrowVertices,getVariableManager()->getColorMap(csvi),getPipe());
+	ArrowRake* result=new ArrowRake(getVariableManager(),myParameters,csvi,myParameters->rakeSize,myParameters->lengthScale,myParameters->shaftRadius,myParameters->numArrowVertices,getPipe());
 	
 	/* Calculate the arrow base points and directions: */
 	for(Index index(0);index[0]<myParameters->rakeSize[0];index.preInc(myParameters->rakeSize))
@@ -343,7 +343,7 @@ ArrowRakeExtractor<DataSetWrapperParam>::startElement(
 	int csvi=myParameters->colorScalarVariableIndex;
 	
 	/* Create a new arrow rake visualization element: */
-	currentArrowRake=new ArrowRake(myParameters,myParameters->rakeSize,myParameters->lengthScale,myParameters->shaftRadius,myParameters->numArrowVertices,getVariableManager()->getColorMap(csvi),getPipe());
+	currentArrowRake=new ArrowRake(getVariableManager(),myParameters,csvi,myParameters->rakeSize,myParameters->lengthScale,myParameters->shaftRadius,myParameters->numArrowVertices,getPipe());
 	
 	/* Remember the parameter object: */
 	currentParameters=myParameters;
@@ -403,7 +403,7 @@ ArrowRakeExtractor<DataSetWrapperParam>::startSlaveElement(
 	int csvi=myParameters->colorScalarVariableIndex;
 	
 	/* Create a new arrow rake visualization element: */
-	currentArrowRake=new ArrowRake(myParameters,myParameters->rakeSize,myParameters->lengthScale,myParameters->shaftRadius,myParameters->numArrowVertices,getVariableManager()->getColorMap(csvi),getPipe());
+	currentArrowRake=new ArrowRake(getVariableManager(),myParameters,csvi,myParameters->rakeSize,myParameters->lengthScale,myParameters->shaftRadius,myParameters->numArrowVertices,getPipe());
 	
 	return currentArrowRake.getPointer();
 	}

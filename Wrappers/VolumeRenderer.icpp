@@ -3,7 +3,7 @@ VolumeRenderer - Wrapper class for volume renderers as visualization
 elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -42,6 +42,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Templatized/VolumeRenderingSampler.h>
 #include <Wrappers/VolumeRendererExtractor.h>
 
+#include <GLRenderState.h>
 #ifdef VISUALIZATION_USE_SHADERS
 #include <SingleChannelRaycaster.h>
 #else
@@ -61,7 +62,7 @@ inline
 VolumeRenderer<DataSetWrapperParam>::VolumeRenderer(
 	Visualization::Abstract::Algorithm* algorithm,
 	Visualization::Abstract::Parameters* sParameters)
-	:Visualization::Abstract::Element(sParameters),
+	:Visualization::Abstract::Element(algorithm->getVariableManager(),sParameters),
 	 #ifndef VISUALIZATION_USE_SHADERS
 	 colorMap(0),
 	 #endif
@@ -79,15 +80,15 @@ VolumeRenderer<DataSetWrapperParam>::VolumeRenderer(
 	
 	/* Get a reference to the templatized data set: */
 	Visualization::Abstract::VariableManager* variableManager=algorithm->getVariableManager();
-	int svi=myParameters->scalarVariableIndex;
-	const Visualization::Abstract::DataSet* dataSet=variableManager->getDataSetByScalarVariable(svi);
+	scalarVariableIndex=myParameters->scalarVariableIndex;
+	const Visualization::Abstract::DataSet* dataSet=variableManager->getDataSetByScalarVariable(scalarVariableIndex);
 	const DataSetWrapper* myDataSet=dynamic_cast<const DataSetWrapper*>(dataSet);
 	if(myDataSet==0)
 		Misc::throwStdErr("VolumeRenderer: Mismatching data set type");
 	const DS& ds=myDataSet->getDs();
 	
 	/* Get a scalar extractor for the scalar variable: */
-	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(variableManager->getScalarExtractor(svi));
+	const ScalarExtractor* myScalarExtractor=dynamic_cast<const ScalarExtractor*>(variableManager->getScalarExtractor(scalarVariableIndex));
 	if(myScalarExtractor==0)
 		Misc::throwStdErr("VolumeRenderer: Mismatching scalar extractor type");
 	const SE& se=myScalarExtractor->getSe();
@@ -97,8 +98,8 @@ VolumeRenderer<DataSetWrapperParam>::VolumeRenderer(
 	VRS sampler(ds);
 	
 	/* Get the scalar value range: */
-	typename SE::Scalar minValue=typename SE::Scalar(variableManager->getScalarValueRange(svi).first);
-	typename SE::Scalar maxValue=typename SE::Scalar(variableManager->getScalarValueRange(svi).second);
+	typename SE::Scalar minValue=typename SE::Scalar(variableManager->getScalarValueRange(scalarVariableIndex).first);
+	typename SE::Scalar maxValue=typename SE::Scalar(variableManager->getScalarValueRange(scalarVariableIndex).second);
 	
 	#ifdef VISUALIZATION_USE_SHADERS
 	
@@ -111,7 +112,7 @@ VolumeRenderer<DataSetWrapperParam>::VolumeRenderer(
 	renderer->updateData();
 	
 	/* Set the raycaster's parameters: */
-	renderer->setColorMap(variableManager->getColorMap(svi));
+	renderer->setColorMap(variableManager->getColorMap(scalarVariableIndex));
 	renderer->setTransparencyGamma(myParameters->transparencyGamma);
 	renderer->setStepSize(myParameters->sliceFactor);
 	
@@ -149,7 +150,7 @@ VolumeRenderer<DataSetWrapperParam>::VolumeRenderer(
 	renderer->setSharePalette(false);
 	
 	/* Set the volume renderer's parameters: */
-	colorMap=variableManager->getColorMap(svi);
+	colorMap=variableManager->getColorMap(scalarVariableIndex);
 	transparencyGamma=1.0f;
 	
 	#endif
@@ -249,12 +250,12 @@ template <class DataSetWrapperParam>
 inline
 void
 VolumeRenderer<DataSetWrapperParam>::glRenderAction(
-	GLContextData& contextData) const
+	GLRenderState& renderState) const
 	{
 	#ifdef VISUALIZATION_USE_SHADERS
 	
 	/* Render the raycaster: */
-	renderer->glRenderAction(contextData);
+	renderer->glRenderAction(renderState.getContextData());
 	
 	#else
 	

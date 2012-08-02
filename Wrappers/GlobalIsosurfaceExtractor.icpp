@@ -2,7 +2,7 @@
 GlobalIsosurfaceExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized isosurface extractor
 implementation.
-Copyright (c) 2006-2011 Oliver Kreylos
+Copyright (c) 2006-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -221,7 +221,7 @@ GlobalIsosurfaceExtractor<DataSetWrapperParam>::createElement(
 	int svi=myParameters->scalarVariableIndex;
 	
 	/* Create a new isosurface visualization element: */
-	Isosurface* result=new Isosurface(myParameters,myParameters->isovalue,getVariableManager()->getColorMap(svi),getPipe());
+	Isosurface* result=new Isosurface(getVariableManager(),myParameters,svi,myParameters->isovalue,getPipe());
 	
 	/* Update the isosurface extractor: */
 	ise.update(getDs(getVariableManager()->getDataSetByScalarVariable(svi)),getSe(getVariableManager()->getScalarExtractor(svi)));
@@ -251,7 +251,7 @@ GlobalIsosurfaceExtractor<DataSetWrapperParam>::startSlaveElement(
 		Misc::throwStdErr("GlobalIsosurfaceExtractor::startSlaveElement: Mismatching parameter object type");
 	
 	/* Create a new isosurface visualization element: */
-	Isosurface* result=new Isosurface(myParameters,myParameters->isovalue,getVariableManager()->getColorMap(myParameters->scalarVariableIndex),getPipe());
+	Isosurface* result=new Isosurface(getVariableManager(),myParameters,myParameters->scalarVariableIndex,myParameters->isovalue,getPipe());
 	
 	/* Receive the isosurface from the master: */
 	result->getSurface().receive();

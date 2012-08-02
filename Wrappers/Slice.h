@@ -2,7 +2,7 @@
 Slice - Wrapper class for slices as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -32,9 +32,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/Element.h>
 #include <Templatized/IndexedTriangleSet.h>
 
-/* Forward declarations: */
-class GLColorMap;
-
 namespace Visualization {
 
 namespace Wrappers {
@@ -55,12 +52,12 @@ class Slice:public Visualization::Abstract::Element
 	
 	/* Elements: */
 	private:
-	const GLColorMap* colorMap; // Color map for slice vertex values
+	int scalarVariableIndex; // Index of the scalar variable visualized by the slice
 	Surface surface; // Representation of the slice
 	
 	/* Constructors and destructors: */
 	public:
-	Slice(Visualization::Abstract::Parameters* sParameters,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty slice for the given parameters
+	Slice(Visualization::Abstract::VariableManager* sVariableManager,Visualization::Abstract::Parameters* sParameters,int sScalarVariableIndex,Cluster::MulticastPipe* pipe); // Creates an empty slice for the given parameters
 	private:
 	Slice(const Slice& source); // Prohibit copy constructor
 	Slice& operator=(const Slice& source); // Prohibit assignment operator
@@ -70,13 +67,9 @@ class Slice:public Visualization::Abstract::Element
 	/* Methods from Visualization::Abstract::Element: */
 	virtual std::string getName(void) const;
 	virtual size_t getSize(void) const;
-	virtual void glRenderAction(GLContextData& contextData) const;
+	virtual void glRenderAction(GLRenderState& renderState) const;
 	
 	/* New methods: */
-	const GLColorMap* getColorMap(void) const // Returns the color map
-		{
-		return colorMap;
-		}
 	Surface& getSurface(void) // Returns the surface representation
 		{
 		return surface;

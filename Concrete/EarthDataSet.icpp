@@ -1,7 +1,7 @@
 /***********************************************************************
 EarthDataSet - Wrapper class to add an Earth renderer to an arbitrary
 visualization module working on whole-Earth grids.
-Copyright (c) 2007-2011 Oliver Kreylos
+Copyright (c) 2007-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -30,6 +30,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Concrete/SphericalCoordinateTransformer.h>
 #include <Concrete/PointSet.h>
+
+#include <GLRenderState.h>
 
 namespace Visualization {
 
@@ -151,40 +153,28 @@ template <class DataSetBaseParam,class DataSetRendererBaseParam>
 inline
 void
 EarthDataSetRenderer<DataSetBaseParam,DataSetRendererBaseParam>::glRenderAction(
-	GLContextData& contextData) const
+	GLRenderState& renderState) const
 	{
 	if(!pointSets.empty())
 		{
-		/* Save and set up OpenGL state: */
-		GLboolean lightingEnabled=glIsEnabled(GL_LIGHTING);
-		if(lightingEnabled)
-			glDisable(GL_LIGHTING);
-		GLfloat pointSize;
-		glGetFloatv(GL_POINT_SIZE,&pointSize);
-		glPointSize(1.0f);
-		GLfloat renderColor[4];
-		glGetFloatv(GL_CURRENT_COLOR,renderColor);
+		/* Set up OpenGL state: */
+		renderState.setPointSize(1.0f);
+		renderState.setLighting(false);
 		
 		/* Draw all point sets: */
 		int index=0;
 		for(std::vector<PointSet*>::const_iterator psIt=pointSets.begin();psIt!=pointSets.end();++psIt,++index)
 			{
 			glColor(pointSetColors[index%numPointSetColors]);
-			(*psIt)->glRenderAction(contextData);
+			(*psIt)->glRenderAction(renderState.getContextData());
 			}
-		
-		/* Restore OpenGL state: */
-		glColor4fv(renderColor);
-		glPointSize(pointSize);
-		if(lightingEnabled)
-			glEnable(GL_LIGHTING);
 		}
 	
 	/* Draw the model itself: */
 	if(drawEarthModel)
-		er.glRenderAction(contextData);
+		er.glRenderAction(renderState);
 	else
-		DataSetRendererBase::glRenderAction(contextData);
+		DataSetRendererBase::glRenderAction(renderState);
 	}
 
 }

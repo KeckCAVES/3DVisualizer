@@ -95,5 +95,24 @@
   toggle visibility of individual scene graphs to Rendering Modes menu.
 
 3D Visualizer 1.10:
+- Bumped required Vrui version number to 2.3-001.
 - Added custom shader implementation of isosurface illumination model
   for tremendous speed-ups on Nvidia Geforce-level cards.
+- Custom shader is incompatible with 3D Visualizer's cutting plane
+  algorithm; use Vrui's clipping plane tool (under pointing tools)
+  instead.
+
+3D Visualizer 1.11:
+- Bumped required Vrui version number to 2.4-001.
+- Improved rendering pipeline throughout by minimizing OpenGL context
+  state changes.
+- Added shader-based renderer for color-mapped isosurfaces for moderate
+  speed-ups on Nvidia Geforce-level cards.
+- Added comment skipping (# marks comment up to end of line) to input
+  metafile (.in) parser.
+- Added comment-skipping (# marks comment up to end of line) to
+  ImageStack's stack descriptor parser.
+- Made ImageStack class cluster-aware to reduce data set load times in
+  cluster environments.
+- Added module class SCTFile for Cartesian single-channel volumetric
+  data sets created by LLNL-developed reprojection code.

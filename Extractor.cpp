@@ -1,7 +1,7 @@
 /***********************************************************************
 Extractor - Helper class to drive multithreaded incremental or immediate
 extraction of visualization elements from a data set.
-Copyright (c) 2009-2011 Oliver Kreylos
+Copyright (c) 2009-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -343,12 +343,12 @@ Extractor::ElementPointer Extractor::checkUpdates(void)
 	return result;
 	}
 
-void Extractor::draw(GLContextData& contextData,bool transparent) const
+void Extractor::glRenderAction(GLRenderState& renderState,bool transparent) const
 	{
 	/* Render the tracked visualization element if its transparency matches the parameter: */
 	const Element* element=trackedElements.getLockedValue().first.getPointer();
 	if(element!=0&&element->usesTransparency()==transparent)
-		element->glRenderAction(contextData);
+		element->glRenderAction(renderState);
 	}
 
 void Extractor::update(void)

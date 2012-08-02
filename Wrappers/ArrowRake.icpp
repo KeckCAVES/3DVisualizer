@@ -1,7 +1,7 @@
 /***********************************************************************
 ArrowRake - Class to represent rakes of arrow glyphs as visualization
 elements.
-Copyright (c) 2008-2011 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -92,15 +92,16 @@ Methods of class ArrowRake:
 template <class DataSetWrapperParam>
 inline
 ArrowRake<DataSetWrapperParam>::ArrowRake(
+	Visualization::Abstract::VariableManager* sVariableManager,
 	Visualization::Abstract::Parameters* sParameters,
+	int sScalarVariableIndex,
 	const typename ArrowRake<DataSetWrapperParam>::Index& sRakeSize,
 	typename ArrowRake<DataSetWrapperParam>::Scalar sLengthScale,
 	typename ArrowRake<DataSetWrapperParam>::Scalar sShaftRadius,
 	unsigned int sNumArrowVertices,
-	const GLColorMap* sColorMap,
 	Cluster::MulticastPipe* sPipe)
-	:Visualization::Abstract::Element(sParameters),
-	 colorMap(sColorMap),
+	:Visualization::Abstract::Element(sVariableManager,sParameters),
+	 scalarVariableIndex(sScalarVariableIndex),
 	 pipe(sPipe),
 	 rake(sRakeSize),
 	 lengthScale(sLengthScale),
@@ -142,25 +143,20 @@ template <class DataSetWrapperParam>
 inline
 void
 ArrowRake<DataSetWrapperParam>::glRenderAction(
-	GLContextData& contextData) const
+	GLRenderState& renderState) const
 	{
-	/* Set up OpenGL state for color-mapped surface rendering: */
-	GLboolean lightingEnabled=glIsEnabled(GL_LIGHTING);
-	if(!lightingEnabled)
-		glEnable(GL_LIGHTING);
-	GLboolean normalizeEnabled=glIsEnabled(GL_NORMALIZE);
-	if(!normalizeEnabled)
-		glEnable(GL_NORMALIZE);
-	GLboolean colorMaterialEnabled=glIsEnabled(GL_COLOR_MATERIAL);
-	if(!colorMaterialEnabled)
-		glEnable(GL_COLOR_MATERIAL);
-	GLMaterial frontMaterial=glGetMaterial(GLMaterialEnums::FRONT);
-	glMaterial(GLMaterialEnums::FRONT,GLMaterial(GLMaterial::Color(1.0f,1.0f,1.0f),GLMaterial::Color(0.6f,0.6f,0.6f),25.0f));
+	/* Set up OpenGL state for arrow rendering: */
+	renderState.enableCulling(GL_BACK);
+	renderState.setLighting(true);
+	renderState.setTwoSidedLighting(false);
+	renderState.enableColorMaterial(GL_FRONT,GL_AMBIENT_AND_DIFFUSE);
+	renderState.setTextureLevel(0);
+	renderState.setSeparateSpecularColor(false);
 	
 	#if ARROWRAKE_USEVBO
 	
 	/* Get the context data item: */
-	DataItem* dataItem=contextData.template retrieveDataItem<DataItem>(this);
+	DataItem* dataItem=renderState.getContextData().template retrieveDataItem<DataItem>(this);
 	
 	/* Bind the buffers: */
 	GLVertexArrayParts::enable(Vertex::getPartsMask());
@@ -225,20 +221,11 @@ ArrowRake<DataSetWrapperParam>::glRenderAction(
 		if(rIt->valid)
 			{
 			/* Render the arrow glyph: */
-			glColor((*colorMap)(rIt->scalarValue));
+			glColor((*variableManager->getColorMap(scalarVariableIndex))(rIt->scalarValue));
 			renderArrow(rIt->base,rIt->direction*lengthScale,scaledArrowShaftRadius,scaledArrowShaftRadius*Scalar(3),scaledArrowShaftRadius*Scalar(6),numArrowVertices);
 			}
 	
 	#endif
-	
-	/* Reset OpenGL state: */
-	glMaterial(GLMaterialEnums::FRONT,frontMaterial);
-	if(!colorMaterialEnabled)
-		glDisable(GL_COLOR_MATERIAL);
-	if(!normalizeEnabled)
-		glDisable(GL_NORMALIZE);
-	if(!lightingEnabled)
-		glDisable(GL_LIGHTING);
 	}
 
 template <class DataSetWrapperParam>

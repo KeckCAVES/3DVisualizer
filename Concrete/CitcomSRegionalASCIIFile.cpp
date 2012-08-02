@@ -134,6 +134,7 @@ Visualization::Abstract::DataSet* CitcomSRegionalASCIIFile::load(const std::vect
 		coordFileName.append(".coord.");
 		coordFileName.append(Misc::ValueCoder<int>::encode(cpuLinearIndex));
 		IO::ValueSource coordReader(openFile(coordFileName,pipe));
+		coordReader.skipWs();
 		
 		/* Read and check the header line: */
 		try
@@ -305,6 +306,7 @@ Visualization::Abstract::DataSet* CitcomSRegionalASCIIFile::load(const std::vect
 				dataValueFileName.push_back('.');
 				dataValueFileName.append(Misc::ValueCoder<int>::encode(timeStepIndex));
 				IO::ValueSource dataValueReader(openFile(dataValueFileName,pipe));
+				dataValueReader.skipWs();
 				
 				/* Read and check the header line(s) in the data value file: */
 				try

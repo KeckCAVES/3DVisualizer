@@ -25,15 +25,134 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <string>
 #include <iostream>
 #include <iomanip>
+#include <Misc/SizedTypes.h>
 #include <Misc/SelfDestructPointer.h>
 #include <Misc/ThrowStdErr.h>
 #include <Plugins/FactoryManager.h>
 #include <IO/OpenFile.h>
 #include <IO/ValueSource.h>
+#include <Math/Interval.h>
 
 namespace Visualization {
 
 namespace Concrete {
+
+namespace {
+
+/****************
+Helper functions:
+****************/
+
+template <class FileValueParam>
+inline
+void
+readVertexPositions(
+	DS& dataSet,
+	IO::File& file,
+	bool master)
+	{
+	typedef FileValueParam FileValue;
+	
+	const DS::Index& size=dataSet.getNumVertices();
+	DS::Index index;
+	if(master)
+		std::cout<<"Reading grid vertices...   0%"<<std::flush;
+	for(index[2]=0;index[2]<size[2];++index[2])
+		{
+		for(index[1]=0;index[1]<size[1];++index[1])
+			for(index[0]=0;index[0]<size[0];++index[0])
+				{
+				DS::Point& vertex=dataSet.getVertexPosition(index);
+				for(int i=0;i<3;++i)
+					vertex[i]=DS::Scalar(file.read<FileValue>());
+				}
+		if(master)
+			std::cout<<"\b\b\b\b"<<std::setw(3)<<((index[2]+1)*100+size[2]/2)/size[2]<<"%"<<std::flush;
+		}
+	if(master)
+		std::cout<<"\b\b\b\bdone"<<std::endl;
+	}
+
+template <class FileValueParam>
+inline
+void
+readVectorAttributes(
+	DS& dataSet,
+	const std::string& attributeName,
+	int sliceIndex,
+	IO::File& file,
+	bool master)
+	{
+	typedef FileValueParam FileValue;
+	
+	const DS::Index& size=dataSet.getNumVertices();
+	DS::Index index;
+	if(master)
+		std::cout<<"Reading vector attribute "<<attributeName<<"...   0%"<<std::flush;
+	Math::Interval<DataValue::VScalar> range[3];
+	for(int i=0;i<3;++i)
+		range[i]=Math::Interval<DataValue::VScalar>::empty;
+	for(index[2]=0;index[2]<size[2];++index[2])
+		{
+		for(index[1]=0;index[1]<size[1];++index[1])
+			for(index[0]=0;index[0]<size[0];++index[0])
+				{
+				DataValue::VVector vector;
+				for(int i=0;i<3;++i)
+					{
+					vector[i]=DataValue::VVector::Scalar(file.read<FileValue>());
+					range[i].addValue(vector[i]);
+					}
+				
+				/* Store the vector's components and magnitude: */
+				for(int i=0;i<3;++i)
+					dataSet.getVertexValue(sliceIndex+i,index)=vector[i];
+				dataSet.getVertexValue(sliceIndex+3,index)=DataValue::VScalar(Geometry::mag(vector));
+				}
+		if(master)
+			std::cout<<"\b\b\b\b"<<std::setw(3)<<((index[2]+1)*100+size[2]/2)/size[2]<<"%"<<std::flush;
+		}
+	if(master)
+		std::cout<<"\b\b\b\bdone"<<std::endl;
+	
+	for(int i=0;i<3;++i)
+		std::cout<<range[i].getMin()<<" - "<<range[i].getMax()<<std::endl;
+	}
+
+template <class FileValueParam>
+inline
+void
+readScalarAttributes(
+	DS& dataSet,
+	const std::string& attributeName,
+	int attributeNumScalars,
+	int sliceIndex,
+	IO::File& file,
+	bool master)
+	{
+	typedef FileValueParam FileValue;
+	
+	const DS::Index& size=dataSet.getNumVertices();
+	DS::Index index;
+	if(master)
+		std::cout<<"Reading "<<attributeNumScalars<<"-component scalar attribute "<<attributeName<<"...   0%"<<std::flush;
+	for(index[2]=0;index[2]<size[2];++index[2])
+		{
+		for(index[1]=0;index[1]<size[1];++index[1])
+			for(index[0]=0;index[0]<size[0];++index[0])
+				{
+				/* Reand and store the next scalar attribute: */
+				dataSet.getVertexValue(sliceIndex,index)=DS::ValueScalar(file.read<FileValue>());
+				file.skip<FileValue>(attributeNumScalars-1);
+				}
+		if(master)
+			std::cout<<"\b\b\b\b"<<std::setw(3)<<((index[2]+1)*100+size[2]/2)/size[2]<<"%"<<std::flush;
+		}
+	if(master)
+		std::cout<<"\b\b\b\bdone"<<std::endl;
+	}
+
+}
 
 /**********************************
 Methods of class StructuredGridVTK:
@@ -129,6 +248,28 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 	/* Read the grid points: */
 	if(binary)
 		{
+		if(gridPointDataType=="unsigned_char")
+			readVertexPositions<Misc::UInt8>(dataSet,*file,master);
+		else if(gridPointDataType=="char")
+			readVertexPositions<Misc::SInt8>(dataSet,*file,master);
+		else if(gridPointDataType=="unsigned_short")
+			readVertexPositions<Misc::UInt16>(dataSet,*file,master);
+		else if(gridPointDataType=="short")
+			readVertexPositions<Misc::SInt16>(dataSet,*file,master);
+		else if(gridPointDataType=="unsigned_int")
+			readVertexPositions<Misc::UInt32>(dataSet,*file,master);
+		else if(gridPointDataType=="int")
+			readVertexPositions<Misc::SInt32>(dataSet,*file,master);
+		else if(gridPointDataType=="unsigned_long")
+			readVertexPositions<Misc::UInt64>(dataSet,*file,master);
+		else if(gridPointDataType=="long")
+			readVertexPositions<Misc::SInt64>(dataSet,*file,master);
+		else if(gridPointDataType=="float")
+			readVertexPositions<Misc::Float32>(dataSet,*file,master);
+		else if(gridPointDataType=="double")
+			readVertexPositions<Misc::Float64>(dataSet,*file,master);
+		else
+			Misc::throwStdErr("StructuredGridVTK::load: unsupported grid point data type %s",gridPointDataType.c_str());
 		}
 	else
 		{
@@ -138,24 +279,22 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 		
 		if(master)
 			std::cout<<"Reading grid vertices...   0%"<<std::flush;
-		DS::Index index(0);
-		while(index[2]<numVertices[2])
+		DS::Index index;
+		for(index[2]=0;index[2]<numVertices[2];++index[2])
 			{
-			/* Read the next vertex: */
-			gridSource.skipWs();
-			DS::Point& vertex=dataSet.getVertexPosition(index);
-			for(int i=0;i<3;++i)
-				vertex[i]=DS::Scalar(gridSource.readNumber());
-			if(gridSource.getChar()!='\n')
-				Misc::throwStdErr("StructuredGridVTK::load: Invalid vertex position in VTK data file %s",args[0].c_str());
-			
-			/* Go to the next vertex: */
-			int incDim;
-			for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
-				index[incDim]=0;
-			++index[incDim];
-			if(incDim==2&&master)
-				std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
+			for(index[1]=0;index[1]<numVertices[1];++index[1])
+				for(index[0]=0;index[0]<numVertices[0];++index[0])
+					{
+					/* Read the next vertex: */
+					gridSource.skipWs();
+					DS::Point& vertex=dataSet.getVertexPosition(index);
+					for(int i=0;i<3;++i)
+						vertex[i]=DS::Scalar(gridSource.readNumber());
+					if(gridSource.getChar()!='\n')
+						Misc::throwStdErr("StructuredGridVTK::load: Invalid vertex position in VTK data file %s",args[0].c_str());
+					}
+			if(master)
+				std::cout<<"\b\b\b\b"<<std::setw(3)<<((index[2]+1)*100+numVertices[2]/2)/numVertices[2]<<"%"<<std::flush;
 			}
 		if(master)
 			std::cout<<"\b\b\b\bdone"<<std::endl;
@@ -236,50 +375,106 @@ Visualization::Abstract::DataSet* StructuredGridVTK::load(const std::vector<std:
 		/* Read the vertex attributes: */
 		if(binary)
 			{
+			if(attributeVectors)
+				{
+				if(attributeScalarType=="unsigned_char")
+					readVectorAttributes<Misc::UInt8>(dataSet,attributeName,sliceIndex,*file,master);
+				else if(attributeScalarType=="char")
+					readVectorAttributes<Misc::SInt8>(dataSet,attributeName,sliceIndex,*file,master);
+				else if(attributeScalarType=="unsigned_short")
+					readVectorAttributes<Misc::UInt16>(dataSet,attributeName,sliceIndex,*file,master);
+				else if(attributeScalarType=="short")
+					readVectorAttributes<Misc::SInt16>(dataSet,attributeName,sliceIndex,*file,master);
+				else if(attributeScalarType=="unsigned_int")
+					readVectorAttributes<Misc::UInt32>(dataSet,attributeName,sliceIndex,*file,master);
+				else if(attributeScalarType=="int")
+					readVectorAttributes<Misc::SInt32>(dataSet,attributeName,sliceIndex,*file,master);
+				else if(attributeScalarType=="unsigned_long")
+					readVectorAttributes<Misc::UInt64>(dataSet,attributeName,sliceIndex,*file,master);
+				else if(attributeScalarType=="long")
+					readVectorAttributes<Misc::SInt64>(dataSet,attributeName,sliceIndex,*file,master);
+				else if(attributeScalarType=="float")
+					readVectorAttributes<Misc::Float32>(dataSet,attributeName,sliceIndex,*file,master);
+				else if(attributeScalarType=="double")
+					readVectorAttributes<Misc::Float64>(dataSet,attributeName,sliceIndex,*file,master);
+				else
+					Misc::throwStdErr("StructuredGridVTK::load: unsupported attribute scalar data type %s in vector attribute %s",attributeScalarType.c_str(),attributeName.c_str());
+				}
+			else
+				{
+				if(attributeScalarType=="unsigned_char")
+					readScalarAttributes<Misc::UInt8>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else if(attributeScalarType=="char")
+					readScalarAttributes<Misc::SInt8>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else if(attributeScalarType=="unsigned_short")
+					readScalarAttributes<Misc::UInt16>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else if(attributeScalarType=="short")
+					readScalarAttributes<Misc::SInt16>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else if(attributeScalarType=="unsigned_int")
+					readScalarAttributes<Misc::UInt32>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else if(attributeScalarType=="int")
+					readScalarAttributes<Misc::SInt32>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else if(attributeScalarType=="unsigned_long")
+					readScalarAttributes<Misc::UInt64>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else if(attributeScalarType=="long")
+					readScalarAttributes<Misc::SInt64>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else if(attributeScalarType=="float")
+					readScalarAttributes<Misc::Float32>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else if(attributeScalarType=="double")
+					readScalarAttributes<Misc::Float64>(dataSet,attributeName,attributeNumScalars,sliceIndex,*file,master);
+				else
+					Misc::throwStdErr("StructuredGridVTK::load: unsupported attribute scalar data type %s in scalar attribute %s",attributeScalarType.c_str(),attributeName.c_str());
+				}
 			}
 		else
 			{
-			/* Attach another data source to the file to read grid points: */
+			/* Attach another data source to the file to read point attributes: */
 			IO::ValueSource attributeSource(file);
 			attributeSource.setPunctuation('\n',true);
 			
 			if(master)
 				std::cout<<"Reading "<<attributeName<<" point attributes...   0%"<<std::flush;
-			DS::Index index(0);
-			while(index[2]<numVertices[2])
+			DS::Index index;
+			for(index[2]=0;index[2]<numVertices[2];++index[2])
 				{
-				/* Read the next attribute: */
-				attributeSource.skipWs();
 				if(attributeVectors)
 					{
-					/* Read the vector value in Cartesian coordinates: */
-					DataValue::VVector vector;
-					for(int i=0;i<3;++i)
-						vector[i]=DataValue::VVector::Scalar(attributeSource.readNumber());
-					if(attributeSource.getChar()!='\n')
-						Misc::throwStdErr("StructuredGridVTK::load: Invalid vector attribute in in VTK data file %s",args[0].c_str());
-					
-					/* Store the vector's components and magnitude: */
-					for(int i=0;i<3;++i)
-						dataSet.getVertexValue(sliceIndex+i,index)=vector[i];
-					dataSet.getVertexValue(sliceIndex+3,index)=DataValue::VScalar(Geometry::mag(vector));
+					for(index[1]=0;index[1]<numVertices[1];++index[1])
+						for(index[0]=0;index[0]<numVertices[0];++index[0])
+							{
+							/* Read the next attribute: */
+							attributeSource.skipWs();
+							
+							/* Read the vector value in Cartesian coordinates: */
+							DataValue::VVector vector;
+							for(int i=0;i<3;++i)
+								vector[i]=DataValue::VVector::Scalar(attributeSource.readNumber());
+							if(attributeSource.getChar()!='\n')
+								Misc::throwStdErr("StructuredGridVTK::load: Invalid vector attribute in in VTK data file %s",args[0].c_str());
+							
+							/* Store the vector's components and magnitude: */
+							for(int i=0;i<3;++i)
+								dataSet.getVertexValue(sliceIndex+i,index)=vector[i];
+							dataSet.getVertexValue(sliceIndex+3,index)=DataValue::VScalar(Geometry::mag(vector));
+							}
 					}
 				else
 					{
-					/* Read the first scalar attribute from the line: */
-					dataSet.getVertexValue(sliceIndex,index)=DS::ValueScalar(attributeSource.readNumber());
-					
-					/* Skip the rest of the line: */
-					attributeSource.skipLine();
+					for(index[1]=0;index[1]<numVertices[1];++index[1])
+						for(index[0]=0;index[0]<numVertices[0];++index[0])
+							{
+							/* Read the next attribute: */
+							attributeSource.skipWs();
+							
+							/* Read the first scalar attribute from the line: */
+							dataSet.getVertexValue(sliceIndex,index)=DS::ValueScalar(attributeSource.readNumber());
+							
+							/* Skip the rest of the line: */
+							attributeSource.skipLine();
+							}
 					}
-				
-				/* Go to the next vertex: */
-				int incDim;
-				for(incDim=0;incDim<2&&index[incDim]==numVertices[incDim]-1;++incDim)
-					index[incDim]=0;
-				++index[incDim];
-				if(incDim==2&&master)
-					std::cout<<"\b\b\b\b"<<std::setw(3)<<(index[2]*100)/numVertices[2]<<"%"<<std::flush;
+				if(master)
+					std::cout<<"\b\b\b\b"<<std::setw(3)<<((index[2]+1)*100+numVertices[2]/2)/numVertices[2]<<"%"<<std::flush;
 				}
 			if(master)
 				std::cout<<"\b\b\b\bdone"<<std::endl;

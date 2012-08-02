@@ -3,7 +3,7 @@ VolumeRenderer - Wrapper class for volume renderers as visualization
 elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -55,6 +55,7 @@ class VolumeRenderer:public Visualization::Abstract::Element
 	
 	/* Elements: */
 	private:
+	int scalarVariableIndex; // Index of the scalar variable visualized by the volume renderer
 	#ifdef VISUALIZATION_USE_SHADERS
 	SingleChannelRaycaster* renderer; // A raycasting volume renderer
 	#else
@@ -80,7 +81,7 @@ class VolumeRenderer:public Visualization::Abstract::Element
 		return true;
 		}
 	virtual GLMotif::Widget* createSettingsDialog(GLMotif::WidgetManager* widgetManager); // Returns a new UI widget to change internal settings of the element
-	virtual void glRenderAction(GLContextData& contextData) const;
+	virtual void glRenderAction(GLRenderState& renderState) const;
 	
 	/* New methods: */
 	void sliceFactorCallback(GLMotif::TextFieldSlider::ValueChangedCallbackData* cbData);

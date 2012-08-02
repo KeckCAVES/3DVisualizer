@@ -2,7 +2,7 @@
 SeededColoredIsosurfaceExtractor - Wrapper class to map from the
 abstract visualization algorithm interface to a templatized colored
 isosurface extractor implementation.
-Copyright (c) 2008-2011 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -323,7 +323,7 @@ SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::createElement(
 		currentValue->setValue(double(myParameters->isovalue));
 	
 	/* Create a new colored isosurface visualization element: */
-	ColoredIsosurface* result=new ColoredIsosurface(myParameters,myParameters->lighting,getVariableManager()->getColorMap(csvi),getPipe());
+	ColoredIsosurface* result=new ColoredIsosurface(getVariableManager(),myParameters,csvi,myParameters->lighting,getPipe());
 	
 	/* Update the colored isosurface extractor: */
 	cise.update(getDs(getVariableManager(),svi,csvi),getSe(getVariableManager()->getScalarExtractor(svi)));
@@ -358,7 +358,7 @@ SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::startElement(
 		currentValue->setValue(double(myParameters->isovalue));
 	
 	/* Create a new colored isosurface visualization element: */
-	currentColoredIsosurface=new ColoredIsosurface(myParameters,myParameters->lighting,getVariableManager()->getColorMap(csvi),getPipe());
+	currentColoredIsosurface=new ColoredIsosurface(getVariableManager(),myParameters,csvi,myParameters->lighting,getPipe());
 	
 	/* Update the colored isosurface extractor: */
 	cise.update(getDs(getVariableManager(),svi,csvi),getSe(getVariableManager()->getScalarExtractor(svi)));
@@ -413,7 +413,7 @@ SeededColoredIsosurfaceExtractor<DataSetWrapperParam>::startSlaveElement(
 		currentValue->setValue(double(myParameters->isovalue));
 	
 	/* Create a new colored isosurface visualization element: */
-	currentColoredIsosurface=new ColoredIsosurface(myParameters,myParameters->lighting,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	currentColoredIsosurface=new ColoredIsosurface(getVariableManager(),myParameters,myParameters->colorScalarVariableIndex,myParameters->lighting,getPipe());
 	
 	return currentColoredIsosurface.getPointer();
 	}

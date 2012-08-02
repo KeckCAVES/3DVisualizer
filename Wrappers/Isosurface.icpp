@@ -2,7 +2,7 @@
 Isosurface - Wrapper class for isosurfaces as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -26,8 +26,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Wrappers/Isosurface.h>
 
 #include <GL/gl.h>
-#include <GL/GLMaterial.h>
+#include <GL/GLMaterialTemplates.h>
 
+#include <Abstract/VariableManager.h>
+
+#include <GLRenderState.h>
 #ifdef VISUALIZATION_USE_SHADERS
 #include <TwoSidedSurfaceShader.h>
 #endif
@@ -43,13 +46,14 @@ Methods of class Isosurface:
 template <class DataSetWrapperParam>
 inline
 Isosurface<DataSetWrapperParam>::Isosurface(
+	Visualization::Abstract::VariableManager* sVariableManager,
 	Visualization::Abstract::Parameters* sParameters,
+	int sScalarVariableIndex,
 	typename Isosurface<DataSetWrapperParam>::VScalar sIsovalue,
-	const GLColorMap* sColorMap,
 	Cluster::MulticastPipe* pipe)
-	:Visualization::Abstract::Element(sParameters),
+	:Visualization::Abstract::Element(sVariableManager,sParameters),
+	 scalarVariableIndex(sScalarVariableIndex),
 	 isovalue(sIsovalue),
-	 colorMap(sColorMap),
 	 #ifdef VISUALIZATION_USE_SHADERS
 	 shader(0),
 	 #endif
@@ -94,73 +98,42 @@ template <class DataSetWrapperParam>
 inline
 void
 Isosurface<DataSetWrapperParam>::glRenderAction(
-	GLContextData& contextData) const
+	GLRenderState& renderState) const
 	{
 	/* Set up OpenGL state for isosurface rendering: */
-	GLboolean lightingEnabled=false;
-	GLboolean normalizeEnabled=false;
-	GLboolean lightModelTwoSide=false;
-	GLboolean colorMaterialEnabled=false;
-	GLboolean cullFaceEnabled=glIsEnabled(GL_CULL_FACE);
-	if(cullFaceEnabled)
-		glDisable(GL_CULL_FACE);
+	renderState.disableCulling();
 	#ifdef VISUALIZATION_USE_SHADERS
 	if(shader!=0)
 		{
 		/* Enable the shader: */
-		shader->set(contextData);
+		shader->set(renderState.getContextData());
 		}
 	else
 	#endif
 		{
-		lightingEnabled=glIsEnabled(GL_LIGHTING);
-		if(!lightingEnabled)
-			glEnable(GL_LIGHTING);
-		normalizeEnabled=glIsEnabled(GL_NORMALIZE);
-		if(!normalizeEnabled)
-			glEnable(GL_NORMALIZE);
-		glGetBooleanv(GL_LIGHT_MODEL_TWO_SIDE,&lightModelTwoSide);
-		if(!lightModelTwoSide)
-			glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,GL_TRUE);
-		colorMaterialEnabled=glIsEnabled(GL_COLOR_MATERIAL);
-		if(colorMaterialEnabled)
-			glDisable(GL_COLOR_MATERIAL);
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(true);
+		renderState.setTextureLevel(0);
+		renderState.setSeparateSpecularColor(false);
 		}
 	
 	/* Set the isosurface material properties: */
-	GLMaterial frontMaterial=glGetMaterial(GLMaterialEnums::FRONT);
-	GLMaterial backMaterial=glGetMaterial(GLMaterialEnums::BACK);
-	GLMaterial::Color surfaceColor=(*colorMap)(isovalue);
-	glMaterial(GLMaterialEnums::FRONT_AND_BACK,GLMaterial(surfaceColor,GLMaterial::Color(0.6f,0.6f,0.6f),25.0f));
+	renderState.disableColorMaterial();
+	glMaterialAmbientAndDiffuse(GLMaterialEnums::FRONT_AND_BACK,(*variableManager->getColorMap(scalarVariableIndex))(isovalue));
+	glMaterialSpecular(GLMaterialEnums::FRONT_AND_BACK,GLColor<GLfloat,4>(0.6f,0.6f,0.6f));
+	glMaterialShininess(GLMaterialEnums::FRONT_AND_BACK,25.0f);
 	
 	/* Render the surface representation: */
-	surface.glRenderAction(contextData);
-	
-	/* Reset the isosurface material properties: */
-	glMaterial(GLMaterialEnums::FRONT,frontMaterial);
-	glMaterial(GLMaterialEnums::BACK,backMaterial);
+	surface.glRenderAction(renderState.getContextData());
 	
 	/* Reset OpenGL state: */
 	#ifdef VISUALIZATION_USE_SHADERS
 	if(shader!=0)
 		{
 		/* Disable the shader: */
-		shader->reset(contextData);
+		shader->reset(renderState.getContextData());
 		}
-	else
 	#endif
-		{
-		if(colorMaterialEnabled)
-			glEnable(GL_COLOR_MATERIAL);
-		if(!lightModelTwoSide)
-			glLightModeli(GL_LIGHT_MODEL_TWO_SIDE,GL_FALSE);
-		if(!normalizeEnabled)
-			glDisable(GL_NORMALIZE);
-		if(!lightingEnabled)
-			glDisable(GL_LIGHTING);
-		}
-	if(cullFaceEnabled)
-		glEnable(GL_CULL_FACE);
 	}
 
 }

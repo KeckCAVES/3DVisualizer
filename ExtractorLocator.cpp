@@ -1,7 +1,7 @@
 /***********************************************************************
 ExtractorLocator - Class for locators applying visualization algorithms
 to data sets.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -33,6 +33,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GLMotif/WidgetStateHelper.h>
 #include <Vrui/Vrui.h>
 
+#include <Abstract/Parameters.h>
 #include <Abstract/ConfigurationFileParametersSink.h>
 #include <Abstract/DataSetRenderer.h>
 #include <Abstract/Algorithm.h>
@@ -291,23 +292,23 @@ void ExtractorLocator::buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCal
 		}
 	}
 
-void ExtractorLocator::highlightLocator(GLContextData& contextData) const
+void ExtractorLocator::highlightLocator(GLRenderState& renderState) const
 	{
 	/* Highlight the locator: */
 	if(locator->isValid())
-		application->dataSetRenderer->highlightLocator(locator,contextData);
+		application->dataSetRenderer->highlightLocator(locator,renderState);
 	}
 
-void ExtractorLocator::glRenderAction(GLContextData& contextData) const
+void ExtractorLocator::renderLocator(GLRenderState& renderState) const
 	{
 	/* Render the currently tracked element if it is opaque: */
-	draw(contextData,false);
+	glRenderAction(renderState,false);
 	}
 
-void ExtractorLocator::glRenderActionTransparent(GLContextData& contextData) const
+void ExtractorLocator::renderLocatorTransparent(GLRenderState& renderState) const
 	{
 	/* Render the currently tracked element if it is transparent: */
-	draw(contextData,true);
+	glRenderAction(renderState,true);
 	}
 
 void ExtractorLocator::update(void)

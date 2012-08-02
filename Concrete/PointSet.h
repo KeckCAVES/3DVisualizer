@@ -1,6 +1,6 @@
 /***********************************************************************
 PointSet - Class to represent and render sets of scattered 3D points.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -65,8 +65,10 @@ class PointSet:public GLObject
 	PointSet(const char* pointFileName,double flatteningFactor,double scaleFactor); // Creates a point set by reading a file; applies flattening factor to geoid formula and scale factor to Cartesian coordinates
 	virtual ~PointSet(void);
 	
-	/* Methods: */
+	/* Methods from GLObject: */
 	virtual void initContext(GLContextData& contextData) const;
+	
+	/* New methods: */
 	void glRenderAction(GLContextData& contextData) const; // Renders point set into the current OpenGL context
 	};
 

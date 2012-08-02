@@ -1,7 +1,7 @@
 /***********************************************************************
 ElementList - Class to manage a list of previously extracted
 visualization elements.
-Copyright (c) 2009-2011 Oliver Kreylos
+Copyright (c) 2009-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -33,6 +33,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Vrui/Vrui.h>
 #include <Vrui/OpenFile.h>
 
+#include <Abstract/Parameters.h>
 #include <Abstract/BinaryParametersSink.h>
 #include <Abstract/FileParametersSink.h>
 #include <Abstract/Element.h>
@@ -294,10 +295,10 @@ void ElementList::saveElements(const char* elementFileName,bool ascii,const Visu
 		}
 	}
 
-void ElementList::renderElements(GLContextData& contextData,bool transparent) const
+void ElementList::renderElements(GLRenderState& renderState,bool transparent) const
 	{
 	/* Render all visualization elements whose transparency flags match the given flag: */
 	for(ListElementList::const_iterator veIt=elements.begin();veIt!=elements.end();++veIt)
 		if(veIt->show&&veIt->element->usesTransparency()==transparent)
-			veIt->element->glRenderAction(contextData);
+			veIt->element->glRenderAction(renderState);
 	}

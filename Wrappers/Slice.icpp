@@ -23,10 +23,13 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #define VISUALIZATION_WRAPPERS_SLICE_IMPLEMENTATION
 
-#include <GL/gl.h>
-#include <GL/GLColorMap.h>
-
 #include <Wrappers/Slice.h>
+
+#include <GL/gl.h>
+
+#include <Abstract/VariableManager.h>
+
+#include <GLRenderState.h>
 
 namespace Visualization {
 
@@ -39,11 +42,12 @@ Methods of class Slice:
 template <class DataSetWrapperParam>
 inline
 Slice<DataSetWrapperParam>::Slice(
+	Visualization::Abstract::VariableManager* sVariableManager,
 	Visualization::Abstract::Parameters* sParameters,
-	const GLColorMap* sColorMap,
-	 Cluster::MulticastPipe* pipe)
-	:Visualization::Abstract::Element(sParameters),
-	 colorMap(sColorMap),
+	int sScalarVariableIndex,
+	Cluster::MulticastPipe* pipe)
+	:Visualization::Abstract::Element(sVariableManager,sParameters),
+	 scalarVariableIndex(sScalarVariableIndex),
 	 surface(pipe)
 	{
 	}
@@ -77,63 +81,16 @@ template <class DataSetWrapperParam>
 inline
 void
 Slice<DataSetWrapperParam>::glRenderAction(
-	GLContextData& contextData) const
+	GLRenderState& renderState) const
 	{
 	/* Set up OpenGL state for slice rendering: */
-	GLboolean cullFaceEnabled=glIsEnabled(GL_CULL_FACE);
-	if(cullFaceEnabled)
-		glDisable(GL_CULL_FACE);
-	GLboolean lightingEnabled=glIsEnabled(GL_LIGHTING);
-	if(lightingEnabled)
-		glDisable(GL_LIGHTING);
-	GLboolean texture1DEnabled=glIsEnabled(GL_TEXTURE_1D);
-	if(!texture1DEnabled)
-		glEnable(GL_TEXTURE_1D);
-	GLboolean texture2DEnabled=glIsEnabled(GL_TEXTURE_2D);
-	if(texture2DEnabled)
-		glDisable(GL_TEXTURE_2D);
-	GLboolean texture3DEnabled=glIsEnabled(GL_TEXTURE_3D);
-	if(texture3DEnabled)
-		glDisable(GL_TEXTURE_3D);
-	
-	/* Upload the color map as a 1D texture: */
-	glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_BASE_LEVEL,0);
-	glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_MAX_LEVEL,0);
-	glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-	glTexImage1D(GL_TEXTURE_1D,0,GL_RGBA8,256,0,GL_RGBA,GL_FLOAT,colorMap->getColors());
-	glTexEnvi(GL_TEXTURE_ENV,GL_TEXTURE_ENV_MODE,GL_REPLACE);
-	
-	GLint matrixMode;
-	glGetIntegerv(GL_MATRIX_MODE,&matrixMode);
-	if(matrixMode!=GL_TEXTURE)
-		glMatrixMode(GL_TEXTURE);
-	glPushMatrix();
-	glLoadIdentity();
-	double mapMin=colorMap->getScalarRangeMin();
-	double mapRange=colorMap->getScalarRangeMax()-mapMin;
-	glScaled(1.0/mapRange,1.0,1.0);
-	glTranslated(-mapMin,0.0,0.0);
-	glColor4f(1.0f,1.0f,1.0f,1.0f);
+	renderState.disableCulling();
+	renderState.setLighting(false);
+	variableManager->bindColorMap(scalarVariableIndex,renderState);
+	renderState.setTextureMode(GL_REPLACE);
 	
 	/* Render the surface representation: */
-	surface.glRenderAction(contextData);
-	
-	/* Reset OpenGL state: */
-	glPopMatrix();
-	if(matrixMode!=GL_TEXTURE)
-		glMatrixMode(matrixMode);
-	if(texture3DEnabled)
-		glEnable(GL_TEXTURE_3D);
-	if(texture2DEnabled)
-		glEnable(GL_TEXTURE_2D);
-	if(!texture1DEnabled)
-		glDisable(GL_TEXTURE_1D);
-	if(lightingEnabled)
-		glEnable(GL_LIGHTING);
-	if(cullFaceEnabled)
-		glEnable(GL_CULL_FACE);
+	surface.glRenderAction(renderState.getContextData());
 	}
 
 }

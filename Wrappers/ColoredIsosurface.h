@@ -3,7 +3,7 @@ ColoredIsosurface - Wrapper class for color-mapped isosurfaces as
 visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2008-2011 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -36,7 +36,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #endif
 
 /* Forward declarations: */
-class GLColorMap;
+#ifdef VISUALIZATION_USE_SHADERS
+class TwoSided1DTexturedSurfaceShader;
+#endif
 
 namespace Visualization {
 
@@ -62,13 +64,16 @@ class ColoredIsosurface:public Visualization::Abstract::Element
 	
 	/* Elements: */
 	private:
+	int scalarVariableIndex; // Index of the scalar variable used to color the colored isosurface
 	bool lighting; // Flag if the colored isosurface is lit
-	const GLColorMap* colorMap; // Color map for colored isosurface vertex values
+	#ifdef VISUALIZATION_USE_SHADERS
+	TwoSided1DTexturedSurfaceShader* shader; // Shader for the isosurface
+	#endif
 	Surface surface; // Representation of the colored isosurface
 	
 	/* Constructors and destructors: */
 	public:
-	ColoredIsosurface(Visualization::Abstract::Parameters* sParameters,bool sLighting,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty colored isosurface for the given parameters
+	ColoredIsosurface(Visualization::Abstract::VariableManager* sVariableManager,Visualization::Abstract::Parameters* sParameters,int sScalarVariableIndex,bool sLighting,Cluster::MulticastPipe* pipe); // Creates an empty colored isosurface for the given parameters
 	private:
 	ColoredIsosurface(const ColoredIsosurface& source); // Prohibit copy constructor
 	ColoredIsosurface& operator=(const ColoredIsosurface& source); // Prohibit assignment operator
@@ -78,13 +83,9 @@ class ColoredIsosurface:public Visualization::Abstract::Element
 	/* Methods from Visualization::Abstract::Element: */
 	virtual std::string getName(void) const;
 	virtual size_t getSize(void) const;
-	virtual void glRenderAction(GLContextData& contextData) const;
+	virtual void glRenderAction(GLRenderState& renderState) const;
 	
 	/* New methods: */
-	const GLColorMap* getColorMap(void) const // Returns the color map
-		{
-		return colorMap;
-		}
 	Surface& getSurface(void) // Returns the surface representation
 		{
 		return surface;

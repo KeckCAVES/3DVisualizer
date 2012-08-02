@@ -1,7 +1,7 @@
 /***********************************************************************
 Extractor - Helper class to drive multithreaded incremental or immediate
 extraction of visualization elements from a data set.
-Copyright (c) 2009-2011 Oliver Kreylos
+Copyright (c) 2009-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -32,7 +32,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Threads/TripleBuffer.h>
 
 /* Forward declarations: */
-class GLContextData;
 namespace Visualization {
 namespace Abstract {
 class Parameters;
@@ -40,6 +39,7 @@ class Algorithm;
 class Element;
 }
 }
+class GLRenderState;
 
 class Extractor
 	{
@@ -98,7 +98,7 @@ class Extractor
 		return finalElementPending;
 		}
 	virtual ElementPointer checkUpdates(void); // Method to synchronize the extraction thread's state back to the main thread; returns pointer to new finished element or 0
-	void draw(GLContextData& contextData,bool transparent) const; // Renders the extractor's current opaque or transparent geometry
+	void glRenderAction(GLRenderState& renderState,bool transparent) const; // Renders the extractor's current opaque or transparent geometry
 	virtual void update(void); // Hook method called asynchronously when the visual state of the extractor changes
 	};
 

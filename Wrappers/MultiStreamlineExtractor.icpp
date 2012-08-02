@@ -2,7 +2,7 @@
 MultiStreamlineExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized multi-streamline
 extractor implementation.
-Copyright (c) 2006-2011 Oliver Kreylos
+Copyright (c) 2006-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -301,7 +301,7 @@ MultiStreamlineExtractor<DataSetWrapperParam>::createElement(
 		Misc::throwStdErr("MultiStreamlineExtractor::createElement: Mismatching parameter object type");
 	
 	/* Create a new multi-streamline visualization element: */
-	MultiStreamline* result=new MultiStreamline(myParameters,myParameters->numStreamlines,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	MultiStreamline* result=new MultiStreamline(getVariableManager(),myParameters,myParameters->colorScalarVariableIndex,myParameters->numStreamlines,getPipe());
 	
 	/* Update the multi-streamline extractor: */
 	msle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
@@ -339,7 +339,7 @@ MultiStreamlineExtractor<DataSetWrapperParam>::startElement(
 		Misc::throwStdErr("MultiStreamlineExtractor::startElement: Mismatching parameter object type");
 	
 	/* Create a new multi-streamline visualization element: */
-	currentMultiStreamline=new MultiStreamline(myParameters,myParameters->numStreamlines,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	currentMultiStreamline=new MultiStreamline(getVariableManager(),myParameters,myParameters->colorScalarVariableIndex,myParameters->numStreamlines,getPipe());
 	
 	/* Update the multi-streamline extractor: */
 	msle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
@@ -399,7 +399,7 @@ MultiStreamlineExtractor<DataSetWrapperParam>::startSlaveElement(
 		Misc::throwStdErr("MultiStreamlineExtractor::startSlaveElement: Mismatching parameter object type");
 	
 	/* Create a new multi-streamline visualization element: */
-	currentMultiStreamline=new MultiStreamline(myParameters,myParameters->numStreamlines,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	currentMultiStreamline=new MultiStreamline(getVariableManager(),myParameters,myParameters->colorScalarVariableIndex,myParameters->numStreamlines,getPipe());
 	
 	return currentMultiStreamline.getPointer();
 	}

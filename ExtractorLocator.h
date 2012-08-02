@@ -1,7 +1,7 @@
 /***********************************************************************
 ExtractorLocator - Class for locators applying visualization algorithms
 to data sets.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -73,9 +73,9 @@ class ExtractorLocator:public BaseLocator,public Extractor
 	virtual void buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCallbackData* cbData);
 	
 	/* Methods from BaseLocator: */
-	virtual void highlightLocator(GLContextData& contextData) const;
-	virtual void glRenderAction(GLContextData& contextData) const;
-	virtual void glRenderActionTransparent(GLContextData& contextData) const;
+	virtual void highlightLocator(GLRenderState& renderState) const;
+	virtual void renderLocator(GLRenderState& renderState) const;
+	virtual void renderLocatorTransparent(GLRenderState& renderState) const;
 	
 	/* Methods from Extractor: */
 	virtual void update(void);

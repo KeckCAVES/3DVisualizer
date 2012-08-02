@@ -2,7 +2,7 @@
 GlobalIsosurfaceExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized isosurface extractor
 implementation.
-Copyright (c) 2006-2011 Oliver Kreylos
+Copyright (c) 2006-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

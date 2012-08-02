@@ -1,7 +1,7 @@
 /***********************************************************************
 DataSetRenderer - Wrapper class to map from the abstract data set
 renderer interface to its templatized data set renderer implementation.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -86,8 +86,19 @@ class DataSetRenderer:public Visualization::Abstract::DataSetRenderer,public GLO
 	public:
 	virtual ~DataSetRenderer(void); // Destroys the data set renderer
 	
-	/* Methods: */
+	/* Methods from Abstract::DataSetRenderer: */
+	virtual Base* clone(void) const;
+	virtual int getNumRenderingModes(void) const;
+	virtual const char* getRenderingModeName(int renderingModeIndex) const;
+	virtual int getRenderingMode(void) const;
+	virtual void setRenderingMode(int renderingModeIndex);
+	virtual void glRenderAction(GLRenderState& renderState) const;
+	virtual void highlightLocator(const Visualization::Abstract::DataSet::Locator* locator,GLRenderState& renderState) const;
+	
+	/* Methods from GLObject: */
 	virtual void initContext(GLContextData& contextData) const;
+	
+	/* New methods: */
 	const DSR& getDsr(void) const // Returns templatized data set renderer
 		{
 		return dsr;
@@ -96,13 +107,6 @@ class DataSetRenderer:public Visualization::Abstract::DataSetRenderer,public GLO
 		{
 		return dsr;
 		}
-	virtual Base* clone(void) const;
-	virtual int getNumRenderingModes(void) const;
-	virtual const char* getRenderingModeName(int renderingModeIndex) const;
-	virtual int getRenderingMode(void) const;
-	virtual void setRenderingMode(int renderingModeIndex);
-	virtual void glRenderAction(GLContextData& contextData) const;
-	virtual void highlightLocator(const Visualization::Abstract::DataSet::Locator* locator,GLContextData& contextData) const;
 	};
 
 }

@@ -3,7 +3,7 @@ DataSetRenderer - Abstract base class to render the structure of data
 sets using OpenGL.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2007 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -28,7 +28,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/DataSet.h>
 
 /* Forward declarations: */
-class GLContextData;
+class GLRenderState;
 
 namespace Visualization {
 
@@ -58,8 +58,8 @@ class DataSetRenderer
 	virtual const char* getRenderingModeName(int renderingModeIndex) const; // Returns the name of a supported rendering mode
 	virtual int getRenderingMode(void) const; // Returns the current rendering mode
 	virtual void setRenderingMode(int renderingModeIndex); // Sets the given rendering mode for future rendering
-	virtual void glRenderAction(GLContextData& contextData) const; // Renders into the given OpenGL context
-	virtual void highlightLocator(const DataSet::Locator* locator,GLContextData& contextData) const; // Highlights the given data set locator
+	virtual void glRenderAction(GLRenderState& renderState) const; // Renders into the given OpenGL context
+	virtual void highlightLocator(const DataSet::Locator* locator,GLRenderState& renderState) const; // Highlights the given data set locator
 	};
 
 }

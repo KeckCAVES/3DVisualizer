@@ -1,7 +1,7 @@
 /***********************************************************************
 VariableManager - Helper class to manage the scalar and vector variables
 that can be extracted from a data set.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #ifndef VISUALIZATION_ABSTRACT_VARIABLEMANAGER_INCLUDED
 #define VISUALIZATION_ABSTRACT_VARIABLEMANAGER_INCLUDED
 
+#include <GL/gl.h>
+#include <GL/GLObject.h>
 #include <Abstract/DataSet.h>
 #include <PaletteEditor.h>
 
@@ -41,12 +43,13 @@ class ScalarExtractor;
 class VectorExtractor;
 }
 }
+class GLRenderState;
 
 namespace Visualization {
 
 namespace Abstract {
 
-class VariableManager
+class VariableManager:public GLObject
 	{
 	/* Embedded classes: */
 	public:
@@ -65,11 +68,28 @@ class VariableManager
 		ScalarExtractor* scalarExtractor; // Scalar extractor for the scalar variable
 		DataSet::VScalarRange valueRange; // Value range of the scalar variable
 		GLColorMap* colorMap; // The color map to render the scalar variable
+		unsigned int colorMapVersion; // Version number of the color map
+		DataSet::VScalarRange colorMapRange; // Scalar variable range that is mapped to the full extent of the color map
 		PaletteEditor::Storage* palette; // Pointer to palette editor state for the scalar variable
 		
 		/* Constructors and destructors: */
 		ScalarVariable(void);
 		~ScalarVariable(void);
+		};
+	
+	struct DataItem:public GLObject::DataItem // Structure containing the variable manager's per-OpenGL context state
+		{
+		/* Elements: */
+		public:
+		unsigned int numScalarVariables; // Number of scalar variables
+		GLuint* colorMapTextureIds; // Array of texture object IDs for the scalar variables' color maps
+		unsigned int* colorMapVersions; // Array of version numbers for the color map texture objects
+		int lastBoundScalarVariableIndex; // The index of the last scalar variable whose color map was bound in the current rendering pass
+		unsigned int textureMatrixVersion; // Version number of the texture matrix as last set by the variable manager
+		
+		/* Constructors and destructors: */
+		DataItem(unsigned int sNumScalarVariables); // Creates a data item for the given number of scalar variables
+		virtual ~DataItem(void);
 		};
 	
 	/* Elements: */
@@ -93,9 +113,12 @@ class VariableManager
 	/* Constructors and destructors: */
 	public:
 	VariableManager(const DataSet* sDataSet,const char* sDefaultColorMapName); // Creates variable manager for the given data set
-	~VariableManager(void);
+	virtual ~VariableManager(void);
 	
-	/* Methods: */
+	/* Methods from GLObject: */
+	virtual void initContext(GLContextData& contextData) const;
+	
+	/* New methods: */
 	int getNumScalarVariables(void) const // Returns the number of scalar variables in the data set
 		{
 		return numScalarVariables;
@@ -130,6 +153,7 @@ class VariableManager
 	int getScalarVariable(const ScalarExtractor* scalarExtractor) const; // Returns the index of the given scalar extractor
 	const DataSet::VScalarRange& getScalarValueRange(int scalarVariableIndex); // Returns the value range of the given scalar variable
 	const GLColorMap* getColorMap(int scalarVariableIndex); // Returns the color map for the given scalar variable
+	const DataSet::VScalarRange& getScalarColorMapRange(int scalarVariableIndex); // Returns the value range of the given scalar variable that is mapped to the full extent of the color map
 	const VectorExtractor* getVectorExtractor(int vectorVariableIndex); // Returns a new vector extractor for the given vector variable
 	int getVectorVariable(const VectorExtractor* vectorExtractor) const; // Returns the index of the given vector extractor
 	const ScalarExtractor* getCurrentScalarExtractor(void) const // Returns the current scalar extractor
@@ -161,6 +185,9 @@ class VariableManager
 	void createPalette(int newPaletteType); // Creates a default palette for the current scalar variable
 	void loadPalette(const char* paletteFileName); // Loads a palette for the current scalar variable
 	void insertPaletteEditorControlPoint(double newControlPoint); // Inserts a new control point into the palette editor at the given value
+	void beginRenderPass(GLRenderState& renderState) const; // Prepares the variable manager for an OpenGL rendering pass
+	void bindColorMap(int scalarVariableIndex,GLRenderState& renderState) const; // Binds the given scalar variable's color map as a 1D texture in the given OpenGL render state
+	void endRenderPass(GLRenderState& renderState) const; // Cleans up the state of the given OpenGL context after a rendering pass
 	};
 
 }

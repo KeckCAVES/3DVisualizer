@@ -266,7 +266,7 @@ Visualization::Abstract::DataSet* StructuredGridASCII::load(const std::vector<st
 				if(token=="gridSize")
 					{
 					/* Read the grid size: */
-					DS::Index sliceNumVertices;
+					DS::Index sliceNumVertices(0);
 					try
 						{
 						for(int i=0;i<3;++i)

@@ -55,11 +55,11 @@ void DataSetRenderer::setRenderingMode(int renderingModeIndex)
 	Misc::throwStdErr("DataSetRenderer::setRenderingMode: invalid rendering mode index %d",renderingModeIndex);
 	}
 
-void DataSetRenderer::glRenderAction(GLContextData& contextData) const
+void DataSetRenderer::glRenderAction(GLRenderState& renderState) const
 	{
 	}
 
-void DataSetRenderer::highlightLocator(const DataSet::Locator* locator,GLContextData& contextData) const
+void DataSetRenderer::highlightLocator(const DataSet::Locator* locator,GLRenderState& renderState) const
 	{
 	}
 

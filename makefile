@@ -25,7 +25,7 @@
 # matches the default Vrui installation; if Vrui's installation
 # directory was changed during Vrui's installation, the directory below
 # must be adapted.
-VRUI_MAKEDIR := $(HOME)/Vrui-2.3/share/make
+VRUI_MAKEDIR := $(HOME)/Vrui-2.4/share/make
 
 # Base installation directory for 3D Visualizer and its module
 # plug-ins. The module plug-ins cannot be moved from this location
@@ -72,6 +72,7 @@ MODULE_NAMES = SphericalASCIIFile \
 UNSUPPORTED_MODULE_NAMES = AnalyzeFile \
                            AvsUcdAsciiFile \
                            ByteVolFile \
+                           SCTFile \
                            GaleFEMVectorFile \
                            GocadVoxetFile \
                            ConvectionFile \
@@ -101,7 +102,7 @@ PACKAGEROOT := $(shell pwd)
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.10
+VERSION = 1.11
 
 # Set up resource directories: */
 PLUGINSDIREXT = 3DVisualizer-$(VERSION)
@@ -257,6 +258,7 @@ VISUALIZER_SOURCES = $(ABSTRACT_SOURCES) \
                      $(TEMPLATIZED_SOURCES) \
                      $(WRAPPERS_SOURCES) \
                      $(CONCRETE_SOURCES) \
+                     GLRenderState.cpp \
                      BaseLocator.cpp \
                      CuttingPlaneLocator.cpp \
                      EvaluationLocator.cpp \
@@ -374,6 +376,9 @@ else
 	@echo Linking $@...
 	@$(CCOMP) $(PLUGINLINKFLAGS) -o $@ $^ $(LINKDIRFLAGS) $(LINKLIBFLAGS)
 endif
+
+$(call COLLABORATIONPLUGINNAME,SharedVisualizationServer): $(OBJDIR)/pic/SharedVisualizationProtocol.o \
+                                                           $(OBJDIR)/pic/SharedVisualizationServer.o
 
 # Keep collaboration plugin object files around after building:
 .SECONDARY: $(COLLABORATIONPLUGIN_NAMES:%=$(OBJDIR)/pic/%.o)

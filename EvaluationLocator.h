@@ -1,7 +1,7 @@
 /***********************************************************************
 EvaluationLocator - Base class for locators evaluating properties of
 data sets.
-Copyright (c) 2006-2010 Oliver Kreylos
+Copyright (c) 2006-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -69,7 +69,7 @@ class EvaluationLocator:public BaseLocator
 	virtual void buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCallbackData* cbData);
 	
 	/* Methods from class BaseLocator: */
-	virtual void highlightLocator(GLContextData& contextData) const;
+	virtual void highlightLocator(GLRenderState& renderState) const;
 	};
 
 #endif

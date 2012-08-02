@@ -1,7 +1,7 @@
 /***********************************************************************
 EvaluationLocator - Base class for locators evaluating properties of
 data sets.
-Copyright (c) 2006-2010 Oliver Kreylos
+Copyright (c) 2006-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -38,6 +38,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/DataSetRenderer.h>
 #include <Abstract/CoordinateTransformer.h>
 
+#include "GLRenderState.h"
 #include "Visualizer.h"
 
 /**********************************************
@@ -127,18 +128,18 @@ void EvaluationLocator::buttonReleaseCallback(Vrui::LocatorTool::ButtonReleaseCa
 	dragging=false;
 	}
 
-void EvaluationLocator::highlightLocator(GLContextData& contextData) const
+void EvaluationLocator::highlightLocator(GLRenderState& renderState) const
 	{
+	/* Highlight the locator: */
+	if(locator->isValid())
+		application->dataSetRenderer->highlightLocator(locator,renderState);
+	
 	/* Render the evaluation point: */
 	if(hasPoint)
 		{
-		/* Set up and save OpenGL state: */
-		GLboolean lightingEnabled=glIsEnabled(GL_LIGHTING);
-		if(lightingEnabled)
-			glDisable(GL_LIGHTING);
-		GLfloat lineWidth;
-		glGetFloatv(GL_LINE_WIDTH,&lineWidth);
-		glLineWidth(1.0f);
+		/* Set up OpenGL state: */
+		renderState.setLineWidth(1.0f);
+		renderState.setLighting(false);
 		
 		/* Calculate the marker size by querying the current navigation transformation: */
 		Vrui::Scalar markerSize=(Vrui::Scalar(2)*Vrui::getUiSize())/Vrui::getNavigationTransformation().getScaling();
@@ -160,14 +161,5 @@ void EvaluationLocator::highlightLocator(GLContextData& contextData) const
 		glVertex(point[0],point[1],point[2]-markerSize);
 		glVertex(point[0],point[1],point[2]+markerSize);
 		glEnd();
-		
-		/* Restore OpenGL state: */
-		glLineWidth(lineWidth);
-		if(lightingEnabled)
-			glDisable(GL_LIGHTING);
 		}
-	
-	/* Highlight the locator: */
-	if(locator->isValid())
-		application->dataSetRenderer->highlightLocator(locator,contextData);
 	}

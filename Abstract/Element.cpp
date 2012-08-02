@@ -4,7 +4,7 @@ data sets. Elements use thread-safe reference counting for automatic
 garbage collection.
 Part of the abstract interface to the templatized visualization
 components.
-Copyright (c) 2005-2009 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 #include <Abstract/Element.h>
 
+#include <Abstract/Parameters.h>
+
 namespace Visualization {
 
 namespace Abstract {
@@ -32,6 +34,12 @@ namespace Abstract {
 /************************
 Methods of class Element:
 ************************/
+
+Element::~Element(void)
+	{
+	/* Delete the parameter object: */
+	delete parameters;
+	}
 
 bool Element::usesTransparency(void) const
 	{

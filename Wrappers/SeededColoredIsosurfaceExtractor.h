@@ -2,7 +2,7 @@
 SeededColoredIsosurfaceExtractor - Wrapper class to map from the
 abstract visualization algorithm interface to a templatized colored
 isosurface extractor implementation.
-Copyright (c) 2008-2011 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

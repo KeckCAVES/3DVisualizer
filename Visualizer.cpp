@@ -1,7 +1,7 @@
 /***********************************************************************
 Visualizer - Test application for the new visualization component
 framework.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -69,6 +69,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/DataSetRenderer.h>
 #include <Abstract/CoordinateTransformer.h>
 #include <Abstract/VariableManager.h>
+#include <Abstract/Parameters.h>
 #include <Abstract/BinaryParametersSink.h>
 #include <Abstract/BinaryParametersSource.h>
 #include <Abstract/FileParametersSource.h>
@@ -87,6 +88,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include "VectorEvaluationLocator.h"
 #include "ExtractorLocator.h"
 #include "ElementList.h"
+#include "GLRenderState.h"
 
 /***************************
 Methods of class Visualizer:
@@ -755,17 +757,36 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 			
 			/* Read the meta-input file of the given name: */
 			IO::ValueSource metaInputFile(Vrui::openFile(argv[i]));
+			metaInputFile.setPunctuation("#");
 			metaInputFile.skipWs();
 			
-			/* Read the module class name: */
-			moduleClassName=metaInputFile.readString();
+			/* Read the module class name while skipping any comments: */
+			while((moduleClassName=metaInputFile.readString())=="#")
+				{
+				/* Skip the rest of the line: */
+				metaInputFile.skipLine();
+				metaInputFile.skipWs();
+				}
 			
 			/* Read the data set arguments: */
 			dataSetArgs.clear();
 			while(!metaInputFile.eof())
 				{
-				/* Read and store the next argument: */
-				dataSetArgs.push_back(metaInputFile.readString());
+				/* Read the next module argument: */
+				std::string argument=metaInputFile.readString();
+				
+				/* Check for comments: */
+				if(argument=="#")
+					{
+					/* Skip the rest of the line: */
+					metaInputFile.skipLine();
+					metaInputFile.skipWs();
+					}
+				else
+					{
+					/* Store the argument: */
+					dataSetArgs.push_back(argument);
+					}
 				}
 			}
 		}
@@ -1030,9 +1051,18 @@ void Visualizer::frame(void)
 
 void Visualizer::display(GLContextData& contextData) const
 	{
+	/* Create an OpenGL state tracker: */
+	GLRenderState renderState(contextData);
+	
+	/* Prepare the variable manager for a rendering pass: */
+	variableManager->beginRenderPass(renderState);
+	
 	#ifdef VISUALIZER_USE_COLLABORATION
 	if(collaborationClient!=0)
 		{
+		/* Associate the render state with the shared visualization protocol client's context data item: */
+		sharedVisualizationClient->associateRenderState(contextData,renderState);
+		
 		/* Call the collaboration client's display method: */
 		collaborationClient->display(contextData);
 		}
@@ -1040,7 +1070,7 @@ void Visualizer::display(GLContextData& contextData) const
 	
 	/* Highlight all locators: */
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
-		(*blIt)->highlightLocator(contextData);
+		(*blIt)->highlightLocator(renderState);
 	
 	/* Enable all cutting planes: */
 	int numSupportedCuttingPlanes;
@@ -1062,9 +1092,9 @@ void Visualizer::display(GLContextData& contextData) const
 			}
 	
 	/* Render all opaque visualization elements: */
-	elementList->renderElements(contextData,false);
+	elementList->renderElements(renderState,false);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
-		(*blIt)->glRenderAction(contextData);
+		(*blIt)->renderLocator(renderState);
 	
 	if(renderSceneGraphs)
 		{
@@ -1084,20 +1114,15 @@ void Visualizer::display(GLContextData& contextData) const
 		}
 	
 	/* Render all transparent visualization elements: */
-	elementList->renderElements(contextData,true);
+	elementList->renderElements(renderState,true);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
-		(*blIt)->glRenderActionTransparent(contextData);
+		(*blIt)->renderLocatorTransparent(renderState);
 	
 	if(renderDataSet)
 		{
 		/* Render the data set: */
-		GLfloat lineWidth;
-		glGetFloatv(GL_LINE_WIDTH,&lineWidth);
-		if(lineWidth!=1.0f)
-			glLineWidth(1.0f);
 		glColor(dataSetRenderColor);
-		dataSetRenderer->glRenderAction(contextData);
-		glLineWidth(lineWidth);
+		dataSetRenderer->glRenderAction(renderState);
 		}
 	
 	/* Disable all cutting planes: */
@@ -1111,6 +1136,9 @@ void Visualizer::display(GLContextData& contextData) const
 			/* Go to the next cutting plane: */
 			++cuttingPlaneIndex;
 			}
+	
+	/* Let the variable manager clean up after a rendering pass: */
+	variableManager->endRenderPass(renderState);
 	}
 
 void Visualizer::sound(ALContextData& contextData) const

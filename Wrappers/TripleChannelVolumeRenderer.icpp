@@ -3,7 +3,7 @@ TripleChannelTripleChannelVolumeRenderer - Wrapper class for triple-channel volu
 renderers as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2009-2011 Oliver Kreylos
+Copyright (c) 2009-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -37,6 +37,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Templatized/VolumeRenderingSampler.h>
 #include <Wrappers/TripleChannelVolumeRendererExtractor.h>
 
+#include <GLRenderState.h>
 #include <TripleChannelRaycaster.h>
 
 namespace Visualization {
@@ -52,7 +53,7 @@ inline
 TripleChannelVolumeRenderer<DataSetWrapperParam>::TripleChannelVolumeRenderer(
 	Visualization::Abstract::Algorithm* algorithm,
 	Visualization::Abstract::Parameters* sParameters)
-	:Visualization::Abstract::Element(sParameters),
+	:Visualization::Abstract::Element(algorithm->getVariableManager(),sParameters),
 	 raycaster(0)
 	{
 	for(int channel=0;channel<3;++channel)
@@ -202,10 +203,10 @@ template <class DataSetWrapperParam>
 inline
 void
 TripleChannelVolumeRenderer<DataSetWrapperParam>::glRenderAction(
-	GLContextData& contextData) const
+	GLRenderState& renderState) const
 	{
 	/* Render the volume: */
-	raycaster->glRenderAction(contextData);
+	raycaster->glRenderAction(renderState.getContextData());
 	}
 
 template <class DataSetWrapperParam>

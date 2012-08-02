@@ -2,7 +2,7 @@
 Isosurface - Wrapper class for isosurfaces as visualization elements.
 Part of the wrapper layer of the templatized visualization
 components.
-Copyright (c) 2005-2011 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -31,7 +31,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Templatized/IndexedTriangleSet.h>
 
 /* Forward declarations: */
-class GLColorMap;
 #ifdef VISUALIZATION_USE_SHADERS
 class TwoSidedSurfaceShader;
 #endif
@@ -56,8 +55,8 @@ class Isosurface:public Visualization::Abstract::Element
 	
 	/* Elements: */
 	private:
+	int scalarVariableIndex; // Index of the scalar variable visualized by the isosurface
 	VScalar isovalue; // Isosurface's isovalue
-	const GLColorMap* colorMap; // Color map for isosurface vertex values
 	#ifdef VISUALIZATION_USE_SHADERS
 	TwoSidedSurfaceShader* shader; // Shader for the isosurface
 	#endif
@@ -65,7 +64,7 @@ class Isosurface:public Visualization::Abstract::Element
 	
 	/* Constructors and destructors: */
 	public:
-	Isosurface(Visualization::Abstract::Parameters* sParameters,VScalar sIsovalue,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty isosurface for the given parameters
+	Isosurface(Visualization::Abstract::VariableManager* sVariableManager,Visualization::Abstract::Parameters* sParameters,int sScalarVariableIndex,VScalar sIsovalue,Cluster::MulticastPipe* pipe); // Creates an empty isosurface for the given parameters
 	private:
 	Isosurface(const Isosurface& source); // Prohibit copy constructor
 	Isosurface& operator=(const Isosurface& source); // Prohibit assignment operator
@@ -75,13 +74,9 @@ class Isosurface:public Visualization::Abstract::Element
 	/* Methods from Visualization::Abstract::Element: */
 	virtual std::string getName(void) const;
 	virtual size_t getSize(void) const;
-	virtual void glRenderAction(GLContextData& contextData) const;
+	virtual void glRenderAction(GLRenderState& renderState) const;
 	
 	/* New methods: */
-	const GLColorMap* getColorMap(void) const // Returns the color map
-		{
-		return colorMap;
-		}
 	Surface& getSurface(void) // Returns the surface representation
 		{
 		return surface;

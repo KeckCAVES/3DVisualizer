@@ -26,5 +26,5 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 Static elements of class SharedVisualizationProtocol:
 ****************************************************/
 
-const char* SharedVisualizationProtocol::protocolName="SharedVisualizer";
+const char* SharedVisualizationProtocol::protocolName="SharedVisualization";
 const unsigned int SharedVisualizationProtocol::protocolVersion=(3U<<16)+0U; // Version 3.0

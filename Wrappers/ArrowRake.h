@@ -1,7 +1,7 @@
 /***********************************************************************
 ArrowRake - Class to represent rakes of arrow glyphs as visualization
 elements.
-Copyright (c) 2008-2011 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -34,7 +34,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 namespace Cluster {
 class MulticastPipe;
 }
-class GLColorMap;
 
 namespace Visualization {
 
@@ -85,7 +84,7 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 	
 	/* Elements: */
 	private:
-	const GLColorMap* colorMap; // Color map to color arrow glyphs
+	int scalarVariableIndex; // Index of the scalar variable used to color the arrow rake
 	Cluster::MulticastPipe* pipe; // Pipe to stream arrow rake data in a cluster environment (owned by caller)
 	Rake rake; // Array containing the arrow definitions
 	Scalar lengthScale; // Arrow length scale
@@ -95,7 +94,7 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 	
 	/* Constructors and destructors: */
 	public:
-	ArrowRake(Visualization::Abstract::Parameters* sParameters,const Index& sRakeSize,Scalar sLengthScale,Scalar sShaftRadius,unsigned int sNumArrowVertices,const GLColorMap* sColorMap,Cluster::MulticastPipe* pipe); // Creates an empty arrow rake for the given parameters
+	ArrowRake(Visualization::Abstract::VariableManager* sVariableManager,Visualization::Abstract::Parameters* sParameters,int sScalarVariableIndex,const Index& sRakeSize,Scalar sLengthScale,Scalar sShaftRadius,unsigned int sNumArrowVertices,Cluster::MulticastPipe* pipe); // Creates an empty arrow rake for the given parameters
 	private:
 	ArrowRake(const ArrowRake& source); // Prohibit copy constructor
 	ArrowRake& operator=(const ArrowRake& source); // Prohibit assignment operator
@@ -105,16 +104,12 @@ class ArrowRake:public Visualization::Abstract::Element,public GLObject
 	/* Methods from Visualization::Abstract::Element: */
 	virtual std::string getName(void) const;
 	virtual size_t getSize(void) const;
-	virtual void glRenderAction(GLContextData& contextData) const;
+	virtual void glRenderAction(GLRenderState& renderState) const;
 	
 	/* Methods from GLObject: */
 	virtual void initContext(GLContextData& contextData) const;
 	
 	/* Methods: */
-	const GLColorMap* getColorMap(void) const // Returns the color map
-		{
-		return colorMap;
-		}
 	const Rake& getRake(void) const // Returns the array of arrows
 		{
 		return rake;

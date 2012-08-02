@@ -1,7 +1,7 @@
 /***********************************************************************
 VectorEvaluationLocator - Class for locators evaluating vector
 properties of data sets.
-Copyright (c) 2008-2010 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Geometry/OrthogonalTransformation.h>
 #include <GL/gl.h>
 #include <GL/GLVertexTemplates.h>
+#include <GL/GLColorTemplates.h>
 #include <GL/GLMaterial.h>
 #include <GL/GLColorMap.h>
 #include <GL/GLGeometryWrappers.h>
@@ -44,6 +45,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/VariableManager.h>
 #include <Wrappers/RenderArrow.h>
 
+#include "GLRenderState.h"
 #include "Visualizer.h"
 
 /****************************************
@@ -184,37 +186,26 @@ void VectorEvaluationLocator::motionCallback(Vrui::LocatorTool::MotionCallbackDa
 		}
 	}
 
-void VectorEvaluationLocator::highlightLocator(GLContextData& contextData) const
+void VectorEvaluationLocator::highlightLocator(GLRenderState& renderState) const
 	{
+	/* Call the base class method: */
+	EvaluationLocator::highlightLocator(renderState);
+	
 	/* Render the evaluated vector value if valid: */
 	if(valueValid)
 		{
 		/* Set up OpenGL state for arrow rendering: */
-		GLboolean lightingEnabled=glIsEnabled(GL_LIGHTING);
-		if(!lightingEnabled)
-			glEnable(GL_LIGHTING);
-		GLboolean normalizeEnabled=glIsEnabled(GL_NORMALIZE);
-		if(!normalizeEnabled)
-			glEnable(GL_NORMALIZE);
-		GLboolean colorMaterialEnabled=glIsEnabled(GL_COLOR_MATERIAL);
-		if(colorMaterialEnabled)
-			glDisable(GL_COLOR_MATERIAL);
-		GLMaterial frontMaterial=glGetMaterial(GLMaterialEnums::FRONT);
-		GLMaterial::Color arrowColor=(*colorMap)(currentScalarValue);
-		glMaterial(GLMaterialEnums::FRONT,GLMaterial(arrowColor,GLMaterial::Color(0.6f,0.6f,0.6f),25.0f));
+		renderState.enableCulling(GL_BACK);
+		renderState.setLighting(true);
+		renderState.setTwoSidedLighting(false);
+		glColor((*colorMap)(currentScalarValue));
+		renderState.enableColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);
+		renderState.setTextureLevel(0);
+		renderState.setSeparateSpecularColor(false);
 		
 		/* Render an arrow glyph: */
 		Scalar arrowShaftRadius=Scalar((Vrui::Scalar(0.5)*Vrui::getUiSize())/Vrui::getNavigationTransformation().getScaling());
 		Visualization::Wrappers::renderArrow(point,currentValue*arrowLengthScale,arrowShaftRadius,arrowShaftRadius*Scalar(3),arrowShaftRadius*Scalar(6),16);
-		
-		/* Reset OpenGL state: */
-		glMaterial(GLMaterialEnums::FRONT,frontMaterial);
-		if(colorMaterialEnabled)
-			glEnable(GL_COLOR_MATERIAL);
-		if(!normalizeEnabled)
-			glDisable(GL_NORMALIZE);
-		if(!lightingEnabled)
-			glDisable(GL_LIGHTING);
 		}
 	}
 

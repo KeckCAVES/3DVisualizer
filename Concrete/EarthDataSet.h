@@ -1,7 +1,7 @@
 /***********************************************************************
 EarthDataSet - Wrapper class to add an Earth renderer to an arbitrary
 visualization module working on whole-Earth grids.
-Copyright (c) 2007-2011 Oliver Kreylos
+Copyright (c) 2007-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -148,7 +148,7 @@ class EarthDataSetRenderer:public DataSetRendererBaseParam // Data set renderer 
 		else
 			drawEarthModel=true;
 		}
-	virtual void glRenderAction(GLContextData& contextData) const;
+	virtual void glRenderAction(GLRenderState& renderState) const;
 	};
 
 }

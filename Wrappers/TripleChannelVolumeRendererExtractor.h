@@ -2,7 +2,7 @@
 TripleChannelVolumeRendererExtractor - Wrapper class to map from the
 abstract visualization algorithm interface to a templatized volume
 renderer implementation.
-Copyright (c) 2009-2011 Oliver Kreylos
+Copyright (c) 2009-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

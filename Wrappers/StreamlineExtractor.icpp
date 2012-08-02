@@ -2,7 +2,7 @@
 StreamlineExtractor - Wrapper class to map from the abstract
 visualization algorithm interface to a templatized streamline extractor
 implementation.
-Copyright (c) 2006-2011 Oliver Kreylos
+Copyright (c) 2006-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -262,7 +262,7 @@ StreamlineExtractor<DataSetWrapperParam>::createElement(
 	int csvi=myParameters->colorScalarVariableIndex;
 	
 	/* Create a new streamline visualization element: */
-	Streamline* result=new Streamline(myParameters,getVariableManager()->getColorMap(csvi),getPipe());
+	Streamline* result=new Streamline(getVariableManager(),myParameters,csvi,getPipe());
 	
 	/* Update the streamline extractor: */
 	sle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
@@ -290,7 +290,7 @@ StreamlineExtractor<DataSetWrapperParam>::startElement(
 	int csvi=myParameters->colorScalarVariableIndex;
 	
 	/* Create a new streamline visualization element: */
-	currentStreamline=new Streamline(myParameters,getVariableManager()->getColorMap(csvi),getPipe());
+	currentStreamline=new Streamline(getVariableManager(),myParameters,csvi,getPipe());
 	
 	/* Update the streamline extractor: */
 	sle.update(myParameters->ds,*myParameters->ve,*myParameters->cse);
@@ -339,7 +339,7 @@ StreamlineExtractor<DataSetWrapperParam>::startSlaveElement(
 		Misc::throwStdErr("StreamlineExtractor::startSlaveElement: Mismatching parameter object type");
 	
 	/* Create a new streamline visualization element: */
-	currentStreamline=new Streamline(myParameters,getVariableManager()->getColorMap(myParameters->colorScalarVariableIndex),getPipe());
+	currentStreamline=new Streamline(getVariableManager(),myParameters,myParameters->colorScalarVariableIndex,getPipe());
 	
 	return currentStreamline.getPointer();
 	}

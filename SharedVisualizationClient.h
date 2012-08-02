@@ -2,7 +2,7 @@
 SharedVisualizationClient - Client for collaborative data exploration in
 spatially distributed VR environments, implemented as a plug-in of the
 Vrui remote collaboration infrastructure.
-Copyright (c) 2009-2011 Oliver Kreylos
+Copyright (c) 2009-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <vector>
 #include <Misc/HashTable.h>
 #include <Threads/Mutex.h>
+#include <GL/GLObject.h>
 #include <Collaboration/ProtocolClient.h>
 
 #include "SharedVisualizationProtocol.h"
@@ -40,10 +41,11 @@ class Algorithm;
 class Element;
 }
 }
+class GLRenderState;
 class ExtractorLocator;
 class Visualizer;
 
-class SharedVisualizationClient:public Collaboration::ProtocolClient,private SharedVisualizationProtocol
+class SharedVisualizationClient:public Collaboration::ProtocolClient,private SharedVisualizationProtocol,public GLObject
 	{
 	/* Embedded classes: */
 	public:
@@ -116,6 +118,17 @@ class SharedVisualizationClient:public Collaboration::ProtocolClient,private Sha
 	
 	typedef std::vector<LocatorAction> LocatorActionList; // Type for lists of locator actions
 	
+	struct DataItem:public GLObject::DataItem // Structure storing per-OpenGL context state
+		{
+		/* Elements: */
+		public:
+		GLRenderState* currentRenderState; // Render state object associated with the current OpenGL context in the current rendering pass
+		
+		/* Constructors and destructors: */
+		DataItem(void);
+		virtual ~DataItem(void);
+		};
+	
 	/* Elements: */
 	Visualizer* application; // Pointer to the Visualizer application object
 	unsigned int nextLocatorID; // ID to assign to the next local locator
@@ -145,11 +158,15 @@ class SharedVisualizationClient:public Collaboration::ProtocolClient,private Sha
 	virtual void frame(ProtocolClient::RemoteClientState* rcs);
 	virtual void glRenderAction(const ProtocolClient::RemoteClientState* rcs,GLContextData& contextData) const;
 	
+	/* Methods from GLObject: */
+	virtual void initContext(GLContextData& contextData) const;
+	
 	/* New methods: */
 	void createLocator(ExtractorLocator* locator); // Registers a newly created extractor locator
 	void postSeedRequest(ExtractorLocator* locator,unsigned int seedRequestID,Parameters* seedParameters); // Sends a seed request of the given ID for the given locator; client inherits parameter object
 	void postFinalizationRequest(ExtractorLocator* locator,unsigned int finalSeedRequestID); // Notifies server that the given seed request ID is the final one for a current seeding operation on the given locator
 	void destroyLocator(ExtractorLocator* locator); // Unregisters an extractor locator before it is destroyed
+	void associateRenderState(GLContextData& contextData,GLRenderState& renderState) const; // Associates the given render state with the given OpenGL context for subsequent rendering
 	};
 
 #endif

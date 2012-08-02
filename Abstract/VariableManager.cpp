@@ -1,7 +1,7 @@
 /***********************************************************************
 VariableManager - Helper class to manage the scalar and vector variables
 that can be extracted from a data set.
-Copyright (c) 2008 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -20,10 +20,14 @@ with the 3D Data Visualizer; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 ***********************************************************************/
 
+#include <Abstract/VariableManager.h>
+
 #include <string.h>
 #include <stdio.h>
 #include <stdexcept>
 #include <Misc/CreateNumberedFileName.h>
+#include <GL/gl.h>
+#include <GL/GLContextData.h>
 #include <GL/GLColorMap.h>
 #include <GLMotif/StyleSheet.h>
 #include <GLMotif/WidgetManager.h>
@@ -33,10 +37,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Abstract/ScalarExtractor.h>
 #include <Abstract/VectorExtractor.h>
 
+#include <GLRenderState.h>
 #include <ColorBar.h>
 #include <ColorMap.h>
-
-#include <Abstract/VariableManager.h>
 
 namespace Visualization {
 
@@ -49,6 +52,7 @@ Methods of class VariableManager::ScalarVariable:
 VariableManager::ScalarVariable::ScalarVariable(void)
 	:scalarExtractor(0),
 	 colorMap(0),
+	 colorMapVersion(0),
 	 palette(0)
 	{
 	}
@@ -58,6 +62,29 @@ VariableManager::ScalarVariable::~ScalarVariable(void)
 	delete scalarExtractor;
 	delete colorMap;
 	delete palette;
+	}
+
+/******************************************
+Methods of class VariableManager::DataItem:
+******************************************/
+
+VariableManager::DataItem::DataItem(unsigned int sNumScalarVariables)
+	:numScalarVariables(sNumScalarVariables),
+	 colorMapTextureIds(new GLuint[numScalarVariables]),
+	 colorMapVersions(new unsigned int[numScalarVariables])
+	{
+	/* Initialize the color map texture array: */
+	glGenTextures(numScalarVariables,colorMapTextureIds);
+	for(unsigned int i=0;i<numScalarVariables;++i)
+		colorMapVersions[i]=0;
+	}
+
+VariableManager::DataItem::~DataItem(void)
+	{
+	/* Delete the color map texture array: */
+	glDeleteTextures(numScalarVariables,colorMapTextureIds);
+	delete[] colorMapTextureIds;
+	delete[] colorMapVersions;
 	}
 
 /********************************
@@ -76,12 +103,17 @@ void VariableManager::prepareScalarVariable(int scalarVariableIndex)
 	
 	/* Create a 256-entry OpenGL color map for rendering: */
 	sv.colorMap=new GLColorMap(GLColorMap::GREYSCALE|GLColorMap::RAMP_ALPHA,1.0f,1.0f,sv.valueRange.first,sv.valueRange.second);
+	++sv.colorMapVersion;
+	
+	/* Initialize the color map range to the variable's full scalar range: */
+	sv.colorMapRange=sv.valueRange;
 	}
 
 void VariableManager::colorMapChangedCallback(Misc::CallbackData* cbData)
 	{
 	/* Export the changed palette to the current color map: */
 	paletteEditor->exportColorMap(*scalarVariables[currentScalarVariableIndex].colorMap);
+	++scalarVariables[currentScalarVariableIndex].colorMapVersion;
 	
 	Vrui::requestUpdate();
 	}
@@ -166,6 +198,13 @@ VariableManager::~VariableManager(void)
 	
 	delete colorBarDialogPopup;
 	delete paletteEditor;
+	}
+
+void VariableManager::initContext(GLContextData& contextData) const
+	{
+	/* Create a data item and register it with the OpenGL context: */
+	DataItem* dataItem=new DataItem(numScalarVariables);
+	contextData.addDataItem(this,dataItem);
 	}
 
 const DataSet* VariableManager::getDataSetByScalarVariable(int scalarVariableIndex) const
@@ -317,6 +356,18 @@ const GLColorMap* VariableManager::getColorMap(int scalarVariableIndex)
 		prepareScalarVariable(scalarVariableIndex);
 	
 	return scalarVariables[scalarVariableIndex].colorMap;
+	}
+
+const DataSet::VScalarRange& VariableManager::getScalarColorMapRange(int scalarVariableIndex)
+	{
+	if(scalarVariableIndex<0||scalarVariableIndex>=numScalarVariables)
+		return scalarVariables[currentScalarVariableIndex].colorMapRange;
+	
+	/* Check if the scalar variable has not been requested before: */
+	if(scalarVariables[scalarVariableIndex].scalarExtractor==0)
+		prepareScalarVariable(scalarVariableIndex);
+	
+	return scalarVariables[scalarVariableIndex].colorMapRange;
 	}
 
 const VectorExtractor* VariableManager::getVectorExtractor(int vectorVariableIndex)
@@ -483,6 +534,76 @@ void VariableManager::loadPalette(const char* paletteFileName)
 void VariableManager::insertPaletteEditorControlPoint(double newControlPoint)
 	{
 	paletteEditor->getColorMap()->insertControlPoint(newControlPoint);
+	}
+
+void VariableManager::beginRenderPass(GLRenderState& renderState) const
+	{
+	/* Get the context data item: */
+	DataItem* dataItem=renderState.getContextData().retrieveDataItem<DataItem>(this);
+	
+	/* Initialize the scalar variable tracker: */
+	dataItem->lastBoundScalarVariableIndex=-1;
+	
+	/* Save the OpenGL texture matrix: */
+	renderState.setMatrixMode(2);
+	glPushMatrix();
+	dataItem->textureMatrixVersion=renderState.getMatrixVersion();
+	}
+
+void VariableManager::bindColorMap(int scalarVariableIndex,GLRenderState& renderState) const
+	{
+	/* Get the context data item: */
+	DataItem* dataItem=renderState.getContextData().retrieveDataItem<DataItem>(this);
+	
+	/* Set up 1D texture mapping: */
+	renderState.setTextureLevel(1);
+	
+	/* Bind the color texture object: */
+	renderState.bindTexture(dataItem->colorMapTextureIds[scalarVariableIndex]);
+	
+	/* Check if the texture object is outdated: */
+	const ScalarVariable& sv=scalarVariables[scalarVariableIndex];
+	if(dataItem->colorMapVersions[scalarVariableIndex]!=sv.colorMapVersion)
+		{
+		/* Set the texture object's parameters: */
+		glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_BASE_LEVEL,0);
+		glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_MAX_LEVEL,0);
+		glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_1D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+		
+		/* Upload the changed color map into the texture object: */
+		glPixelStorei(GL_UNPACK_SKIP_PIXELS,0);
+		glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+		glTexImage1D(GL_TEXTURE_1D,0,GL_RGBA8,256,0,GL_RGBA,GL_FLOAT,sv.colorMap->getColors());
+		
+		/* Mark the texture object as up-to-date: */
+		dataItem->colorMapVersions[scalarVariableIndex]=sv.colorMapVersion;
+		}
+	
+	/* Set up the texture matrix to convert scalar variable values to color map indices: */
+	renderState.setMatrixMode(2);
+	if(dataItem->lastBoundScalarVariableIndex!=scalarVariableIndex||dataItem->textureMatrixVersion!=renderState.getMatrixVersion())
+		{
+		glLoadIdentity();
+		double mapMin=double(sv.colorMapRange.first);
+		double mapRange=double(sv.colorMapRange.second)-mapMin;
+		glScaled(1.0/mapRange,1.0,1.0);
+		glTranslated(-mapMin,0.0,0.0);
+		renderState.updateMatrix();
+		
+		/* Mark the texture matrix as up to date: */
+		dataItem->lastBoundScalarVariableIndex=scalarVariableIndex;
+		dataItem->textureMatrixVersion=renderState.getMatrixVersion();
+		}
+	}
+
+void VariableManager::endRenderPass(GLRenderState& renderState) const
+	{
+	/* Restore the OpenGL texture matrix: */
+	renderState.setMatrixMode(2);
+	glPopMatrix();
+	renderState.updateMatrix();
 	}
 
 }

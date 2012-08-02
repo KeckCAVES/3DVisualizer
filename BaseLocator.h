@@ -1,6 +1,6 @@
 /***********************************************************************
 BaseLocator - Base class for locators in visualizer application.
-Copyright (c) 2005-2010 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <Vrui/LocatorToolAdapter.h>
 
 /* Forward declarations: */
-class GLContextData;
+class GLRenderState;
 class Visualizer;
 
 class BaseLocator:public Vrui::LocatorToolAdapter
@@ -39,9 +39,9 @@ class BaseLocator:public Vrui::LocatorToolAdapter
 	BaseLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication);
 
 	/* New methods: */
-	virtual void highlightLocator(GLContextData& contextData) const; // Renders the locator itself
-	virtual void glRenderAction(GLContextData& contextData) const; // Renders opaque elements and other objects controlled by the locator
-	virtual void glRenderActionTransparent(GLContextData& contextData) const; // Renders transparent elements and other objects controlled by the locator
+	virtual void highlightLocator(GLRenderState& renderState) const; // Renders the locator itself
+	virtual void renderLocator(GLRenderState& renderState) const; // Renders opaque elements and other objects controlled by the locator
+	virtual void renderLocatorTransparent(GLRenderState& renderState) const; // Renders transparent elements and other objects controlled by the locator
 	};
 
 #endif

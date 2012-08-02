@@ -1,7 +1,7 @@
 /***********************************************************************
 ElementList - Class to manage a list of previously extracted
 visualization elements.
-Copyright (c) 2009-2011 Oliver Kreylos
+Copyright (c) 2009-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -34,7 +34,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 namespace Misc {
 class CallbackData;
 }
-class GLContextData;
 namespace GLMotif {
 class Widget;
 class PopupWindow;
@@ -45,6 +44,7 @@ class Element;
 class VariableManager;
 }
 }
+class GLRenderState;
 
 class ElementList
 	{
@@ -98,7 +98,7 @@ class ElementList
 		{
 		return elementListDialogPopup;
 		}
-	void renderElements(GLContextData& contextData,bool transparent) const; // Renders all visible transparent or opaque elements
+	void renderElements(GLRenderState& renderState,bool transparent) const; // Renders all visible transparent or opaque elements
 	};
 
 #endif
