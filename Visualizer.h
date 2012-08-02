@@ -1,7 +1,7 @@
 /***********************************************************************
 Visualizer - Test application for the new visualization component
 framework.
-Copyright (c) 2005-2017 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -40,6 +40,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 /* Forward declarations: */
 namespace GLMotif {
 class Widget;
+class Popup;
 class PopupMenu;
 class PopupWindow;
 class RowColumn;
@@ -139,20 +140,20 @@ class Visualizer:public Vrui::Application
 	bool inLoadElements; // Flag whether the user is currently selecting an element file to load
 	
 	/* Private methods: */
-	GLMotif::PopupMenu* createRenderingModesMenu(void);
-	GLMotif::PopupMenu* createScalarVariablesMenu(void);
-	GLMotif::PopupMenu* createVectorVariablesMenu(void);
-	GLMotif::PopupMenu* createAlgorithmsMenu(void);
-	GLMotif::PopupMenu* createElementsMenu(void);
-	GLMotif::PopupMenu* createStandardLuminancePalettesMenu(void);
-	GLMotif::PopupMenu* createStandardSaturationPalettesMenu(void);
-	GLMotif::PopupMenu* createColorMenu(void);
+	GLMotif::Popup* createRenderingModesMenu(void);
+	GLMotif::Popup* createScalarVariablesMenu(void);
+	GLMotif::Popup* createVectorVariablesMenu(void);
+	GLMotif::Popup* createAlgorithmsMenu(void);
+	GLMotif::Popup* createElementsMenu(void);
+	GLMotif::Popup* createStandardLuminancePalettesMenu(void);
+	GLMotif::Popup* createStandardSaturationPalettesMenu(void);
+	GLMotif::Popup* createColorMenu(void);
 	GLMotif::PopupMenu* createMainMenu(void);
 	void loadElements(const char* elementFileName,bool ascii); // Loads all visualization elements defined in the given file
 	
 	/* Constructors and destructors: */
 	public:
-	Visualizer(int& argc,char**& argv);
+	Visualizer(int& argc,char**& argv,char**& appDefaults);
 	virtual ~Visualizer(void);
 	
 	/* Methods from Vrui::Application: */
@@ -161,7 +162,6 @@ class Visualizer:public Vrui::Application
 	virtual void frame();
 	virtual void display(GLContextData& contextData) const;
 	virtual void sound(ALContextData& contextData) const;
-	virtual void resetNavigation(void);
 	
 	/* New methods: */
 	void changeRenderingModeCallback(GLMotif::RadioBox::ValueChangedCallbackData* cbData);
@@ -187,6 +187,7 @@ class Visualizer:public Vrui::Application
 	void clearElementsCallback(Misc::CallbackData* cbData);
 	void showClientDialogCallback(GLMotif::ToggleButton::ValueChangedCallbackData* cbData);
 	void clientDialogClosedCallback(Misc::CallbackData* cbData);
+	void centerDisplayCallback(Misc::CallbackData* cbData);
 	};
 
 #endif

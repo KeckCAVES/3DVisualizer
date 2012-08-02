@@ -52,7 +52,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 Methods of class VectorEvaluationLocator:
 ****************************************/
 
-VectorEvaluationLocator::VectorEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,const Misc::ConfigurationFileSection* cfg)
+VectorEvaluationLocator::VectorEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg)
 	:EvaluationLocator(sLocatorTool,sApplication,"Vector Evaluation Dialog"),
 	 vectorExtractor(0),
 	 scalarExtractor(0),

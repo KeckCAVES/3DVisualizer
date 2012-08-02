@@ -1,6 +1,6 @@
 /***********************************************************************
 PointSet - Class to represent and render sets of scattered 3D points.
-Copyright (c) 2005-2013 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

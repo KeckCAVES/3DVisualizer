@@ -1,7 +1,7 @@
 /***********************************************************************
 ColorBar - A widget to display color bars with tick marks and numerical
 values.
-Copyright (c) 2008-2013 Oliver Kreylos
+Copyright (c) 2008 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

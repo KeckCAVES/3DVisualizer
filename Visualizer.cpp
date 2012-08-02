@@ -1,7 +1,7 @@
 /***********************************************************************
 Visualizer - Test application for the new visualization component
 framework.
-Copyright (c) 2005-2017 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -46,21 +46,22 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLGeometryWrappers.h>
 #include <GLMotif/WidgetManager.h>
 #include <GLMotif/StyleSheet.h>
+#include <GLMotif/Popup.h>
 #include <GLMotif/PopupMenu.h>
 #include <GLMotif/PopupWindow.h>
 #include <GLMotif/RowColumn.h>
+#include <GLMotif/SubMenu.h>
 #include <GLMotif/Separator.h>
 #include <GLMotif/Label.h>
 #include <GLMotif/TextField.h>
 #include <GLMotif/Button.h>
 #include <GLMotif/CascadeButton.h>
-#include <SceneGraph/GLRenderState.h>
 #include <SceneGraph/NodeCreator.h>
 #include <SceneGraph/VRMLFile.h>
+#include <SceneGraph/GLRenderState.h>
 #include <Vrui/Vrui.h>
 #include <Vrui/CoordinateManager.h>
 #include <Vrui/OpenFile.h>
-#include <Vrui/SceneGraphSupport.h>
 #ifdef VISUALIZER_USE_COLLABORATION
 #include <Collaboration/CollaborationClient.h>
 #endif
@@ -93,11 +94,11 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 Methods of class Visualizer:
 ***************************/
 
-GLMotif::PopupMenu* Visualizer::createRenderingModesMenu(void)
+GLMotif::Popup* Visualizer::createRenderingModesMenu(void)
 	{
-	GLMotif::PopupMenu* renderingModesMenuPopup=new GLMotif::PopupMenu("RenderingModesMenuPopup",Vrui::getWidgetManager());
+	GLMotif::Popup* renderingModesMenuPopup=new GLMotif::Popup("RenderingModesMenuPopup",Vrui::getWidgetManager());
 	
-	GLMotif::Menu* renderingModesMenu=new GLMotif::Menu("RenderingModesMenu",renderingModesMenuPopup,false);
+	GLMotif::SubMenu* renderingModesMenu=new GLMotif::SubMenu("RenderingModesMenu",renderingModesMenuPopup,false);
 	
 	GLMotif::RadioBox* renderingModes=new GLMotif::RadioBox("RenderingModes",renderingModesMenu,false);
 	renderingModes->setSelectionMode(GLMotif::RadioBox::ATMOST_ONE);
@@ -133,13 +134,11 @@ GLMotif::PopupMenu* Visualizer::createRenderingModesMenu(void)
 	return renderingModesMenuPopup;
 	}
 
-GLMotif::PopupMenu* Visualizer::createScalarVariablesMenu(void)
+GLMotif::Popup* Visualizer::createScalarVariablesMenu(void)
 	{
-	GLMotif::PopupMenu* scalarVariablesMenuPopup=new GLMotif::PopupMenu("ScalarVariablesMenuPopup",Vrui::getWidgetManager());
+	GLMotif::Popup* scalarVariablesMenuPopup=new GLMotif::Popup("ScalarVariablesMenuPopup",Vrui::getWidgetManager());
 	
-	GLMotif::Menu* scalarVariablesMenu=new GLMotif::Menu("ScalarVariablesMenu",scalarVariablesMenuPopup,false);
-	
-	GLMotif::RadioBox* scalarVariables=new GLMotif::RadioBox("ScalarVariables",scalarVariablesMenu,false);
+	GLMotif::RadioBox* scalarVariables=new GLMotif::RadioBox("ScalarVariables",scalarVariablesMenuPopup,false);
 	scalarVariables->setSelectionMode(GLMotif::RadioBox::ALWAYS_ONE);
 	
 	for(int i=0;i<variableManager->getNumScalarVariables();++i)
@@ -150,18 +149,14 @@ GLMotif::PopupMenu* Visualizer::createScalarVariablesMenu(void)
 	
 	scalarVariables->manageChild();
 	
-	scalarVariablesMenu->manageChild();
-	
 	return scalarVariablesMenuPopup;
 	}
 
-GLMotif::PopupMenu* Visualizer::createVectorVariablesMenu(void)
+GLMotif::Popup* Visualizer::createVectorVariablesMenu(void)
 	{
-	GLMotif::PopupMenu* vectorVariablesMenuPopup=new GLMotif::PopupMenu("VectorVariablesMenuPopup",Vrui::getWidgetManager());
+	GLMotif::Popup* vectorVariablesMenuPopup=new GLMotif::Popup("VectorVariablesMenuPopup",Vrui::getWidgetManager());
 	
-	GLMotif::Menu* vectorVariablesMenu=new GLMotif::Menu("VectorVariablesMenu",vectorVariablesMenuPopup,false);
-	
-	GLMotif::RadioBox* vectorVariables=new GLMotif::RadioBox("VectorVariables",vectorVariablesMenu,false);
+	GLMotif::RadioBox* vectorVariables=new GLMotif::RadioBox("VectorVariables",vectorVariablesMenuPopup,false);
 	vectorVariables->setSelectionMode(GLMotif::RadioBox::ALWAYS_ONE);
 	
 	for(int i=0;i<variableManager->getNumVectorVariables();++i)
@@ -172,18 +167,14 @@ GLMotif::PopupMenu* Visualizer::createVectorVariablesMenu(void)
 	
 	vectorVariables->manageChild();
 	
-	vectorVariablesMenu->manageChild();
-	
 	return vectorVariablesMenuPopup;
 	}
 
-GLMotif::PopupMenu* Visualizer::createAlgorithmsMenu(void)
+GLMotif::Popup* Visualizer::createAlgorithmsMenu(void)
 	{
-	GLMotif::PopupMenu* algorithmsMenuPopup=new GLMotif::PopupMenu("AlgorithmsMenuPopup",Vrui::getWidgetManager());
+	GLMotif::Popup* algorithmsMenuPopup=new GLMotif::Popup("AlgorithmsMenuPopup",Vrui::getWidgetManager());
 	
-	GLMotif::Menu* algorithmsMenu=new GLMotif::Menu("AlgorithmsMenu",algorithmsMenuPopup,false);
-	
-	GLMotif::RadioBox* algorithms=new GLMotif::RadioBox("Algorithms",algorithmsMenu,false);
+	GLMotif::RadioBox* algorithms=new GLMotif::RadioBox("Algorithms",algorithmsMenuPopup,false);
 	algorithms->setSelectionMode(GLMotif::RadioBox::ALWAYS_ONE);
 	
 	/* Add the cutting plane algorithm: */
@@ -226,17 +217,15 @@ GLMotif::PopupMenu* Visualizer::createAlgorithmsMenu(void)
 	
 	algorithms->manageChild();
 	
-	algorithmsMenu->manageChild();
-	
 	return algorithmsMenuPopup;
 	}
 
-GLMotif::PopupMenu* Visualizer::createElementsMenu(void)
+GLMotif::Popup* Visualizer::createElementsMenu(void)
 	{
-	GLMotif::PopupMenu* elementsMenuPopup=new GLMotif::PopupMenu("ElementsMenuPopup",Vrui::getWidgetManager());
+	GLMotif::Popup* elementsMenuPopup=new GLMotif::Popup("ElementsMenuPopup",Vrui::getWidgetManager());
 	
 	/* Create the elements menu: */
-	GLMotif::Menu* elementsMenu=new GLMotif::Menu("ElementsMenu",elementsMenuPopup,false);
+	GLMotif::SubMenu* elementsMenu=new GLMotif::SubMenu("ElementsMenu",elementsMenuPopup,false);
 	
 	showElementListToggle=new GLMotif::ToggleButton("ShowElementListToggle",elementsMenu,"Show Element List");
 	showElementListToggle->getValueChangedCallbacks().add(this,&Visualizer::showElementListCallback);
@@ -257,12 +246,12 @@ GLMotif::PopupMenu* Visualizer::createElementsMenu(void)
 	return elementsMenuPopup;
 	}
 
-GLMotif::PopupMenu* Visualizer::createStandardLuminancePalettesMenu(void)
+GLMotif::Popup* Visualizer::createStandardLuminancePalettesMenu(void)
 	{
-	GLMotif::PopupMenu* standardLuminancePalettesMenuPopup=new GLMotif::PopupMenu("StandardLuminancePalettesMenuPopup",Vrui::getWidgetManager());
+	GLMotif::Popup* standardLuminancePalettesMenuPopup=new GLMotif::Popup("StandardLuminancePalettesMenuPopup",Vrui::getWidgetManager());
 	
 	/* Create the palette creation menu and add entries for all standard palettes: */
-	GLMotif::Menu* standardLuminancePalettes=new GLMotif::Menu("StandardLuminancePalettes",standardLuminancePalettesMenuPopup,false);
+	GLMotif::SubMenu* standardLuminancePalettes=new GLMotif::SubMenu("StandardLuminancePalettes",standardLuminancePalettesMenuPopup,false);
 	
 	standardLuminancePalettes->addEntry("Grey");
 	standardLuminancePalettes->addEntry("Red");
@@ -279,12 +268,12 @@ GLMotif::PopupMenu* Visualizer::createStandardLuminancePalettesMenu(void)
 	return standardLuminancePalettesMenuPopup;
 	}
 
-GLMotif::PopupMenu* Visualizer::createStandardSaturationPalettesMenu(void)
+GLMotif::Popup* Visualizer::createStandardSaturationPalettesMenu(void)
 	{
-	GLMotif::PopupMenu* standardSaturationPalettesMenuPopup=new GLMotif::PopupMenu("StandardSaturationPalettesMenuPopup",Vrui::getWidgetManager());
+	GLMotif::Popup* standardSaturationPalettesMenuPopup=new GLMotif::Popup("StandardSaturationPalettesMenuPopup",Vrui::getWidgetManager());
 	
 	/* Create the palette creation menu and add entries for all standard palettes: */
-	GLMotif::Menu* standardSaturationPalettes=new GLMotif::Menu("StandardSaturationPalettes",standardSaturationPalettesMenuPopup,false);
+	GLMotif::SubMenu* standardSaturationPalettes=new GLMotif::SubMenu("StandardSaturationPalettes",standardSaturationPalettesMenuPopup,false);
 	
 	standardSaturationPalettes->addEntry("Red -> Cyan");
 	standardSaturationPalettes->addEntry("Yellow -> Blue");
@@ -301,12 +290,12 @@ GLMotif::PopupMenu* Visualizer::createStandardSaturationPalettesMenu(void)
 	return standardSaturationPalettesMenuPopup;
 	}
 
-GLMotif::PopupMenu* Visualizer::createColorMenu(void)
+GLMotif::Popup* Visualizer::createColorMenu(void)
 	{
-	GLMotif::PopupMenu* colorMenuPopup=new GLMotif::PopupMenu("ColorMenuPopup",Vrui::getWidgetManager());
+	GLMotif::Popup* colorMenuPopup=new GLMotif::Popup("ColorMenuPopup",Vrui::getWidgetManager());
 	
 	/* Create the color menu and add entries for all standard palettes: */
-	GLMotif::Menu* colorMenu=new GLMotif::Menu("ColorMenu",colorMenuPopup,false);
+	GLMotif::SubMenu* colorMenu=new GLMotif::SubMenu("ColorMenu",colorMenuPopup,false);
 	
 	GLMotif::CascadeButton* standardLuminancePalettesCascade=new GLMotif::CascadeButton("StandardLuminancePalettesCascade",colorMenu,"Create Luminance Palette");
 	standardLuminancePalettesCascade->setPopup(createStandardLuminancePalettesMenu());
@@ -358,6 +347,9 @@ GLMotif::PopupMenu* Visualizer::createMainMenu(void)
 	
 	GLMotif::CascadeButton* colorCascade=new GLMotif::CascadeButton("ColorCascade",mainMenu,"Color Maps");
 	colorCascade->setPopup(createColorMenu());
+	
+	GLMotif::Button* centerDisplayButton=new GLMotif::Button("CenterDisplayButton",mainMenu,"Center Display");
+	centerDisplayButton->getSelectCallbacks().add(this,&Visualizer::centerDisplayCallback);
 	
 	#ifdef VISUALIZER_USE_COLLABORATION
 	if(collaborationClient!=0)
@@ -605,8 +597,8 @@ void Visualizer::loadElements(const char* elementFileName,bool ascii)
 		}
 	}
 
-Visualizer::Visualizer(int& argc,char**& argv)
-	:Vrui::Application(argc,argv),
+Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
+	:Vrui::Application(argc,argv,appDefaults),
 	 moduleManager(VISUALIZER_MODULENAMETEMPLATE),
 	 module(0),dataSet(0),variableManager(0),
 	 renderDataSet(true),dataSetRenderer(0),
@@ -845,8 +837,7 @@ Visualizer::Visualizer(int& argc,char**& argv)
 	coordinateTransformer=dataSet->getCoordinateTransformer();
 	
 	/* Set Vrui's application unit: */
-	if(dataSet->getUnit().unit!=Geometry::LinearUnit::UNKNOWN)
-		Vrui::getCoordinateManager()->setUnit(dataSet->getUnit());
+	Vrui::getCoordinateManager()->setUnit(dataSet->getUnit());
 	
 	/* Create cutting planes: */
 	numCuttingPlanes=6;
@@ -905,6 +896,9 @@ Visualizer::Visualizer(int& argc,char**& argv)
 			loadElements(*lfnIt,false);
 			}
 		}
+	
+	/* Initialize navigation transformation: */
+	centerDisplayCallback(0);
 	}
 
 Visualizer::~Visualizer(void)
@@ -982,10 +976,7 @@ void Visualizer::toolCreationCallback(Vrui::ToolManager::ToolCreationCallbackDat
 					newLocator=new ExtractorLocator(locatorTool,this,extractor,cbData->cfg);
 					}
 				else
-					{
-					newLocator=0;
 					delete algorithmPipe;
-					}
 				}
 			}
 		else
@@ -1060,19 +1051,22 @@ void Visualizer::frame(void)
 
 void Visualizer::display(GLContextData& contextData) const
 	{
-	#ifdef VISUALIZER_USE_COLLABORATION
-	if(collaborationClient!=0)
-		{
-		/* Call the collaboration client's display method: */
-		collaborationClient->display(contextData);
-		}
-	#endif
-	
 	/* Create an OpenGL state tracker: */
 	GLRenderState renderState(contextData);
 	
 	/* Prepare the variable manager for a rendering pass: */
 	variableManager->beginRenderPass(renderState);
+	
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		{
+		/* Associate the render state with the shared visualization protocol client's context data item: */
+		sharedVisualizationClient->associateRenderState(contextData,renderState);
+		
+		/* Call the collaboration client's display method: */
+		collaborationClient->display(contextData);
+		}
+	#endif
 	
 	/* Highlight all locators: */
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
@@ -1101,32 +1095,21 @@ void Visualizer::display(GLContextData& contextData) const
 	elementList->renderElements(renderState,false);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->renderLocator(renderState);
-	#ifdef VISUALIZER_USE_COLLABORATION
-	if(collaborationClient!=0)
-		sharedVisualizationClient->drawLocators(renderState,false);
-	#endif
 	
 	if(renderSceneGraphs)
 		{
 		/* Save OpenGL state: */
 		glPushAttrib(GL_ENABLE_BIT|GL_LIGHTING_BIT|GL_TEXTURE_BIT);
 		
-		/* Save the modelview matrix: */
-		renderState.setMatrixMode(1);
-		glPushMatrix();
-		
-		/* Create a render state to traverse the scene graphs: */
-		SceneGraph::GLRenderState* sgRenderState=Vrui::createRenderState(true,contextData);
+		/* Create a render state to traverse the scene graph: */
+		SceneGraph::GLRenderState renderState(contextData,Vrui::getHeadPosition(),Vrui::getInverseNavigationTransformation().transform(Vrui::getUpDirection()));
 		
 		/* Render all additional scene graphs: */
 		for(std::vector<SG>::const_iterator sgIt=sceneGraphs.begin();sgIt!=sceneGraphs.end();++sgIt)
 			if(sgIt->render)
-				sgIt->root->glRenderAction(*sgRenderState);
-		
-		delete sgRenderState;
+				sgIt->root->glRenderAction(renderState);
 		
 		/* Restore OpenGL state: */
-		glPopMatrix();
 		glPopAttrib();
 		}
 	
@@ -1134,10 +1117,6 @@ void Visualizer::display(GLContextData& contextData) const
 	elementList->renderElements(renderState,true);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->renderLocatorTransparent(renderState);
-	#ifdef VISUALIZER_USE_COLLABORATION
-	if(collaborationClient!=0)
-		sharedVisualizationClient->drawLocators(renderState,true);
-	#endif
 	
 	if(renderDataSet)
 		{
@@ -1171,16 +1150,6 @@ void Visualizer::sound(ALContextData& contextData) const
 		collaborationClient->sound(contextData);
 		}
 	#endif
-	}
-
-void Visualizer::resetNavigation(void)
-	{
-	/* Get the data set's domain box: */
-	DataSet::Box domain=dataSet->getDomainBox();
-	Vrui::Point center=Geometry::mid(domain.min,domain.max);
-	Vrui::Scalar radius=Geometry::dist(domain.min,domain.max);
-	
-	Vrui::setNavigationTransformation(center,radius);
 	}
 
 void Visualizer::changeRenderingModeCallback(GLMotif::RadioBox::ValueChangedCallbackData* cbData)
@@ -1411,4 +1380,28 @@ void Visualizer::clientDialogClosedCallback(Misc::CallbackData* cbData)
 	#endif
 	}
 
-VRUI_APPLICATION_RUN(Visualizer)
+void Visualizer::centerDisplayCallback(Misc::CallbackData*)
+	{
+	/* Get the data set's domain box: */
+	DataSet::Box domain=dataSet->getDomainBox();
+	Vrui::Point center=Geometry::mid(domain.min,domain.max);
+	Vrui::Scalar radius=Geometry::dist(domain.min,domain.max);
+	
+	Vrui::setNavigationTransformation(center,radius);
+	}
+
+int main(int argc,char* argv[])
+	{
+	try
+		{
+		char** appDefaults=0;
+		Visualizer iso(argc,argv,appDefaults);
+		iso.run();
+		return 0;
+		}
+	catch(std::runtime_error err)
+		{
+		std::cerr<<"Caught exception "<<err.what()<<std::endl;
+		return 1;
+		}
+	}

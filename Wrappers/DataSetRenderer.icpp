@@ -1,7 +1,7 @@
 /***********************************************************************
 DataSetRenderer - Wrapper class to map from the abstract data set
 renderer interface to its templatized data set renderer implementation.
-Copyright (c) 2005-2013 Oliver Kreylos
+Copyright (c) 2005-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -87,11 +87,9 @@ inline
 DataSetRenderer<DataSetWrapperParam>::DataSetRenderer(
 	const DataSetRenderer<DataSetWrapperParam>& source)
 	:Base(source),
-	 GLObject(false),
 	 dsr(source.dsr),
 	 displayVersion(1)
 	{
-	GLObject::init();
 	}
 
 template <class DataSetWrapperParam>

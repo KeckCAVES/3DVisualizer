@@ -1,7 +1,7 @@
 /***********************************************************************
 Raycaster - Base class for volume renderers for Cartesian gridded data
 using GLSL shaders.
-Copyright (c) 2007-2013 Oliver Kreylos
+Copyright (c) 2007-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -81,13 +81,11 @@ Raycaster::DataItem::DataItem(void)
 	
 	/* Create the depth framebuffer and attach the depth texture to it: */
 	glGenFramebuffersEXT(1,&depthFramebufferID);
-	GLint currentFramebuffer;
-	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT,&currentFramebuffer);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,depthFramebufferID);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT,GL_DEPTH_ATTACHMENT_EXT,GL_TEXTURE_2D,depthTextureID,0);
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,currentFramebuffer);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT,0);
 	}
 
 Raycaster::DataItem::~DataItem(void)
@@ -97,21 +95,21 @@ Raycaster::DataItem::~DataItem(void)
 	glDeleteTextures(1,&depthTextureID);
 	}
 
-void Raycaster::DataItem::initDepthBuffer(const Vrui::DisplayState& displayState)
+void Raycaster::DataItem::initDepthBuffer(const int* windowSize)
 	{
 	/* Calculate the new depth texture size: */
 	GLsizei newDepthTextureSize[2];
 	if(hasNPOTDTextures)
 		{
-		/* Use the maximum frame buffer size in the current window group: */
+		/* Use the viewport size: */
 		for(int i=0;i<2;++i)
-			newDepthTextureSize[i]=displayState.maxFrameSize[i];
+			newDepthTextureSize[i]=windowSize[i];
 		}
 	else
 		{
 		/* Pad the viewport size to the next power of two: */
 		for(int i=0;i<2;++i)
-			for(newDepthTextureSize[i]=1;newDepthTextureSize[i]<displayState.maxFrameSize[i];newDepthTextureSize[i]<<=1)
+			for(newDepthTextureSize[i]=1;newDepthTextureSize[i]<windowSize[i];newDepthTextureSize[i]<<=1)
 				;
 		}
 	
@@ -133,8 +131,8 @@ void Raycaster::DataItem::initDepthBuffer(const Vrui::DisplayState& displayState
 	GLint viewport[4];
 	glGetIntegerv(GL_VIEWPORT,viewport);
 	
-	/* Copy the current depth buffer from the current viewport into the depth texture: */
-	glCopyTexSubImage2D(GL_TEXTURE_2D,0,displayState.viewport[0],displayState.viewport[1],displayState.viewport[0],displayState.viewport[1],displayState.viewport[2],displayState.viewport[3]);
+	/* Copy the current depth buffer into the depth texture: */
+	glCopyTexSubImage2D(GL_TEXTURE_2D,0,viewport[0],viewport[1],viewport[0],viewport[1],viewport[2],viewport[3]);
 	
 	/* Unbind the depth texture: */
 	glBindTexture(GL_TEXTURE_2D,0);
@@ -261,8 +259,7 @@ Polyhedron<Raycaster::Scalar>* Raycaster::clipDomain(const Raycaster::PTransform
 	}
 
 Raycaster::Raycaster(const unsigned int sDataSize[3],const Raycaster::Box& sDomain)
-	:GLObject(false),
-	 domain(sDomain),domainExtent(0),cellSize(0),
+	:domain(sDomain),domainExtent(0),cellSize(0),
 	 renderDomain(Polyhedron<Scalar>::Point(domain.min),Polyhedron<Scalar>::Point(domain.max)),
 	 stepSize(1)
 	{
@@ -278,8 +275,6 @@ Raycaster::Raycaster(const unsigned int sDataSize[3],const Raycaster::Box& sDoma
 		}
 	domainExtent=Math::sqrt(domainExtent);
 	cellSize=Math::sqrt(cellSize);
-	
-	GLObject::init();
 	}
 
 Raycaster::~Raycaster(void)
@@ -305,7 +300,8 @@ void Raycaster::glRenderAction(GLContextData& contextData) const
 	glPushAttrib(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_ENABLE_BIT|GL_LIGHTING_BIT|GL_POLYGON_BIT);
 	
 	/* Initialize the ray termination depth frame buffer: */
-	dataItem->initDepthBuffer(Vrui::getDisplayState(contextData));
+	const Vrui::DisplayState& vds=Vrui::getDisplayState(contextData);
+	dataItem->initDepthBuffer(vds.window->getWindowSize());
 	
 	/* Bind the ray termination framebuffer: */
 	GLint currentFramebuffer;

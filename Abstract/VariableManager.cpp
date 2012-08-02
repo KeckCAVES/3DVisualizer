@@ -1,7 +1,7 @@
 /***********************************************************************
 VariableManager - Helper class to manage the scalar and vector variables
 that can be extracted from a data set.
-Copyright (c) 2008-2013 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -101,13 +101,6 @@ void VariableManager::prepareScalarVariable(int scalarVariableIndex)
 	/* Calculate the scalar extractor's value range: */
 	sv.valueRange=dataSet->calcScalarValueRange(sv.scalarExtractor);
 	
-	/* Check for and correct an empty value range: */
-	if(sv.valueRange.first==sv.valueRange.second)
-		{
-		sv.valueRange.first-=1.0;
-		sv.valueRange.second+=1.0;
-		}
-	
 	/* Create a 256-entry OpenGL color map for rendering: */
 	sv.colorMap=new GLColorMap(GLColorMap::GREYSCALE|GLColorMap::RAMP_ALPHA,1.0f,1.0f,sv.valueRange.first,sv.valueRange.second);
 	++sv.colorMapVersion;
@@ -142,8 +135,7 @@ void VariableManager::savePaletteCallback(Misc::CallbackData* cbData)
 	}
 
 VariableManager::VariableManager(const DataSet* sDataSet,const char* sDefaultColorMapName)
-	:GLObject(false),
-	 dataSet(sDataSet),
+	:dataSet(sDataSet),
 	 defaultColorMapName(0),
 	 scalarVariables(0),
 	 colorBarDialogPopup(0),colorBar(0),
@@ -190,8 +182,6 @@ VariableManager::VariableManager(const DataSet* sDataSet,const char* sDefaultCol
 	/* Initialize the current variable state: */
 	setCurrentScalarVariable(0);
 	setCurrentVectorVariable(0);
-	
-	GLObject::init();
 	}
 
 VariableManager::~VariableManager(void)

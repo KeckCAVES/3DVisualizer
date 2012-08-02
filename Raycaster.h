@@ -1,7 +1,7 @@
 /***********************************************************************
 Raycaster - Base class for volume renderers for Cartesian gridded data
 using GLSL shaders.
-Copyright (c) 2007-2013 Oliver Kreylos
+Copyright (c) 2007-2010 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -32,11 +32,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <GL/GLShader.h>
 
 #include <Polyhedron.h>
-
-/* Forward declarations: */
-namespace Vrui {
-class DisplayState;
-}
 
 class Raycaster:public GLObject
 	{
@@ -77,7 +72,7 @@ class Raycaster:public GLObject
 		virtual ~DataItem(void);
 		
 		/* Methods: */
-		virtual void initDepthBuffer(const Vrui::DisplayState& displayState); // Creates the depth texture and framebuffer based on current OpenGL state and copies the current depth buffer contents
+		virtual void initDepthBuffer(const int* windowSize); // Creates the depth texture and framebuffer based on current OpenGL state and copies the current depth buffer contents
 		};
 	
 	/* Elements: */

@@ -3,7 +3,7 @@ SlicedMultiCurvilinear - Base class for vertex-centered multi-block
 curvilinear data sets containing arbitrary numbers of independent scalar
 fields, combined into vector and/or tensor fields using special value
 extractors.
-Copyright (c) 2008-2014 Oliver Kreylos
+Copyright (c) 2008-2011 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -130,6 +130,8 @@ class SlicedMultiCurvilinear
 	/* Data set interface classes: */
 	typedef LinearIndexID VertexID;
 	
+	class Cell;
+	
 	class Vertex // Class to represent and iterate through vertices
 		{
 		friend class SlicedMultiCurvilinear;
@@ -200,6 +202,8 @@ class SlicedMultiCurvilinear
 	typedef LinearIndexID EdgeID; // Class to identify cell edges
 	
 	typedef LinearIndexID CellID; // Class to identify cells
+	
+	class Locator;
 	
 	class Cell // Class to represent and iterate through cells
 		{

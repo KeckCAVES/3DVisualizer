@@ -1,7 +1,7 @@
 /***********************************************************************
 ColorBar - A widget to display color bars with tick marks and numerical
 values.
-Copyright (c) 2008-2013 Oliver Kreylos
+Copyright (c) 2008 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -131,7 +131,6 @@ void ColorBar::layout(void)
 
 ColorBar::ColorBar(const char* sName,Container* sParent,GLfloat sColorBarHeight,int sTickMarkLabelPrecision,int sNumTickMarks,bool sManageChild)
 	:Widget(sName,sParent,false),
-	 GLObject(false),
 	 colorBarHeight(sColorBarHeight),
 	 valueMin(0.0),valueMax(1.0),
 	 colorMap(0),
@@ -162,8 +161,6 @@ ColorBar::ColorBar(const char* sName,Container* sParent,GLfloat sColorBarHeight,
 	/* Manage me: */
 	if(sManageChild)
 		manageChild();
-	
-	GLObject::init();
 	}
 
 ColorBar::~ColorBar(void)

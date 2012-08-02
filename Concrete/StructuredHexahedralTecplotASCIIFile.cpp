@@ -213,7 +213,6 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 		DS::Grid& grid=dataSet.getGrid(gridIndex);
 		
 		/* Read all grid vertices and scalar values for the zone: */
-		parser.setWhitespace('\n',false);
 		int index0Start=0;
 		int index0End=numZoneVertices[0];
 		int index0Inc=1;
@@ -224,10 +223,9 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 			index0Inc=-1;
 			}
 		DS::Index index;
-		size_t line=1;
 		for(index[0]=index0Start;index[0]!=index0End;index[0]+=index0Inc)
 			for(index[1]=0;index[1]<numZoneVertices[1];++index[1])
-				for(index[2]=0;index[2]<numZoneVertices[2];++index[2],++line)
+				for(index[2]=0;index[2]<numZoneVertices[2];++index[2])
 					{
 					/* Parse the line: */
 					try
@@ -238,7 +236,7 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 						}
 					catch(std::runtime_error err)
 						{
-						Misc::throwStdErr("StructuredHexahedralTecplotASCIIFile::load: %s while reading zone from file %s at vertex (%d, %d, %d) in line %u",err.what(),dataFileName,index[0],index[1],index[2],(unsigned int)line);
+						Misc::throwStdErr("StructuredHexahedralTecplotASCIIFile::load: %s while reading zone from file %s",err.what(),dataFileName);
 						}
 					
 					/* Extract and store the vertex position: */
@@ -263,7 +261,6 @@ Visualization::Abstract::DataSet* StructuredHexahedralTecplotASCIIFile::load(con
 						dataSet.getVertexValue(vectorSliceIndices[i*4+3],gridIndex,index)=vector.mag();
 						}
 					}
-		parser.setWhitespace('\n',true);
 		if(master)
 			std::cout<<" done"<<std::endl;
 		
