@@ -286,7 +286,7 @@ VolumeRenderer<DataSetWrapperParam>::glRenderAction(
 	/* Render the volume: */
 	renderer->setSliceCenter(PaletteRenderer::Point::origin);
 	renderer->setColorMap(&privateColorMap);
-	renderer->renderBlock(contextData,viewDirection);
+	renderer->renderBlock(renderState.getContextData(),viewDirection);
 	
 	/* Reset OpenGL state: */
 	if(!alphaTestEnabled)
