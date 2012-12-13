@@ -2,7 +2,7 @@
 CitcomSGlobalASCIIFile - Class reading ASCII files produced by parallel
 global CitcomS simulations. These are the uncombined files produced by
 each CPU in a parallel run.
-Copyright (c) 2008-2011 Oliver Kreylos
+Copyright (c) 2008-2012 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -133,6 +133,7 @@ Visualization::Abstract::DataSet* CitcomSGlobalASCIIFile::load(const std::vector
 			coordFileName.append(".coord.");
 			coordFileName.append(Misc::ValueCoder<int>::encode(cpuLinearIndex));
 			IO::ValueSource coordReader(openFile(coordFileName,pipe));
+			coordReader.skipWs();
 			
 			/* Read and check the header line: */
 			try
@@ -245,7 +246,7 @@ Visualization::Abstract::DataSet* CitcomSGlobalASCIIFile::load(const std::vector
 					std::cout<<"Reading vector variable "<<*argIt<<"...   0%"<<std::flush;
 				
 				/* Add seven new slices to the data set (3 components spherical and Cartesian each plus Cartesian magnitude): */
-				static const char* componentNames[7]={" Colatitude"," Longitude"," Radius"," X"," Y"," Z"};
+				static const char* componentNames[7]={" Colatitude"," Longitude"," Radius"," X"," Y"," Z"," Magnitude"};
 				for(int i=0;i<7;++i)
 					{
 					dataSet.addSlice();
@@ -306,6 +307,7 @@ Visualization::Abstract::DataSet* CitcomSGlobalASCIIFile::load(const std::vector
 					dataValueFileName.push_back('.');
 					dataValueFileName.append(Misc::ValueCoder<int>::encode(timeStepIndex));
 					IO::ValueSource dataValueReader(openFile(dataValueFileName,pipe));
+					dataValueReader.skipWs();
 					
 					/* Read and check the header line(s) in the data value file: */
 					try
