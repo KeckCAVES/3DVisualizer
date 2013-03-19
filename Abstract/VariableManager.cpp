@@ -101,6 +101,13 @@ void VariableManager::prepareScalarVariable(int scalarVariableIndex)
 	/* Calculate the scalar extractor's value range: */
 	sv.valueRange=dataSet->calcScalarValueRange(sv.scalarExtractor);
 	
+	/* Check for and correct an empty value range: */
+	if(sv.valueRange.first==sv.valueRange.second)
+		{
+		sv.valueRange.first-=1.0;
+		sv.valueRange.second+=1.0;
+		}
+	
 	/* Create a 256-entry OpenGL color map for rendering: */
 	sv.colorMap=new GLColorMap(GLColorMap::GREYSCALE|GLColorMap::RAMP_ALPHA,1.0f,1.0f,sv.valueRange.first,sv.valueRange.second);
 	++sv.colorMapVersion;
