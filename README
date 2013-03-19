@@ -1,6 +1,6 @@
 ========================================================================
-README for 3D Visualizer version 1.12
-Copyright (c) 2005-2012 Oliver Kreylos
+README for 3D Visualizer version 1.13
+Copyright (c) 2005-2013 Oliver Kreylos
 ========================================================================
 
 Overview
@@ -28,7 +28,7 @@ Science Foundation.
 Requirements
 ============
 
-3D Visualizer version 1.12 requires Vrui version 2.5 build 001 or newer.
+3D Visualizer version 1.13 requires Vrui version 2.5 build 001 or newer.
 To read images in PNG, JPEG, or TIFF formats, libpng, libjpeg, or
 libtiff have to be installed, respectively, and Vrui has to be
 configured with support for these image formats (see Vrui README file).

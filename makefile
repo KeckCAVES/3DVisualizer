@@ -1,7 +1,7 @@
 ########################################################################
 # Makefile for 3D Visualizer, a generic visualization program for 3D
 # multivariate gridded data.
-# Copyright (c) 1999-2012 Oliver Kreylos
+# Copyright (c) 1999-2013 Oliver Kreylos
 #
 # This file is part of the WhyTools Build Environment.
 # 
@@ -25,7 +25,7 @@
 # matches the default Vrui installation; if Vrui's installation
 # directory was changed during Vrui's installation, the directory below
 # must be adapted.
-VRUI_MAKEDIR := $(HOME)/Vrui-2.5/share/make
+VRUI_MAKEDIR := $(HOME)/Vrui-2.7/share/make
 ifdef DEBUG
   VRUI_MAKEDIR := $(VRUI_MAKEDIR)/debug
 endif
@@ -105,7 +105,7 @@ PACKAGEROOT := $(shell pwd)
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.12
+VERSION = 1.13
 
 # Set up resource directories: */
 PLUGINSDIREXT = 3DVisualizer-$(VERSION)
@@ -276,6 +276,7 @@ VISUALIZER_SOURCES = $(ABSTRACT_SOURCES) \
                      Visualizer.cpp
 ifneq ($(USE_SHADERS),0)
   VISUALIZER_SOURCES += TwoSidedSurfaceShader.cpp \
+                        TwoSided1DTexturedSurfaceShader.cpp \
                         Polyhedron.cpp \
                         Raycaster.cpp \
                         SingleChannelRaycaster.cpp \
