@@ -1,7 +1,7 @@
 /***********************************************************************
 ExtractorLocator - Class for locators applying visualization algorithms
 to data sets.
-Copyright (c) 2005-2012 Oliver Kreylos
+Copyright (c) 2005-2013 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -62,7 +62,7 @@ class ExtractorLocator:public BaseLocator,public Extractor
 	
 	/* Constructors and destructors: */
 	public:
-	ExtractorLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,Algorithm* sExtractor,Misc::ConfigurationFileSection* cfg =0);
+	ExtractorLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,Algorithm* sExtractor,const Misc::ConfigurationFileSection* cfg =0);
 	virtual ~ExtractorLocator(void);
 	
 	/* Methods from Vrui::LocatorToolAdapter: */

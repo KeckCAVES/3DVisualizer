@@ -38,7 +38,7 @@ class CuttingPlaneLocator:public BaseLocator
 	
 	/* Constructors and destructors: */
 	public:
-	CuttingPlaneLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg =0);
+	CuttingPlaneLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,const Misc::ConfigurationFileSection* cfg =0);
 	virtual ~CuttingPlaneLocator(void);
 	
 	/* Methods from Vrui::LocatorToolAdapter: */

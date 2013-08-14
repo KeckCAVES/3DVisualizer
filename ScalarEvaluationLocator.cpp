@@ -43,7 +43,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 Methods of class ScalarEvaluationLocator:
 ****************************************/
 
-ScalarEvaluationLocator::ScalarEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg)
+ScalarEvaluationLocator::ScalarEvaluationLocator(Vrui::LocatorTool* sLocatorTool,Visualizer* sApplication,const Misc::ConfigurationFileSection* cfg)
 	:EvaluationLocator(sLocatorTool,sApplication,""),
 	 scalarExtractor(0),
 	 valueValid(false)

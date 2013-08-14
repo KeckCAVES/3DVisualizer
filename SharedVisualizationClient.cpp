@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <iostream>
 #include <Comm/NetPipe.h>
 #include <Cluster/MulticastPipe.h>
-#include <GL/GLContextData.h>
 #include <Vrui/Vrui.h>
 
 #include <Abstract/VariableManager.h>
@@ -92,19 +91,6 @@ SharedVisualizationClient::RemoteClientState::~RemoteClientState(void)
 	/* Delete all remote locators: */
 	for(RemoteLocatorHash::Iterator lIt=locators.begin();!lIt.isFinished();++lIt)
 		delete lIt->getDest();
-	}
-
-/****************************************************
-Methods of class SharedVisualizationClient::DataItem:
-****************************************************/
-
-SharedVisualizationClient::DataItem::DataItem(void)
-	:currentRenderState(0)
-	{
-	}
-
-SharedVisualizationClient::DataItem::~DataItem(void)
-	{
 	}
 
 /******************************************
@@ -418,6 +404,33 @@ void SharedVisualizationClient::rejectedByServer(void)
 	std::cout<<"SharedVisualizationClient: Server does not support shared Visualizer protocol. Bummer."<<std::endl;
 	}
 
+void SharedVisualizationClient::connectClient(Collaboration::ProtocolClient::RemoteClientState* rcs)
+	{
+	RemoteClientState* myRcs=dynamic_cast<RemoteClientState*>(rcs);
+	if(myRcs==0)
+		Misc::throwStdErr("SharedVisualizationClient::connectClient: Mismatching remote client state object type");
+	
+	/* Add the new remote client object to the list: */
+	Threads::Mutex::Lock clientStatesLock(clientStatesMutex);
+	clientStates.push_back(myRcs);
+	}
+
+void SharedVisualizationClient::disconnectClient(Collaboration::ProtocolClient::RemoteClientState* rcs)
+	{
+	RemoteClientState* myRcs=dynamic_cast<RemoteClientState*>(rcs);
+	if(myRcs==0)
+		Misc::throwStdErr("SharedVisualizationClient::disconnectClient: Mismatching remote client state object type");
+	
+	/* Remove the remote client object from the list: */
+	Threads::Mutex::Lock clientStatesLock(clientStatesMutex);
+	for(std::vector<RemoteClientState*>::iterator csIt=clientStates.begin();csIt!=clientStates.end();++csIt)
+		if(*csIt==rcs)
+			{
+			clientStates.erase(csIt);
+			break;
+			}
+	}
+
 void SharedVisualizationClient::frame(Collaboration::ProtocolClient::RemoteClientState* rcs)
 	{
 	RemoteClientState* myRcs=dynamic_cast<RemoteClientState*>(rcs);
@@ -434,29 +447,6 @@ void SharedVisualizationClient::frame(Collaboration::ProtocolClient::RemoteClien
 			application->elementList->addElement(newElement.getPointer(),lIt->getDest()->getExtractor()->getName());
 		}
 	}
-	}
-
-void SharedVisualizationClient::glRenderAction(const Collaboration::ProtocolClient::RemoteClientState* rcs,GLContextData& contextData) const
-	{
-	const RemoteClientState* myRcs=dynamic_cast<const RemoteClientState*>(rcs);
-	if(myRcs==0)
-		Misc::throwStdErr("SharedVisualizationClient::display: Mismatching remote client state object type");
-	
-	/* Retrieve a pointer to the render state from the context data item: */
-	GLRenderState& renderState=*(contextData.retrieveDataItem<DataItem>(this)->currentRenderState);
-	
-	/* Display the client's remote locators which have opaque current elements: */
-	{
-	Threads::Mutex::Lock locatorLock(myRcs->locatorMutex);
-	for(RemoteLocatorHash::ConstIterator lIt=myRcs->locators.begin();!lIt.isFinished();++lIt)
-		lIt->getDest()->glRenderAction(renderState,false);
-	}
-	}
-
-void SharedVisualizationClient::initContext(GLContextData& contextData) const
-	{
-	/* Create a new data item and associate it with the given OpenGL context: */
-	contextData.addDataItem(this,new DataItem);
 	}
 
 void SharedVisualizationClient::createLocator(ExtractorLocator* locator)
@@ -525,8 +515,16 @@ void SharedVisualizationClient::destroyLocator(ExtractorLocator* locator)
 	}
 	}
 
-void SharedVisualizationClient::associateRenderState(GLContextData& contextData,GLRenderState& renderState) const
+void SharedVisualizationClient::drawLocators(GLRenderState& renderState,bool transparent) const
 	{
-	/* Store a pointer to the render state in the context data item: */
-	contextData.retrieveDataItem<DataItem>(this)->currentRenderState=&renderState;
+	Threads::Mutex::Lock clientStatesLock(clientStatesMutex);
+	for(std::vector<RemoteClientState*>::const_iterator csIt=clientStates.begin();csIt!=clientStates.end();++csIt)
+		{
+		/* Display the client's remote locators: */
+		{
+		Threads::Mutex::Lock locatorLock((*csIt)->locatorMutex);
+		for(RemoteLocatorHash::Iterator lIt=(*csIt)->locators.begin();!lIt.isFinished();++lIt)
+			lIt->getDest()->glRenderAction(renderState,transparent);
+		}
+		}
 	}
