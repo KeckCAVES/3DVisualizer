@@ -838,7 +838,8 @@ Visualizer::Visualizer(int& argc,char**& argv,char**& appDefaults)
 	coordinateTransformer=dataSet->getCoordinateTransformer();
 	
 	/* Set Vrui's application unit: */
-	Vrui::getCoordinateManager()->setUnit(dataSet->getUnit());
+	if(dataSet->getUnit().unit!=Geometry::LinearUnit::UNKNOWN)
+		Vrui::getCoordinateManager()->setUnit(dataSet->getUnit());
 	
 	/* Create cutting planes: */
 	numCuttingPlanes=6;
@@ -1052,22 +1053,19 @@ void Visualizer::frame(void)
 
 void Visualizer::display(GLContextData& contextData) const
 	{
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		{
+		/* Call the collaboration client's display method: */
+		collaborationClient->display(contextData);
+		}
+	#endif
+	
 	/* Create an OpenGL state tracker: */
 	GLRenderState renderState(contextData);
 	
 	/* Prepare the variable manager for a rendering pass: */
 	variableManager->beginRenderPass(renderState);
-	
-	#ifdef VISUALIZER_USE_COLLABORATION
-	if(collaborationClient!=0)
-		{
-		/* Associate the render state with the shared visualization protocol client's context data item: */
-		sharedVisualizationClient->associateRenderState(contextData,renderState);
-		
-		/* Call the collaboration client's display method: */
-		collaborationClient->display(contextData);
-		}
-	#endif
 	
 	/* Highlight all locators: */
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
@@ -1096,6 +1094,10 @@ void Visualizer::display(GLContextData& contextData) const
 	elementList->renderElements(renderState,false);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->renderLocator(renderState);
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		sharedVisualizationClient->drawLocators(renderState,false);
+	#endif
 	
 	if(renderSceneGraphs)
 		{
@@ -1125,6 +1127,10 @@ void Visualizer::display(GLContextData& contextData) const
 	elementList->renderElements(renderState,true);
 	for(BaseLocatorList::const_iterator blIt=baseLocators.begin();blIt!=baseLocators.end();++blIt)
 		(*blIt)->renderLocatorTransparent(renderState);
+	#ifdef VISUALIZER_USE_COLLABORATION
+	if(collaborationClient!=0)
+		sharedVisualizationClient->drawLocators(renderState,true);
+	#endif
 	
 	if(renderDataSet)
 		{

@@ -129,3 +129,7 @@
 - Bumped required Vrui version number to 2.7-001.
 - Improved variable manager to properly handle "empty" scalar value
   ranges.
+
+3D Visualizer 1.14:
+- Improved background frame buffer management in Raycaster.
+- Bumped required Vrui version number to 3.0-002.
