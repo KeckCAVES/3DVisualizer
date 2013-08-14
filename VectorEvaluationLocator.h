@@ -57,7 +57,7 @@ class VectorEvaluationLocator:public EvaluationLocator
 	
 	/* Constructors and destructors: */
 	public:
-	VectorEvaluationLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg =0);
+	VectorEvaluationLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,const Misc::ConfigurationFileSection* cfg =0);
 	virtual ~VectorEvaluationLocator(void);
 	
 	/* Methods from Vrui::LocatorToolAdapter: */

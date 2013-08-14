@@ -51,7 +51,7 @@ class ScalarEvaluationLocator:public EvaluationLocator
 
 	/* Constructors and destructors: */
 	public:
-	ScalarEvaluationLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,Misc::ConfigurationFileSection* cfg =0);
+	ScalarEvaluationLocator(Vrui::LocatorTool* sTool,Visualizer* sApplication,const Misc::ConfigurationFileSection* cfg =0);
 	virtual ~ScalarEvaluationLocator(void);
 
 	/* Methods from Vrui::LocatorToolAdapter: */

@@ -1,5 +1,5 @@
 ========================================================================
-README for 3D Visualizer version 1.13
+README for 3D Visualizer version 1.14
 Copyright (c) 2005-2013 Oliver Kreylos
 ========================================================================
 
@@ -28,10 +28,10 @@ Science Foundation.
 Requirements
 ============
 
-3D Visualizer version 1.13 requires Vrui version 2.5 build 001 or newer.
-To read images in PNG, JPEG, or TIFF formats, libpng, libjpeg, or
-libtiff have to be installed, respectively, and Vrui has to be
-configured with support for these image formats (see Vrui README file).
+3D Visualizer requires Vrui version 3.0 build 002 or newer. To read
+images in PNG, JPEG, or TIFF formats, libpng, libjpeg, or libtiff have
+to be installed, respectively, and Vrui has to be configured with
+support for these image formats (see Vrui README file).
 
 Installation Guide
 ==================
@@ -59,7 +59,7 @@ accounts.
 2. Change into 3D Visualizer base directory:
    > cd 3DVisualizer-<version>
 
-3. Adapt makefile if Vrui installation path is *not* ~/Vrui-2.5 by
+3. Adapt makefile if Vrui installation path is *not* ~/Vrui-3.0 by
    setting the VRUIDIR variable to the correct location. VRUIDIR is
    *not* the directory containing Vrui's sources (and the Vrui README
    file), but the directory specified via the INSTALLDIR variable in

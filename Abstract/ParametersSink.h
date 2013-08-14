@@ -116,7 +116,7 @@ class ArrayWriter:public WriterBase // Generic class for array values that can b
 		}
 	virtual void write(std::string& string) const
 		{
-		string=Misc::FixedArrayValueCoder<Data>::encode(elements,numElements);
+		string=Misc::FixedArrayValueCoder<Data>(numElements).encode(elements);
 		}
 	virtual void write(IO::File& file) const
 		{

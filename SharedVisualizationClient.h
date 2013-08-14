@@ -27,7 +27,6 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #include <vector>
 #include <Misc/HashTable.h>
 #include <Threads/Mutex.h>
-#include <GL/GLObject.h>
 #include <Collaboration/ProtocolClient.h>
 
 #include "SharedVisualizationProtocol.h"
@@ -45,7 +44,7 @@ class GLRenderState;
 class ExtractorLocator;
 class Visualizer;
 
-class SharedVisualizationClient:public Collaboration::ProtocolClient,private SharedVisualizationProtocol,public GLObject
+class SharedVisualizationClient:public Collaboration::ProtocolClient,private SharedVisualizationProtocol
 	{
 	/* Embedded classes: */
 	public:
@@ -118,17 +117,6 @@ class SharedVisualizationClient:public Collaboration::ProtocolClient,private Sha
 	
 	typedef std::vector<LocatorAction> LocatorActionList; // Type for lists of locator actions
 	
-	struct DataItem:public GLObject::DataItem // Structure storing per-OpenGL context state
-		{
-		/* Elements: */
-		public:
-		GLRenderState* currentRenderState; // Render state object associated with the current OpenGL context in the current rendering pass
-		
-		/* Constructors and destructors: */
-		DataItem(void);
-		virtual ~DataItem(void);
-		};
-	
 	/* Elements: */
 	Visualizer* application; // Pointer to the Visualizer application object
 	unsigned int nextLocatorID; // ID to assign to the next local locator
@@ -136,6 +124,8 @@ class SharedVisualizationClient:public Collaboration::ProtocolClient,private Sha
 	LocatorHash locators; // Hash table mapping Visualizer's extractor locators to server locator IDs
 	LocatorActionList actions; // List of locator actions queued up since the last client update
 	unsigned int mostRecentSeedRequestID; // ID of most recently posted seed request
+	mutable Threads::Mutex clientStatesMutex; // Mutex protecting the remote client list
+	std::vector<RemoteClientState*> clientStates; // List of currently connected remote clients
 	
 	/* Private methods: */
 	void receiveRemoteLocator(RemoteClientState* rcs,Comm::NetPipe& pipe); // Creates a new remote locator by reading from the given pipe, and adds it to the hash table
@@ -155,18 +145,16 @@ class SharedVisualizationClient:public Collaboration::ProtocolClient,private Sha
 	virtual bool receiveServerUpdate(ProtocolClient::RemoteClientState* rcs,Comm::NetPipe& pipe);
 	virtual void sendClientUpdate(Comm::NetPipe& pipe);
 	virtual void rejectedByServer(void);
+	virtual void connectClient(ProtocolClient::RemoteClientState* rcs);
+	virtual void disconnectClient(ProtocolClient::RemoteClientState* rcs);
 	virtual void frame(ProtocolClient::RemoteClientState* rcs);
-	virtual void glRenderAction(const ProtocolClient::RemoteClientState* rcs,GLContextData& contextData) const;
-	
-	/* Methods from GLObject: */
-	virtual void initContext(GLContextData& contextData) const;
 	
 	/* New methods: */
 	void createLocator(ExtractorLocator* locator); // Registers a newly created extractor locator
 	void postSeedRequest(ExtractorLocator* locator,unsigned int seedRequestID,Parameters* seedParameters); // Sends a seed request of the given ID for the given locator; client inherits parameter object
 	void postFinalizationRequest(ExtractorLocator* locator,unsigned int finalSeedRequestID); // Notifies server that the given seed request ID is the final one for a current seeding operation on the given locator
 	void destroyLocator(ExtractorLocator* locator); // Unregisters an extractor locator before it is destroyed
-	void associateRenderState(GLContextData& contextData,GLRenderState& renderState) const; // Associates the given render state with the given OpenGL context for subsequent rendering
+	void drawLocators(GLRenderState& renderState,bool transparent) const;
 	};
 
 #endif
