@@ -1,6 +1,6 @@
 /***********************************************************************
 CuttingPlaneLocator - Class for locators rendering cutting planes.
-Copyright (c) 2006-2010 Oliver Kreylos
+Copyright (c) 2006-2014 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

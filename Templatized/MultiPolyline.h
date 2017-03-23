@@ -1,6 +1,6 @@
 /***********************************************************************
 MultiPolyline - Class to represent multiple arbitrary-length polylines.
-Copyright (c) 2007-2011 Oliver Kreylos
+Copyright (c) 2007-2013 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

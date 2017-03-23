@@ -1,7 +1,7 @@
 /***********************************************************************
 VariableManager - Helper class to manage the scalar and vector variables
 that can be extracted from a data set.
-Copyright (c) 2008-2012 Oliver Kreylos
+Copyright (c) 2008-2013 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 

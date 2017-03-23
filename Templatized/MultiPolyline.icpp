@@ -1,6 +1,6 @@
 /***********************************************************************
 MultiPolyline - Class to represent multiple arbitrary-length polylines.
-Copyright (c) 2007-2011 Oliver Kreylos
+Copyright (c) 2007-2013 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -154,12 +154,14 @@ inline
 MultiPolyline<VertexParam>::MultiPolyline(
 	unsigned int sNumPolylines,
 	Cluster::MulticastPipe* sPipe)
-	:numPolylines(sNumPolylines),
+	:GLObject(false),
+	 numPolylines(sNumPolylines),
 	 pipe(sPipe),
 	 version(0),
 	 polylines(new Polyline[numPolylines]),
 	 maxNumVertices(0)
 	{
+	GLObject::init();
 	}
 
 template <class VertexParam>
