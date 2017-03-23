@@ -1,7 +1,7 @@
 /***********************************************************************
 ArrowRake - Class to represent rakes of arrow glyphs as visualization
 elements.
-Copyright (c) 2008-2012 Oliver Kreylos
+Copyright (c) 2008-2013 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -101,6 +101,7 @@ ArrowRake<DataSetWrapperParam>::ArrowRake(
 	unsigned int sNumArrowVertices,
 	Cluster::MulticastPipe* sPipe)
 	:Visualization::Abstract::Element(sVariableManager,sParameters),
+	 GLObject(false),
 	 scalarVariableIndex(sScalarVariableIndex),
 	 pipe(sPipe),
 	 rake(sRakeSize),
@@ -112,6 +113,8 @@ ArrowRake<DataSetWrapperParam>::ArrowRake(
 	/* Invalidate all arrows: */
 	for(typename Rake::iterator rIt=rake.begin();rIt!=rake.end();++rIt)
 		rIt->valid=false;
+	
+	GLObject::init();
 	}
 
 template <class DataSetWrapperParam>

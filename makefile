@@ -1,7 +1,7 @@
 ########################################################################
 # Makefile for 3D Visualizer, a generic visualization program for 3D
 # multivariate gridded data.
-# Copyright (c) 1999-2013 Oliver Kreylos
+# Copyright (c) 1999-2017 Oliver Kreylos
 #
 # This file is part of the WhyTools Build Environment.
 # 
@@ -25,7 +25,7 @@
 # matches the default Vrui installation; if Vrui's installation
 # directory was changed during Vrui's installation, the directory below
 # must be adapted.
-VRUI_MAKEDIR := $(HOME)/Vrui-3.0/share/make
+VRUI_MAKEDIR := /usr/local/share/Vrui-4.2/make
 ifdef DEBUG
   VRUI_MAKEDIR := $(VRUI_MAKEDIR)/debug
 endif
@@ -105,7 +105,7 @@ PACKAGEROOT := $(shell pwd)
 # subsequent release versions of 3D Visualizer from clobbering each
 # other. The value should be identical to the major.minor version
 # number found in VERSION in the root package directory.
-VERSION = 1.14
+VERSION = 1.15
 
 # Set up resource directories: */
 PLUGINSDIREXT = 3DVisualizer-$(VERSION)
@@ -412,4 +412,3 @@ endif
 plugins-install: $(COLLABORATIONPLUGINS)
 	@echo Installing 3D Visualizer collaboration server plugin in $(COLLABORATIONPLUGININSTALLDIR)
 	@install $(COLLABORATIONPLUGINS) $(COLLABORATIONPLUGININSTALLDIR)
-

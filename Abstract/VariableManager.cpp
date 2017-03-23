@@ -1,7 +1,7 @@
 /***********************************************************************
 VariableManager - Helper class to manage the scalar and vector variables
 that can be extracted from a data set.
-Copyright (c) 2008-2012 Oliver Kreylos
+Copyright (c) 2008-2013 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -142,7 +142,8 @@ void VariableManager::savePaletteCallback(Misc::CallbackData* cbData)
 	}
 
 VariableManager::VariableManager(const DataSet* sDataSet,const char* sDefaultColorMapName)
-	:dataSet(sDataSet),
+	:GLObject(false),
+	 dataSet(sDataSet),
 	 defaultColorMapName(0),
 	 scalarVariables(0),
 	 colorBarDialogPopup(0),colorBar(0),
@@ -189,6 +190,8 @@ VariableManager::VariableManager(const DataSet* sDataSet,const char* sDefaultCol
 	/* Initialize the current variable state: */
 	setCurrentScalarVariable(0);
 	setCurrentVectorVariable(0);
+	
+	GLObject::init();
 	}
 
 VariableManager::~VariableManager(void)

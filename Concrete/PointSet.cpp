@@ -1,6 +1,6 @@
 /***********************************************************************
 PointSet - Class to represent and render sets of scattered 3D points.
-Copyright (c) 2005-2012 Oliver Kreylos
+Copyright (c) 2005-2013 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -245,6 +245,7 @@ Methods of class PointSet:
 *************************/
 
 PointSet::PointSet(const char* pointFileName,double flatteningFactor,double scaleFactor)
+	:GLObject(false)
 	{
 	/* Open the point file: */
 	Misc::File pointFile(pointFileName,"rt");
@@ -355,6 +356,8 @@ PointSet::PointSet(const char* pointFileName,double flatteningFactor,double scal
 			}
 		}
 	std::cout<<points.size()<<" points parsed from "<<pointFileName<<std::endl;
+	
+	GLObject::init();
 	}
 
 PointSet::~PointSet(void)

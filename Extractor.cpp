@@ -1,7 +1,7 @@
 /***********************************************************************
 Extractor - Helper class to drive multithreaded incremental or immediate
 extraction of visualization elements from a data set.
-Copyright (c) 2009-2012 Oliver Kreylos
+Copyright (c) 2009-2014 Oliver Kreylos
 
 This file is part of the 3D Data Visualizer (Visualizer).
 
@@ -95,6 +95,7 @@ void* Extractor::masterExtractorThreadMethod(void)
 				/* Start the visualization element: */
 				element.first=extractor->startElement(parameters);
 				element.second=requestID;
+				bool notPosted=true; // Flag whether the element has not been posted to the triple buffer
 				
 				/* Continue extracting the visualization element until it is done: */
 				bool keepGrowing;
@@ -105,7 +106,12 @@ void* Extractor::masterExtractorThreadMethod(void)
 					keepGrowing=!extractor->continueElement(alarm);
 					
 					/* Push this visualization element to the main thread: */
-					trackedElements.postNewValue();
+					if(notPosted)
+						{
+						/* Post the initial piece of the visualization element to the triple buffer: */
+						trackedElements.postNewValue();
+						notPosted=false;
+						}
 					update();
 					
 					/* Check if there is another seed request: */

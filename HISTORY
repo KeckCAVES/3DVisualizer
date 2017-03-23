@@ -133,3 +133,9 @@
 3D Visualizer 1.14:
 - Improved background frame buffer management in Raycaster.
 - Bumped required Vrui version number to 3.0-002.
+
+3D Visualizer 1.15:
+- Adapted 3D Visualizer to recent changes in Vrui API.
+- Bumped required Vrui version number to 4.2-006.
+- Removed several potential race conditions in GL state management that
+  could have caused spurious crashes.
